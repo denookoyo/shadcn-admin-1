@@ -39,10 +39,7 @@ import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
 import { Route as ClerkAuthenticatedUserManagementImport } from './routes/clerk/_authenticated/user-management'
 import { Route as ClerkauthSignUpImport } from './routes/clerk/(auth)/sign-up'
-// ✅ FIXED (if you're using a Clerk Sign In route)
 import { Route as ClerkauthSignInImport } from './routes/clerk/(auth)/sign-in'
-
-import { Route as AuthenticatedWarehousesImport } from './routes/_authenticated/warehouses'
 import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'

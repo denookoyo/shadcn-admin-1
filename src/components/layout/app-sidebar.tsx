@@ -13,7 +13,7 @@ import type { NavLink } from '@/components/layout/types'
 
 // Define allowed URLs with literal types
 const allowedUrls = [
-  "/", "/clerk", "/settings", "/forgot-password", "/otp", "/sign-in", "/sign-in-2", "/sign-up",
+  "/", "/fleets", "/drivers", "/warehouse","/clerk", "/settings", "/forgot-password", "/otp", "/sign-in", "/sign-in-2", "/sign-up",
   "/401", "/403", "/404", "/500", "/503", "/settings/account", "/settings/appearance",
   "/settings/billing", "/settings/integrations", "/settings/notifications", "/settings/security",
   "/settings/team", "/settings/plans", "/settings/profile", "/settings/password", "/settings/email",
