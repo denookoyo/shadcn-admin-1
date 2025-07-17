@@ -27,15 +27,22 @@ import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-passwo
 import { Route as ClerkAuthenticatedRouteImport } from './routes/clerk/_authenticated/route'
 import { Route as ClerkauthRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
+import { Route as AuthenticatedWarehouseIndexImport } from './routes/_authenticated/warehouse/index'
 import { Route as AuthenticatedUsersIndexImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedFleetIndexImport } from './routes/_authenticated/fleet/index'
+import { Route as AuthenticatedDriversIndexImport } from './routes/_authenticated/drivers/index'
+import { Route as AuthenticatedDeliveryIndexImport } from './routes/_authenticated/delivery/index'
 import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
 import { Route as ClerkAuthenticatedUserManagementImport } from './routes/clerk/_authenticated/user-management'
 import { Route as ClerkauthSignUpImport } from './routes/clerk/(auth)/sign-up'
+// ✅ FIXED (if you're using a Clerk Sign In route)
 import { Route as ClerkauthSignInImport } from './routes/clerk/(auth)/sign-in'
+
+import { Route as AuthenticatedWarehousesImport } from './routes/_authenticated/warehouses'
 import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
@@ -138,6 +145,13 @@ const AuthenticatedSettingsRouteRoute = AuthenticatedSettingsRouteImport.update(
   } as any,
 )
 
+const AuthenticatedWarehouseIndexRoute =
+  AuthenticatedWarehouseIndexImport.update({
+    id: '/warehouse/',
+    path: '/warehouse/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexImport.update({
   id: '/users/',
   path: '/users/',
@@ -164,6 +178,26 @@ const AuthenticatedHelpCenterIndexRoute =
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+
+const AuthenticatedFleetIndexRoute = AuthenticatedFleetIndexImport.update({
+  id: '/fleet/',
+  path: '/fleet/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedDriversIndexRoute = AuthenticatedDriversIndexImport.update({
+  id: '/drivers/',
+  path: '/drivers/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedDeliveryIndexRoute = AuthenticatedDeliveryIndexImport.update(
+  {
+    id: '/delivery/',
+    path: '/delivery/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any,
+)
 
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexImport.update({
   id: '/chats/',
@@ -403,6 +437,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatsIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/delivery/': {
+      id: '/_authenticated/delivery/'
+      path: '/delivery'
+      fullPath: '/delivery'
+      preLoaderRoute: typeof AuthenticatedDeliveryIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/drivers/': {
+      id: '/_authenticated/drivers/'
+      path: '/drivers'
+      fullPath: '/drivers'
+      preLoaderRoute: typeof AuthenticatedDriversIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/fleet/': {
+      id: '/_authenticated/fleet/'
+      path: '/fleet'
+      fullPath: '/fleet'
+      preLoaderRoute: typeof AuthenticatedFleetIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
       path: '/help-center'
@@ -429,6 +484,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/warehouse/': {
+      id: '/_authenticated/warehouse/'
+      path: '/warehouse'
+      fullPath: '/warehouse'
+      preLoaderRoute: typeof AuthenticatedWarehouseIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
   }
@@ -464,9 +526,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedDeliveryIndexRoute: typeof AuthenticatedDeliveryIndexRoute
+  AuthenticatedDriversIndexRoute: typeof AuthenticatedDriversIndexRoute
+  AuthenticatedFleetIndexRoute: typeof AuthenticatedFleetIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedWarehouseIndexRoute: typeof AuthenticatedWarehouseIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -474,9 +540,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedDeliveryIndexRoute: AuthenticatedDeliveryIndexRoute,
+  AuthenticatedDriversIndexRoute: AuthenticatedDriversIndexRoute,
+  AuthenticatedFleetIndexRoute: AuthenticatedFleetIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedWarehouseIndexRoute: AuthenticatedWarehouseIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -550,10 +620,14 @@ export interface FileRoutesByFullPath {
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
 }
 
 export interface FileRoutesByTo {
@@ -578,10 +652,14 @@ export interface FileRoutesByTo {
   '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
 }
 
 export interface FileRoutesById {
@@ -611,10 +689,14 @@ export interface FileRoutesById {
   '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/delivery/': typeof AuthenticatedDeliveryIndexRoute
+  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
+  '/_authenticated/fleet/': typeof AuthenticatedFleetIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/warehouse/': typeof AuthenticatedWarehouseIndexRoute
 }
 
 export interface FileRouteTypes {
@@ -644,10 +726,14 @@ export interface FileRouteTypes {
     | '/clerk/user-management'
     | '/apps'
     | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
     | '/help-center'
     | '/settings/'
     | '/tasks'
     | '/users'
+    | '/warehouse'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/clerk'
@@ -671,10 +757,14 @@ export interface FileRouteTypes {
     | '/clerk/user-management'
     | '/apps'
     | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
     | '/help-center'
     | '/settings'
     | '/tasks'
     | '/users'
+    | '/warehouse'
   id:
     | '__root__'
     | '/_authenticated'
@@ -702,10 +792,14 @@ export interface FileRouteTypes {
     | '/clerk/_authenticated/user-management'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
+    | '/_authenticated/delivery/'
+    | '/_authenticated/drivers/'
+    | '/_authenticated/fleet/'
     | '/_authenticated/help-center/'
     | '/_authenticated/settings/'
     | '/_authenticated/tasks/'
     | '/_authenticated/users/'
+    | '/_authenticated/warehouse/'
   fileRoutesById: FileRoutesById
 }
 
@@ -770,9 +864,13 @@ export const routeTree = rootRoute
         "/_authenticated/",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
+        "/_authenticated/delivery/",
+        "/_authenticated/drivers/",
+        "/_authenticated/fleet/",
         "/_authenticated/help-center/",
         "/_authenticated/tasks/",
-        "/_authenticated/users/"
+        "/_authenticated/users/",
+        "/_authenticated/warehouse/"
       ]
     },
     "/clerk": {
@@ -878,6 +976,18 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/chats/index.tsx",
       "parent": "/_authenticated"
     },
+    "/_authenticated/delivery/": {
+      "filePath": "_authenticated/delivery/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/drivers/": {
+      "filePath": "_authenticated/drivers/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/fleet/": {
+      "filePath": "_authenticated/fleet/index.tsx",
+      "parent": "/_authenticated"
+    },
     "/_authenticated/help-center/": {
       "filePath": "_authenticated/help-center/index.tsx",
       "parent": "/_authenticated"
@@ -892,6 +1002,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/users/": {
       "filePath": "_authenticated/users/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/warehouse/": {
+      "filePath": "_authenticated/warehouse/index.tsx",
       "parent": "/_authenticated"
     }
   }

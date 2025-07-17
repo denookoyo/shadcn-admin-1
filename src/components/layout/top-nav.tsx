@@ -8,6 +8,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Truck,
+  Package,
+  AlertCircle,
+  ClipboardList,
+  LayoutDashboard,
+  Settings
+} from 'lucide-react'
 
 interface TopNavProps extends React.HTMLAttributes<HTMLElement> {
   links: {
@@ -45,6 +53,8 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
       </div>
 
       <nav
+        role='navigation'
+        aria-label='Main navigation'
         className={cn(
           'hidden items-center space-x-4 md:flex lg:space-x-6',
           className
@@ -56,8 +66,14 @@ export function TopNav({ className, links, ...props }: TopNavProps) {
             key={`${title}-${href}`}
             to={href}
             disabled={disabled}
-            className={`hover:text-primary text-sm font-medium transition-colors ${isActive ? '' : 'text-muted-foreground'}`}
+            className={`flex items-center gap-2 hover:text-primary text-sm font-medium transition-colors ${isActive ? 'text-primary border-b-2 border-primary' : 'text-muted-foreground'}`}
           >
+            {title === 'Overview' && <LayoutDashboard className='h-4 w-4' />}
+            {title === 'Fleet' && <Truck className='h-4 w-4' />}
+            {title === 'Orders' && <ClipboardList className='h-4 w-4' />}
+            {title === 'Deliveries' && <Package className='h-4 w-4' />}
+            {title === 'Alerts' && <AlertCircle className='h-4 w-4' />}
+            {title === 'Settings' && <Settings className='h-4 w-4' />}
             {title}
           </Link>
         ))}

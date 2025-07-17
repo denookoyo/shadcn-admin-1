@@ -1,54 +1,85 @@
 import {
-  IconBarrierBlock,
   IconBrowserCheck,
-  IconBug,
+ 
   IconChecklist,
-  IconError404,
   IconHelp,
   IconLayoutDashboard,
-  IconLock,
-  IconLockAccess,
+  
   IconMessages,
   IconNotification,
   IconPackages,
   IconPalette,
-  IconServerOff,
   IconSettings,
   IconTool,
   IconUserCog,
-  IconUserOff,
   IconUsers,
+  IconTruckDelivery,
+  IconMapPin,
+  IconRoad,
+  IconBuildingWarehouse,
+  IconReportAnalytics
 } from '@tabler/icons-react'
 import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
-import { ClerkLogo } from '@/assets/clerk-logo'
-import { type SidebarData } from '../types'
+
+interface BaseNavItem {
+  title: string
+  badge?: string
+  icon?: React.ElementType
+  url?: string
+  items?: NavItem[]
+}
+
+type NavItem = BaseNavItem
+
+interface Team {
+  name: string
+  logo: React.ElementType
+  plan: string
+}
+
+interface User {
+  name: string
+  email: string
+  avatar: string
+}
+
+interface NavGroup {
+  title: string
+  items: NavItem[]
+}
+
+interface SidebarData {
+  user: User
+  teams: Team[]
+  navGroups: NavGroup[]
+}
 
 export const sidebarData: SidebarData = {
   user: {
-    name: 'satnaing',
-    email: 'satnaingdev@gmail.com',
-    avatar: '/avatars/shadcn.jpg',
+    name: 'LogiTrack Admin',
+    email: 'admin@logitrack.com',
+    avatar: '/avatars/logistics-admin.jpg',
   },
   teams: [
     {
-      name: 'Shadcn Admin',
+      name: 'FleetOps Ltd',
       logo: Command,
-      plan: 'Vite + ShadcnUI',
+      plan: 'Fleet Management SaaS',
     },
     {
-      name: 'Acme Inc',
+      name: 'Global Couriers',
       logo: GalleryVerticalEnd,
-      plan: 'Enterprise',
+      plan: 'Enterprise Logistics',
     },
     {
-      name: 'Acme Corp.',
+      name: 'Swift Movers',
       logo: AudioWaveform,
-      plan: 'Startup',
+      plan: 'Last-Mile Startup',
     },
   ],
   navGroups: [
     {
-      title: 'General',
+      title: 'Operations',
       items: [
         {
           title: 'Dashboard',
@@ -56,110 +87,60 @@ export const sidebarData: SidebarData = {
           icon: IconLayoutDashboard,
         },
         {
-          title: 'Tasks',
+          title: 'Fleet Status',
+          url: '/fleet',
+          icon: IconTruckDelivery,
+        },
+        {
+          title: 'Delivery Routes',
+          url: '/delivery',
+          icon: IconRoad,
+        },
+        {
+          title: 'Warehouses',
+          url: '/warehouse',
+          icon: IconBuildingWarehouse,
+        },
+        {
+          title: 'Live Map',
+          url: '/map',
+          icon: IconMapPin,
+        },
+      ],
+    },
+    {
+      title: 'Reports & Tools',
+      items: [
+        {
+          title: 'Analytics Reports',
+          url: '/analytics',
+          icon: IconReportAnalytics,
+        },
+        {
+          title: 'Task Scheduler',
           url: '/tasks',
           icon: IconChecklist,
         },
         {
-          title: 'Apps',
-          url: '/apps',
+          title: 'Partner Integration',
+          url: '/partners',
           icon: IconPackages,
         },
         {
-          title: 'Chats',
+          title: 'Messages',
           url: '/chats',
           badge: '3',
           icon: IconMessages,
         },
         {
-          title: 'Users',
+          title: 'Team Members',
           url: '/users',
           icon: IconUsers,
         },
-        {
-          title: 'Secured by Clerk',
-          icon: ClerkLogo,
-          items: [
-            {
-              title: 'Sign In',
-              url: '/clerk/sign-in',
-            },
-            {
-              title: 'Sign Up',
-              url: '/clerk/sign-up',
-            },
-            {
-              title: 'User Management',
-              url: '/clerk/user-management',
-            },
-          ],
-        },
       ],
     },
     {
-      title: 'Pages',
-      items: [
-        {
-          title: 'Auth',
-          icon: IconLockAccess,
-          items: [
-            {
-              title: 'Sign In',
-              url: '/sign-in',
-            },
-            {
-              title: 'Sign In (2 Col)',
-              url: '/sign-in-2',
-            },
-            {
-              title: 'Sign Up',
-              url: '/sign-up',
-            },
-            {
-              title: 'Forgot Password',
-              url: '/forgot-password',
-            },
-            {
-              title: 'OTP',
-              url: '/otp',
-            },
-          ],
-        },
-        {
-          title: 'Errors',
-          icon: IconBug,
-          items: [
-            {
-              title: 'Unauthorized',
-              url: '/401',
-              icon: IconLock,
-            },
-            {
-              title: 'Forbidden',
-              url: '/403',
-              icon: IconUserOff,
-            },
-            {
-              title: 'Not Found',
-              url: '/404',
-              icon: IconError404,
-            },
-            {
-              title: 'Internal Server Error',
-              url: '/500',
-              icon: IconServerOff,
-            },
-            {
-              title: 'Maintenance Error',
-              url: '/503',
-              icon: IconBarrierBlock,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      title: 'Other',
+      title: 'System',
       items: [
         {
           title: 'Settings',
@@ -201,3 +182,5 @@ export const sidebarData: SidebarData = {
     },
   ],
 }
+
+export type { SidebarData, NavGroup, NavItem }
