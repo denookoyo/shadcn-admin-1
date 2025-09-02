@@ -108,7 +108,7 @@ export default function Dashboard() {
 
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2'>
-          <h1 className='text-2xl font-bold tracking-tight'>Product Management</h1>
+          <h1 className='text-2xl font-bold tracking-tight'>Product Management V1</h1>
           <div className='flex items-center space-x-2'>
             <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm() }}>
               <DialogTrigger asChild>
