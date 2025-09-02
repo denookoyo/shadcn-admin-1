@@ -5,11 +5,10 @@ import { createAuthRouter } from '../server/auth.js'
 import { createApiRouter } from '../server/api.js'
 
 const app = express()
-
 app.use(express.json())
-app.use(express.urlencoded({ extended: true })) // handle form posts
+app.use(express.urlencoded({ extended: true })) // handle form-encoded posts
 
-// Log to verify we hit the function
+// quick log to verify hits in Vercel logs
 app.use((req, _res, next) => {
   console.log('[API]', req.method, req.url, req.headers['content-type'])
   next()

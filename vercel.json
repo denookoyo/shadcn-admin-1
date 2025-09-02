@@ -1,8 +1,11 @@
 {
     "version": 2,
-    "routes": [
-      { "src": "^/api/(.*)$", "dest": "api/index.js" },
-      { "src": "^(?!/api/).*", "dest": "dist/index.html" }
+    "framework": null,
+    "buildCommand": "pnpm run build",
+    "outputDirectory": "dist",
+    "rewrites": [
+      { "source": "/api/(.*)", "destination": "/api/index" },
+      { "source": "/(.*)", "destination": "/" }
     ],
     "headers": [
       {
