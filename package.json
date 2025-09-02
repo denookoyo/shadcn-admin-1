@@ -21,7 +21,8 @@
     "prisma:push": "prisma db push",
     "dev:netlify": "netlify dev",
     "serve": "node server/prod.js",
-    "knip": "knip"
+    "knip": "knip",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.31.4",
