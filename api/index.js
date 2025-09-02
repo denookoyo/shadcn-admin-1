@@ -9,6 +9,7 @@ import { createApiRouter } from '../server/api.js'
 const app = express()
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true })) // <-- add this
 
 const authRouter = createAuthRouter()
 const apiRouter = createApiRouter()
