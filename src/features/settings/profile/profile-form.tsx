@@ -1,179 +1,123 @@
 import { z } from 'zod'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link } from '@tanstack/react-router'
-import { cn } from '@/lib/utils'
-import { showSubmittedData } from '@/utils/show-submitted-data'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { db } from '@/lib/data'
+import { useAuthStore } from '@/stores/authStore'
+import { toast } from 'sonner'
 
-const profileFormSchema = z.object({
-  username: z
-    .string()
-    .min(2, {
-      message: 'Username must be at least 2 characters.',
-    })
-    .max(30, {
-      message: 'Username must not be longer than 30 characters.',
-    }),
-  email: z
-    .string({
-      required_error: 'Please select an email to display.',
-    })
-    .email(),
-  bio: z.string().max(160).min(4),
-  urls: z
-    .array(
-      z.object({
-        value: z.string().url({ message: 'Please enter a valid URL.' }),
-      })
-    )
-    .optional(),
+const schema = z.object({
+  name: z.string().min(2, 'Name is too short').max(60).optional(),
+  email: z.string().email(),
+  image: z.string().url().optional().or(z.literal('')),
+  phoneNo: z.string().optional().or(z.literal('')),
+  ABN: z.string().optional().or(z.literal('')),
+  bio: z.string().max(160).optional().or(z.literal('')),
 })
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>
-
-// This can come from your database or API.
-const defaultValues: Partial<ProfileFormValues> = {
-  bio: 'I own a computer.',
-  urls: [
-    { value: 'https://shadcn.com' },
-    { value: 'http://twitter.com/shadcn' },
-  ],
-}
+type Values = z.infer<typeof schema>
 
 export default function ProfileForm() {
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues,
-    mode: 'onChange',
-  })
+  const setUser = useAuthStore((s) => s.auth.setUser)
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', image: '', phoneNo: '', ABN: '', bio: '' } })
 
-  const { fields, append } = useFieldArray({
-    name: 'urls',
-    control: form.control,
-  })
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const me = await db.getMe?.()
+        if (!mounted || !me) return
+        // Reset the form once with fetched data to avoid re-render loops
+        form.reset({
+          name: me.name ?? '',
+          email: me.email,
+          image: me.image ?? '',
+          phoneNo: me.phoneNo ?? '',
+          ABN: me.ABN ?? '',
+          bio: me.bio ?? '',
+        })
+      } catch {}
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function onSubmit(values: Values) {
+    try {
+      const patch = { name: values.name, image: values.image, phoneNo: values.phoneNo, ABN: values.ABN, bio: values.bio }
+      const updated = await db.updateMe?.(patch)
+      if (updated) {
+        setUser(updated)
+        toast.success('Profile updated')
+      }
+    } catch (e) {
+      toast.error('Update failed')
+    }
+  }
 
   return (
     <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit((data) => showSubmittedData(data))}
-        className='space-y-8'
-      >
-        <FormField
-          control={form.control}
-          name='username'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Username</FormLabel>
-              <FormControl>
-                <Input placeholder='shadcn' {...field} />
-              </FormControl>
-              <FormDescription>
-                This is your public display name. It can be your real name or a
-                pseudonym. You can only change this once every 30 days.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name='email'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder='Select a verified email to display' />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value='m@example.com'>m@example.com</SelectItem>
-                  <SelectItem value='m@google.com'>m@google.com</SelectItem>
-                  <SelectItem value='m@support.com'>m@support.com</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                You can manage verified email addresses in your{' '}
-                <Link to='/'>email settings</Link>.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name='bio'
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Bio</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder='Tell us a little bit about yourself'
-                  className='resize-none'
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                You can <span>@mention</span> other users and organizations to
-                link to them.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div>
-          {fields.map((field, index) => (
-            <FormField
-              control={form.control}
-              key={field.id}
-              name={`urls.${index}.value`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className={cn(index !== 0 && 'sr-only')}>
-                    URLs
-                  </FormLabel>
-                  <FormDescription className={cn(index !== 0 && 'sr-only')}>
-                    Add links to your website, blog, or social media profiles.
-                  </FormDescription>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ))}
-          <Button
-            type='button'
-            variant='outline'
-            size='sm'
-            className='mt-2'
-            onClick={() => append({ value: '' })}
-          >
-            Add URL
-          </Button>
-        </div>
-        <Button type='submit'>Update profile</Button>
+      <form onSubmit={form.handleSubmit(onSubmit)} className='space-y-6'>
+        <FormField control={form.control} name='name' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Name</FormLabel>
+            <FormControl>
+              <Input placeholder='Your name' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='email' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Email</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly disabled />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='image' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Avatar URL</FormLabel>
+            <FormControl>
+              <Input placeholder='https://…' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='phoneNo' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Phone</FormLabel>
+            <FormControl>
+              <Input placeholder='+61…' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='ABN' render={({ field }) => (
+          <FormItem>
+            <FormLabel>ABN</FormLabel>
+            <FormControl>
+              <Input placeholder='ABN' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='bio' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Bio</FormLabel>
+            <FormControl>
+              <Textarea placeholder='Tell us a little bit about yourself' className='resize-none' {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <Button type='submit'>Save changes</Button>
       </form>
     </Form>
   )

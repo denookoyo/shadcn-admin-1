@@ -106,6 +106,11 @@ export const sidebarData: SidebarData = {
           url: '/map',
           icon: IconMapPin,
         },
+        {
+          title: 'Seller Orders',
+          url: '/marketplace/dashboard/orders',
+          icon: IconChecklist,
+        },
       ],
     },
     {

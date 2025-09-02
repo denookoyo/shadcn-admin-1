@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/card'
 import AuthLayout from '../auth-layout'
 import { UserAuthForm } from './components/user-auth-form'
+import { GoogleSignInButton } from '../google-signin'
 
 export default function SignIn() {
   return (
@@ -21,7 +22,11 @@ export default function SignIn() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <UserAuthForm />
+          <div className='space-y-4'>
+            <GoogleSignInButton />
+            <div className='text-center text-xs text-muted-foreground'>or continue with email</div>
+            <UserAuthForm />
+          </div>
         </CardContent>
         <CardFooter>
           <p className='text-muted-foreground px-8 text-center text-sm'>

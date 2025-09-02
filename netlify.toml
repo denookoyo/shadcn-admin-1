@@ -1,3 +1,29 @@
+[functions]
+  directory = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-prisma"
+
+[[redirects]]
+  from = "/api/products"
+  to = "/.netlify/functions/products"
+  status = 200
+
+[[redirects]]
+  from = "/api/cart"
+  to = "/.netlify/functions/cart"
+  status = 200
+
+[[redirects]]
+  from = "/api/checkout"
+  to = "/.netlify/functions/checkout"
+  status = 200
+
+[[redirects]]
+  from = "/api/orders"
+  to = "/.netlify/functions/orders"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

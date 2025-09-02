@@ -11,21 +11,23 @@ import { TeamSwitcher } from '@/components/layout/team-switcher'
 import { sidebarData } from './data/sidebar-data'
 import type { NavLink } from '@/components/layout/types'
 
-// Define allowed URLs with literal types
+// Keep URLs within known routes to satisfy router literal types
 const allowedUrls = [
-  "/", "/fleets", "/drivers", "/warehouse","/clerk", "/settings", "/forgot-password", "/otp", "/sign-in", "/sign-in-2", "/sign-up",
-  "/401", "/403", "/404", "/500", "/503", "/settings/account", "/settings/appearance",
-  "/settings/billing", "/settings/integrations", "/settings/notifications", "/settings/security",
-  "/settings/team", "/settings/plans", "/settings/profile", "/settings/password", "/settings/email",
-  "/settings/connected-accounts", "/settings/domains", "/settings/api-keys", "/settings/logs",
-  "/settings/usage", "/settings/support", "/settings/feedback"
+  "/", "/marketplace", "/clerk", "/forgot-password", "/otp", "/sign-in", "/sign-in-2", "/sign-up",
+  "/401", "/403", "/404", "/500", "/503", "/settings", "/apps", "/chats",
+  "/delivery", "/drivers", "/fleet", "/warehouse",
+  "/marketplace/dashboard", "/marketplace/dashboard/orders",
+  "/settings/account", "/settings/appearance", "/settings/billing", "/settings/integrations",
+  "/settings/notifications", "/settings/security", "/settings/team", "/settings/plans", "/settings/profile",
+  "/settings/password", "/settings/email", "/settings/connected-accounts", "/settings/domains",
+  "/settings/api-keys", "/settings/logs", "/settings/usage", "/settings/support", "/settings/feedback"
 ] as const
 
 type AllowedUrl = typeof allowedUrls[number]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible='icon' variant='floating' {...props}>
+    <Sidebar collapsible='icon' {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={sidebarData.teams} />
       </SidebarHeader>

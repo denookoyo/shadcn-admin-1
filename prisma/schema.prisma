@@ -1,0 +1,162 @@
+// Prisma schema for Neon Postgres
+// Uses `DATABASE_URL` from .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  price     Int      // store minor units (e.g., A$229 => 22900) or whole units as per app
+  seller    String
+  rating    Float?
+  type      ProductType
+  img       String
+  ownerId   Int?
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  OrderItems OrderItem[]
+  CartItems  CartItem[]
+}
+
+enum ProductType {
+  goods
+  service
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  buyerId       Int?
+  sellerId      Int?
+  total         Int
+  status        OrderStatus @default(pending)
+  customerName  String?
+  customerEmail String?
+  address       String?
+  customerPhone String?
+  accessCode    String?     @unique
+  createdAt     DateTime    @default(now())
+
+  items OrderItem[]
+
+  buyer  User? @relation("OrderBuyer", fields: [buyerId], references: [id])
+  seller User? @relation("OrderSeller", fields: [sellerId], references: [id])
+  reviews OrderReview[]
+}
+
+enum OrderStatus {
+  pending
+  scheduled
+  paid
+  shipped
+  completed
+  cancelled
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  title     String
+  price     Int
+  quantity  Int
+  appointmentAt DateTime?
+  appointmentStatus String?
+  appointmentAlternates String? // JSON string array of ISO datetimes proposed by seller
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    Int?
+  createdAt DateTime @default(now())
+
+  items CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int      @default(1)
+  meta      String?
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  products  Product[]
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  email      String    @unique
+  name       String?
+  image      String?
+  googleSub  String?   @unique
+  phoneNo    String?   // legacy column in existing DB, keep optional here
+  ABN        String?   // legacy column in existing DB, keep optional here
+  bio        String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  reputation UserReputation?
+  buyerReports  NegativeReport[] @relation("BuyerReports")
+  sellerReports NegativeReport[] @relation("SellerReports")
+
+  sellingOrders Order[] @relation("OrderSeller")
+  buyingOrders  Order[] @relation("OrderBuyer")
+  orderReviewsGiven OrderReview[] @relation("OrderReviewBuyer")
+  orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
+}
+
+model UserReputation {
+  userId        Int     @id
+  negativeCount Int     @default(0)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NegativeReport {
+  id       String   @id @default(cuid())
+  buyerId  Int
+  sellerId Int
+  orderId  String?
+  reason   String
+  createdAt DateTime @default(now())
+
+  buyer  User  @relation("BuyerReports", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller User  @relation("SellerReports", fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+model OrderReview {
+  id        String  @id @default(cuid())
+  orderId   String  @unique
+  buyerId   Int
+  sellerId  Int
+  rating    Int
+  feedback  String
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyer User  @relation("OrderReviewBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  seller User @relation("OrderReviewSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+}

@@ -15,14 +15,10 @@ import { ThemeProvider } from './context/theme-context'
 import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // eslint-disable-next-line no-console
-        if (import.meta.env.DEV) console.log({ failureCount, error })
-
         if (failureCount >= 0 && import.meta.env.DEV) return false
         if (failureCount > 3 && import.meta.env.PROD) return false
 
@@ -98,3 +94,11 @@ if (!rootElement.innerHTML) {
     </StrictMode>
   )
 }
+
+// Attempt to hydrate auth state from server session cookie
+fetch('/api/auth/me')
+  .then((r) => (r.ok ? r.json() : null))
+  .then((user) => {
+    if (user) useAuthStore.getState().auth.setUser(user)
+  })
+  .catch(() => {})
