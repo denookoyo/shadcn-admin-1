@@ -11,7 +11,7 @@ declare global {
 export function GoogleSignInButton() {
   const divRef = useRef<HTMLDivElement | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const clientId = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID) as string | undefined
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID as string | undefined
   const router = useRouter()
 
   useEffect(() => {
@@ -65,6 +65,6 @@ export function GoogleSignInButton() {
     }
   }
 
-  if (!clientId) return <div className='text-sm text-red-600'>Missing GOOGLE_CLIENT_ID</div>
+  if (!clientId) return null
   return <div ref={divRef} />
 }
