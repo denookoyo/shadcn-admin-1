@@ -13,10 +13,17 @@ const FontContext = createContext<FontContextType | undefined>(undefined)
 export const FontProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [font, _setFont] = useState<Font>(() => {
-    const savedFont = localStorage.getItem('font')
-    return fonts.includes(savedFont as Font) ? (savedFont as Font) : fonts[0]
-  })
+  // Avoid accessing localStorage during SSR; hydrate on client
+  const [font, _setFont] = useState<Font>(fonts[0])
+
+  useEffect(() => {
+    try {
+      const savedFont = typeof window !== 'undefined' ? localStorage.getItem('font') : null
+      if (savedFont && fonts.includes(savedFont as Font)) {
+        _setFont(savedFont as Font)
+      }
+    } catch {}
+  }, [])
 
   useEffect(() => {
     const applyFont = (font: string) => {
@@ -31,7 +38,9 @@ export const FontProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [font])
 
   const setFont = (font: Font) => {
-    localStorage.setItem('font', font)
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem('font', font)
+    } catch {}
     _setFont(font)
   }
 

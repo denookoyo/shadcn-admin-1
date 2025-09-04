@@ -26,11 +26,16 @@ export function ThemeProvider({
   storageKey = 'vite-ui-theme',
   ...props
 }: ThemeProviderProps) {
-  const [theme, _setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  )
+  // Do not access localStorage during SSR; hydrate from it on client
+  const [theme, _setTheme] = useState<Theme>(defaultTheme)
 
   useEffect(() => {
+    // Hydrate theme from localStorage, then apply
+    try {
+      const saved = typeof window !== 'undefined' ? (localStorage.getItem(storageKey) as Theme | null) : null
+      if (saved) _setTheme(saved)
+    } catch {}
+
     const root = window.document.documentElement
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
@@ -55,7 +60,9 @@ export function ThemeProvider({
   }, [theme])
 
   const setTheme = (theme: Theme) => {
-    localStorage.setItem(storageKey, theme)
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem(storageKey, theme)
+    } catch {}
     _setTheme(theme)
   }
 
