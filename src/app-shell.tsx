@@ -1,6 +1,6 @@
 'use client'
 
-import { StrictMode, useEffect } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { AxiosError } from 'axios'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
@@ -12,7 +12,7 @@ import { ThemeProvider } from './context/theme-context'
 import { routeTree } from './routeTree.gen'
 
 export function AppShell() {
-  const queryClient = new QueryClient({
+  const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
         retry: (failureCount, error) => {
@@ -43,7 +43,7 @@ export function AppShell() {
         }
       },
     }),
-  })
+  }))
 
   const router = createRouter({ routeTree, context: { queryClient }, defaultPreload: 'intent', defaultPreloadStaleTime: 0 })
 
@@ -69,4 +69,3 @@ export function AppShell() {
     </StrictMode>
   )
 }
-
