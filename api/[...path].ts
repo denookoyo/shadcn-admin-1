@@ -1,6 +1,5 @@
 // Catch-all serverless function to serve all /api/* routes on Vercel
 import express from 'express'
-import serverless from 'serverless-http'
 import { authMiddleware, createAuthRouter } from '../server/auth.js'
 import { createApiRouter } from '../server/api.js'
 
@@ -23,5 +22,7 @@ app.use((req, _res, next) => {
 app.use('/auth', createAuthRouter())
 app.use('/', createApiRouter())
 
-export default serverless(app)
-
+// Export a Node-style handler so Vercel invokes Express directly
+export default function handler(req: any, res: any) {
+  return (app as any)(req, res)
+}
