@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { getPrisma } from '../../../../../../server/prisma.js'
+import { getPrisma } from '../../../../_lib/prisma'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -17,4 +17,3 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: e?.message || 'Internal Error' }, { status: 500 })
   }
 }
-

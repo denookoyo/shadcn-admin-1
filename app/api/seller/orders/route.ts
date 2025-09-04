@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { getPrisma } from '../../../../server/prisma.js'
+import { getPrisma } from '../../_lib/prisma'
 import { getUserFromRequest } from '../../_lib/jwt'
 
 export async function GET(req: NextRequest) {
@@ -24,4 +24,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: e?.message || 'Internal Error' }, { status: 500 })
   }
 }
-

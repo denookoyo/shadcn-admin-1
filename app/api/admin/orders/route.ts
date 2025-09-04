@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPrisma } from '../../../../server/prisma.js'
+import { getPrisma } from '../../_lib/prisma'
 // Auth is required in Express version; here assume any authenticated user; tighten as needed later
 
 export async function GET() {
@@ -15,4 +15,3 @@ export async function GET() {
     return NextResponse.json({ error: e?.message || 'Internal Error' }, { status: 500 })
   }
 }
-

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { OAuth2Client } from 'google-auth-library'
-import { getPrisma } from '../../../../server/prisma.js'
+import { getPrisma } from '../../_lib/prisma'
 import { signSession } from '../../_lib/jwt'
 
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID
@@ -40,4 +40,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message || 'Auth error' }, { status: 500 })
   }
 }
-
