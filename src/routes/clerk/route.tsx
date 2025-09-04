@@ -13,7 +13,7 @@ export const Route = createFileRoute('/clerk')({
 })
 
 // Import your Publishable Key
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const PUBLISHABLE_KEY = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY) as string | undefined
 
 function RouteComponent() {
   if (!PUBLISHABLE_KEY) {
