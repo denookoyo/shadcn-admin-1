@@ -11,10 +11,12 @@
   "version": "1.4.0",
   "type": "module",
   "scripts": {
-    "dev": "node server/dev.js",
-    "build": "tsc -b && vite build",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:vite": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview:vite": "vite preview",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "prisma:generate": "prisma generate",
@@ -25,6 +27,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "next": "^15.0.3",
     "@clerk/clerk-react": "^5.31.4",
     "@hookform/resolvers": "^5.0.1",
     "@netlify/functions": "^4.2.5",
