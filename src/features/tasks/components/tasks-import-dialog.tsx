@@ -22,14 +22,22 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 
+// Avoid referencing FileList at module scope during SSR
+const isFileList = (val: unknown): val is FileList =>
+  typeof FileList !== 'undefined' && val instanceof FileList
+
 const formSchema = z.object({
   file: z
-    .instanceof(FileList)
-    .refine((files) => files.length > 0, {
+    .any()
+    .refine((files) => (typeof FileList === 'undefined' ? true : isFileList(files)), {
+      message: 'Please upload a file',
+    })
+    .refine((files) => (typeof FileList === 'undefined' ? true : (files as FileList).length > 0), {
       message: 'Please upload a file',
     })
     .refine(
-      (files) => ['text/csv'].includes(files?.[0]?.type),
+      (files) =>
+        typeof FileList === 'undefined' ? true : ['text/csv'].includes((files as FileList)?.[0]?.type),
       'Please upload csv format.'
     ),
 })
