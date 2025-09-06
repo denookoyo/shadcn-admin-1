@@ -124,7 +124,7 @@ export default function Dashboard() {
               <DialogTrigger asChild>
                 <Button onClick={() => setOpen(true)}>Add Product</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className='max-h-[85vh] overflow-y-auto'>
                 <DialogHeader>
                   <DialogTitle>{editing ? 'Edit product' : 'Add product'}</DialogTitle>
                 </DialogHeader>
