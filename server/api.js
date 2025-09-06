@@ -717,6 +717,36 @@ export function createApiRouter() {
     }
   })
 
+  // One-off: apply missing Product columns (description TEXT, images TEXT[])
+  // Protected via secret key. Invoke with: POST /api/admin/migrate/product-columns?key=STACK_SECRET_SERVER_KEY
+  router.post('/admin/migrate/product-columns', async (req, res) => {
+    try {
+      const provided = String(req.query.key || req.headers['x-admin-key'] || '')
+      const secret = String(process.env.STACK_SECRET_SERVER_KEY || '')
+      if (!secret || provided !== secret) {
+        return res.status(403).json({ error: 'Forbidden' })
+      }
 
+      const results = []
+      try {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "description" TEXT')
+        results.push({ op: 'add_column', column: 'description', ok: true })
+      } catch (e) {
+        results.push({ op: 'add_column', column: 'description', ok: false, error: e?.message || String(e) })
+      }
+      try {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "images" TEXT[]')
+        results.push({ op: 'add_column', column: 'images', ok: true })
+      } catch (e) {
+        results.push({ op: 'add_column', column: 'images', ok: false, error: e?.message || String(e) })
+      }
+      return res.json({ ok: true, results })
+    } catch (e) {
+      console.error('POST /api/admin/migrate/product-columns error:', e)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  
   return router
 }
