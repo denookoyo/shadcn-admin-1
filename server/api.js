@@ -717,6 +717,71 @@ export function createApiRouter() {
     }
   })
 
+  // AI: generate a marketing description for a product
+  router.post('/ai/description', async (req, res) => {
+    try {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) return res.status(400).json({ error: 'Missing OPENAI_API_KEY' })
+
+      const {
+        title,
+        price,
+        type,
+        categoryName,
+        seller,
+        tone = 'friendly',
+      } = req.body || {}
+
+      if (!title) return res.status(400).json({ error: 'Missing title' })
+
+      const sys = `You are a helpful product copywriter for an online marketplace in Australia. Write concise, persuasive descriptions (120–220 words) with short paragraphs.`
+      const user = `Write a ${tone} product description for the following item:
+
+Name: ${title}
+${Number.isFinite(Number(price)) ? `Price: A$${Number(price)}` : ''}
+${type ? `Type: ${type}` : ''}
+${categoryName ? `Category: ${categoryName}` : ''}
+${seller ? `Seller: ${seller}` : ''}
+
+Guidelines:
+- Open with a strong single-sentence hook
+- Summarise key benefits (not just features)
+- Use clear, simple language; no hype words like “best ever”
+- Add a short scannable list of 3 benefit bullets
+- End with a one‑line call to action
+
+Output as plain text with paragraphs separated by a blank line. Include the 3 bullets as a dash list.`
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: sys },
+            { role: 'user', content: user },
+          ],
+          temperature: 0.7,
+          max_tokens: 350,
+        }),
+      })
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '')
+        return res.status(500).json({ error: 'OpenAI error', detail: text })
+      }
+      const data = await resp.json()
+      const content = data?.choices?.[0]?.message?.content?.trim?.() || ''
+      return res.json({ description: content })
+    } catch (e) {
+      console.error('POST /api/ai/description error:', e)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
   // One-off: apply missing Product columns (description TEXT, images TEXT[])
   // Protected via secret key. Invoke with: POST /api/admin/migrate/product-columns?key=STACK_SECRET_SERVER_KEY
   router.post('/admin/migrate/product-columns', async (req, res) => {

@@ -42,6 +42,7 @@ export default function Dashboard() {
     slug: '',
     categoryId: '' as string,
   })
+  const [generating, setGenerating] = useState(false)
   const [catDialog, setCatDialog] = useState(false)
   const [catForm, setCatForm] = useState({ name: '', slug: '' })
   const [catEditingId, setCatEditingId] = useState<string | null>(null)
@@ -132,7 +133,7 @@ export default function Dashboard() {
                     <Label htmlFor='title'>Title</Label>
                     <Input id='title' value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: slugify(e.target.value) })} />
                   </div>
-                  <div className='grid gap-3 md:grid-cols-3'>
+                <div className='grid gap-3 md:grid-cols-3'>
                     <div>
                       <Label htmlFor='price'>Price (A$)</Label>
                       <Input id='price' type='number' value={form.price} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} />
@@ -181,6 +182,33 @@ export default function Dashboard() {
                     <textarea id='description' className='mt-1 w-full rounded-md border px-3 py-2 text-sm' rows={6}
                       value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                    <div className='mt-2 flex items-center gap-2'>
+                      <Button type='button' variant='outline' disabled={generating}
+                        onClick={async () => {
+                          setGenerating(true)
+                          try {
+                            const catName = categories.find((c) => c.id === form.categoryId)?.name
+                            const r = await fetch('/api/ai/description', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                title: form.title,
+                                price: Number(form.price) || undefined,
+                                type: form.type,
+                                seller: form.seller,
+                                categoryName: catName,
+                              }),
+                            })
+                            if (r.ok) {
+                              const j = await r.json()
+                              if (j?.description) setForm((f) => ({ ...f, description: j.description }))
+                            }
+                          } catch {}
+                          setGenerating(false)
+                        }}
+                      >{generating ? 'Generating…' : 'Generate with AI'}</Button>
+                      <span className='text-xs text-gray-500'>Uses your OpenAI key</span>
+                    </div>
                     <div className='mt-2 rounded-md border p-3'>
                       <div className='mb-1 text-xs font-semibold text-gray-500'>Preview</div>
                       <div className='prose prose-sm max-w-none'>
