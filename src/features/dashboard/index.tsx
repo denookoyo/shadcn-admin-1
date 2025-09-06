@@ -72,16 +72,21 @@ export default function Dashboard() {
   }
 
   async function handleSave() {
+    const imagesArr = (form.images || '')
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+
     const payload = {
       title: form.title,
       price: Number(form.price) || 0,
       type: form.type,
       seller: form.seller || 'You',
       img: form.img,
-      images: form.images,
-      description: form.description,
       slug: form.slug || slugify(form.title),
       categoryId: form.categoryId || undefined,
+      ...(imagesArr.length ? { images: imagesArr } : {}),
+      ...(form.description ? { description: form.description } : {}),
     }
     if (editing) {
       const updated = await db.updateProduct(editing.id, payload)
