@@ -41,6 +41,12 @@ export type DataAPI = {
   rateNegative?: (id: number, reason: string) => Promise<{ negativeCount: number; rating: number }>
   // Reviews
   listSellerReviews?: (sellerId: number) => Promise<{ avg: number; count: number; histogram: Record<number, number>; reviews: { orderId: string; rating: number; feedback: string; createdAt: string; buyer?: { id: number; name?: string | null; email: string; image?: string | null } }[] }>
+  // Blog
+  listBlogPosts?: (authorId?: number) => Promise<{ id: string; slug: string; title: string; coverImage?: string | null; tags?: string[]; createdAt: string; published: boolean; authorId?: number | null }[]>
+  getBlogPostBySlug?: (slug: string) => Promise<any>
+  createBlogPost?: (input: { title: string; slug: string; content: string; coverImage?: string; tags?: string[]; published?: boolean }) => Promise<any>
+  updateBlogPost?: (id: string, patch: Partial<{ title: string; slug: string; content: string; coverImage?: string | null; tags?: string[]; published?: boolean }>) => Promise<any>
+  deleteBlogPost?: (id: string) => Promise<void>
 }
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -168,6 +174,22 @@ const api: DataAPI = {
   },
   async listSellerReviews(sellerId: number) {
     return http<{ avg: number; count: number; histogram: Record<number, number>; reviews: { orderId: string; rating: number; feedback: string; createdAt: string; buyer?: { id: number; name?: string | null; email: string; image?: string | null } }[] }>(`/api/users/${sellerId}/reviews`)
+  },
+  async listBlogPosts(authorId?: number) {
+    const q = authorId ? `?authorId=${authorId}` : ''
+    return http<any[]>(`/api/blog/posts${q}`)
+  },
+  async getBlogPostBySlug(slug: string) {
+    return http<any>(`/api/blog/posts/${encodeURIComponent(slug)}`)
+  },
+  async createBlogPost(input: { title: string; slug: string; content: string; coverImage?: string; tags?: string[]; published?: boolean }) {
+    return http<any>('/api/blog/posts', { method: 'POST', body: JSON.stringify(input) })
+  },
+  async updateBlogPost(id: string, patch: Partial<{ title: string; slug: string; content: string; coverImage?: string | null; tags?: string[]; published?: boolean }>) {
+    return http<any>(`/api/blog/posts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) })
+  },
+  async deleteBlogPost(id: string) {
+    await http<void>(`/api/blog/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
 }
 
