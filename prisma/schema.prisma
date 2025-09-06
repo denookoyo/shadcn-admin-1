@@ -127,6 +127,7 @@ model User {
   buyingOrders  Order[] @relation("OrderBuyer")
   orderReviewsGiven OrderReview[] @relation("OrderReviewBuyer")
   orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
+  blogPosts BlogPost[]
 }
 
 model BlogPost {
