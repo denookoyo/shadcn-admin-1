@@ -730,11 +730,15 @@ export function createApiRouter() {
         categoryName,
         seller,
         tone = 'friendly',
+        existing,
+        existingDescription,
+        description,
       } = req.body || {}
 
       if (!title) return res.status(400).json({ error: 'Missing title' })
 
       const sys = `You are a helpful product copywriter for an online marketplace in Australia. Write concise, persuasive descriptions (120–220 words) with short paragraphs.`
+      const existingNotes = String(existing || existingDescription || description || '').trim()
       const user = `Write a ${tone} product description for the following item:
 
 Name: ${title}
@@ -742,6 +746,7 @@ ${Number.isFinite(Number(price)) ? `Price: A$${Number(price)}` : ''}
 ${type ? `Type: ${type}` : ''}
 ${categoryName ? `Category: ${categoryName}` : ''}
 ${seller ? `Seller: ${seller}` : ''}
+${existingNotes ? `\nExisting notes/details (incorporate and improve):\n${existingNotes}` : ''}
 
 Guidelines:
 - Open with a strong single-sentence hook

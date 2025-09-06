@@ -197,6 +197,7 @@ export default function Dashboard() {
                                 type: form.type,
                                 seller: form.seller,
                                 categoryName: catName,
+                                existing: form.description,
                               }),
                             })
                             if (r.ok) {
