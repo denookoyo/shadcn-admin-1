@@ -129,6 +129,20 @@ model User {
   orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
 }
 
+model BlogPost {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  title      String
+  content    String   // markdown/plain text
+  coverImage String?
+  tags       String[]
+  published  Boolean  @default(false)
+  authorId   Int?
+  author     User?    @relation(fields: [authorId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
 model UserReputation {
   userId        Int     @id
   negativeCount Int     @default(0)

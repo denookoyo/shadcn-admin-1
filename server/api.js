@@ -717,6 +717,83 @@ export function createApiRouter() {
     }
   })
 
+  // Blog: list published posts or author posts
+  router.get('/blog/posts', async (req, res) => {
+    try {
+      const author = req.query.authorId ? Number(req.query.authorId) : undefined
+      const where = author ? { authorId: author } : { published: true }
+      const posts = await prisma.blogPost.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, slug: true, title: true, coverImage: true, tags: true, createdAt: true, published: true, authorId: true },
+      })
+      res.json(posts)
+    } catch (e) {
+      console.error('GET /api/blog/posts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Blog: fetch by slug
+  router.get('/blog/posts/:slug', async (req, res) => {
+    try {
+      const slug = String(req.params.slug)
+      const post = await prisma.blogPost.findUnique({ where: { slug } })
+      if (!post || (!post.published && !req.user?.uid)) return res.status(404).json({ error: 'Not found' })
+      res.json(post)
+    } catch (e) {
+      console.error('GET /api/blog/posts/:slug error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Blog: create new post
+  router.post('/blog/posts', ensureAuth, async (req, res) => {
+    try {
+      const { title, slug, content, coverImage, tags = [], published = false } = req.body || {}
+      if (!title || !slug || !content) return res.status(400).json({ error: 'Missing required fields' })
+      const data = { title, slug, content, coverImage: coverImage || null, tags: Array.isArray(tags) ? tags : [], published: !!published, authorId: req.user?.uid ? Number(req.user.uid) : null }
+      const created = await prisma.blogPost.create({ data })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/blog/posts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Blog: update post by id
+  router.put('/blog/posts/:id', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id)
+      const { title, slug, content, coverImage, tags, published } = req.body || {}
+      const data = {
+        title: title ?? undefined,
+        slug: slug ?? undefined,
+        content: content ?? undefined,
+        coverImage: coverImage === undefined ? undefined : (coverImage || null),
+        tags: Array.isArray(tags) ? tags : undefined,
+        published: typeof published === 'boolean' ? published : undefined,
+      }
+      const updated = await prisma.blogPost.update({ where: { id }, data })
+      res.json(updated)
+    } catch (e) {
+      console.error('PUT /api/blog/posts/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Blog: delete post
+  router.delete('/blog/posts/:id', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id)
+      await prisma.blogPost.delete({ where: { id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/blog/posts/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
   // AI: generate a marketing description for a product
   router.post('/ai/description', async (req, res) => {
     try {
