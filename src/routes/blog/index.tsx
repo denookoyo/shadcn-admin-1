@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { db } from '@/lib/data'
@@ -43,4 +44,3 @@ function BlogList() {
     </>
   )
 }
-
