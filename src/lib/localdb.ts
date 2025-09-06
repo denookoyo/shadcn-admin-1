@@ -12,8 +12,8 @@ export type Product = {
   rating?: number
   type: ProductType
   img: string
-  images?: string[]
   description?: string
+  images?: string[]
   ownerId?: string
   categoryId?: string
 }

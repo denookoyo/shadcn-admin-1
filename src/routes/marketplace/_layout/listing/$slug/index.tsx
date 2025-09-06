@@ -24,18 +24,15 @@ function ListingDetail() {
   // const [reviewsLoading, setReviewsLoading] = useState(false)
   // const [reviewsData, setReviewsData] = useState<{ avg: number; count: number; histogram: Record<number, number>; reviews: { orderId: string; rating: number; feedback: string; createdAt: string; buyer?: { id: number; name?: string | null; email: string; image?: string | null } }[] } | null>(null)
 
-  const images = useMemo(
-    () =>
-      product
-        ? [
-            product.img,
-            imageFor(`${product.title} detail texture`, 600, 400),
-            imageFor(`${product.title} accessories`, 600, 400),
-            imageFor(`${product.title} lifestyle`, 600, 400),
-          ]
-        : [],
-    [product]
-  )
+  const images = useMemo(() => {
+    if (!product) return [] as string[]
+    const extra = ((product as any).images as string[] | undefined)?.filter(Boolean) || []
+    const base = [product.img, ...extra]
+    if (base.length >= 4) return base.slice(0, 4)
+    const needed = 4 - base.length
+    const pads = Array.from({ length: needed }, (_, i) => imageFor(`${product.title} ${i + 1}`, 600, 400))
+    return [...base, ...pads]
+  }, [product])
 
   const bullets = useMemo(
     () => [
@@ -175,9 +172,15 @@ function ListingDetail() {
 
           <div>
             <h3 className="mb-2 font-semibold">About this item</h3>
-            <ul className="list-inside list-disc text-sm text-gray-700">
-              {bullets.map((b, i) => <li key={i}>{b}</li>)}
-            </ul>
+            {((product as any).description) ? (
+              <div className='prose prose-sm max-w-none text-gray-700'>
+                {String((product as any).description).split(/\n\n+/).map((p: string, i: number) => (<p key={i}>{p}</p>))}
+              </div>
+            ) : (
+              <ul className="list-inside list-disc text-sm text-gray-700">
+                {bullets.map((b, i) => <li key={i}>{b}</li>)}
+              </ul>
+            )}
           </div>
         </div>
       </div>

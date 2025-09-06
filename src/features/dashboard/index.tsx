@@ -37,6 +37,8 @@ export default function Dashboard() {
     type: 'goods' as Product['type'],
     seller: 'You',
     img: '',
+    images: '' as string,
+    description: '' as string,
     slug: '',
     categoryId: '' as string,
   })
@@ -65,7 +67,7 @@ export default function Dashboard() {
   const totalRevenue = useMemo(() => orders.reduce((a, o) => a + o.total, 0), [orders])
 
   function resetForm() {
-    setForm({ title: '', price: 0, type: 'goods', seller: 'You', img: '', slug: '', categoryId: '' })
+    setForm({ title: '', price: 0, type: 'goods', seller: 'You', img: '', images: '', description: '', slug: '', categoryId: '' })
     setEditing(null)
   }
 
@@ -76,6 +78,8 @@ export default function Dashboard() {
       type: form.type,
       seller: form.seller || 'You',
       img: form.img,
+      images: form.images,
+      description: form.description,
       slug: form.slug || slugify(form.title),
       categoryId: form.categoryId || undefined,
     }
@@ -139,6 +143,17 @@ export default function Dashboard() {
                       <Label htmlFor='seller'>Seller</Label>
                       <Input id='seller' value={form.seller} onChange={(e) => setForm({ ...form, seller: e.target.value })} />
                     </div>
+                    <div className='md:col-span-3'>
+                      <Label htmlFor='images'>Additional image URLs (comma or newline separated)</Label>
+                      <textarea id='images' className='mt-1 w-full rounded-md border px-3 py-2 text-sm' rows={3}
+                        value={form.images}
+                        onChange={(e) => setForm({ ...form, images: e.target.value })} />
+                      <div className='mt-2 flex flex-wrap gap-2'>
+                        {form.images.split(/\n|,/).map((u) => u.trim()).filter(Boolean).slice(0,4).map((u,i)=> (
+                          <img key={i} src={u} alt={`preview-${i}`} className='h-16 w-16 rounded-md object-cover' />
+                        ))}
+                      </div>
+                    </div>
                     <div className='md:col-span-3 grid grid-cols-3 gap-3 items-end'>
                       <div className='col-span-2'>
                         <Label htmlFor='category'>Category</Label>
@@ -155,6 +170,18 @@ export default function Dashboard() {
                   <div>
                     <Label htmlFor='img'>Image URL</Label>
                     <Input id='img' value={form.img} onChange={(e) => setForm({ ...form, img: e.target.value })} placeholder='https://images…' />
+                  </div>
+                  <div>
+                    <Label htmlFor='description'>Description</Label>
+                    <textarea id='description' className='mt-1 w-full rounded-md border px-3 py-2 text-sm' rows={6}
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                    <div className='mt-2 rounded-md border p-3'>
+                      <div className='mb-1 text-xs font-semibold text-gray-500'>Preview</div>
+                      <div className='prose prose-sm max-w-none'>
+                        {form.description ? form.description.split(/\n\n+/).map((p,i)=>(<p key={i}>{p}</p>)) : <p className='text-gray-400'>Type a description to preview…</p>}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <Label htmlFor='slug'>Slug</Label>
@@ -221,7 +248,17 @@ export default function Dashboard() {
                                   className='mr-2'
                                   onClick={() => {
                                     setEditing(p)
-                                    setForm({ title: p.title, price: p.price, type: p.type, seller: p.seller, img: p.img, slug: p.slug, categoryId: p.categoryId || '' })
+                                    setForm({
+                                      title: p.title,
+                                      price: p.price,
+                                      type: p.type,
+                                      seller: p.seller,
+                                      img: p.img,
+                                      images: Array.isArray((p as any).images) ? (p as any).images.join(',') : '',
+                                      description: (p as any).description || '',
+                                      slug: p.slug,
+                                      categoryId: p.categoryId || '',
+                                    })
                                     setOpen(true)
                                   }}
                                 >

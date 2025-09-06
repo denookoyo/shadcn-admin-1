@@ -10,760 +10,1019 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 
-// Import Routes
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as ClerkRouteRouteImport } from './routes/clerk/route'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as MarketplaceLayoutRouteImport } from './routes/marketplace/_layout'
+import { Route as errors503RouteImport } from './routes/(errors)/503'
+import { Route as errors500RouteImport } from './routes/(errors)/500'
+import { Route as errors404RouteImport } from './routes/(errors)/404'
+import { Route as errors403RouteImport } from './routes/(errors)/403'
+import { Route as errors401RouteImport } from './routes/(errors)/401'
+import { Route as authSignUpRouteImport } from './routes/(auth)/sign-up'
+import { Route as authSignIn2RouteImport } from './routes/(auth)/sign-in-2'
+import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
+import { Route as authOtpRouteImport } from './routes/(auth)/otp'
+import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
+import { Route as ClerkAuthenticatedRouteRouteImport } from './routes/clerk/_authenticated/route'
+import { Route as ClerkauthRouteRouteImport } from './routes/clerk/(auth)/route'
+import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authenticated/settings/route'
+import { Route as MarketplaceLayoutIndexRouteImport } from './routes/marketplace/_layout/index'
+import { Route as AuthenticatedWarehouseIndexRouteImport } from './routes/_authenticated/warehouse/index'
+import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
+import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedFleetIndexRouteImport } from './routes/_authenticated/fleet/index'
+import { Route as AuthenticatedDriversIndexRouteImport } from './routes/_authenticated/drivers/index'
+import { Route as AuthenticatedDeliveryIndexRouteImport } from './routes/_authenticated/delivery/index'
+import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
+import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
+import { Route as MarketplaceLayoutMyOrdersRouteImport } from './routes/marketplace/_layout/my-orders'
+import { Route as ClerkAuthenticatedUserManagementRouteImport } from './routes/clerk/_authenticated/user-management'
+import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-up'
+import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
+import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
+import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
+import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
+import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
+import { Route as MarketplaceLayoutListingsIndexRouteImport } from './routes/marketplace/_layout/listings/index'
+import { Route as MarketplaceLayoutDashboardIndexRouteImport } from './routes/marketplace/_layout/dashboard/index'
+import { Route as MarketplaceLayoutCheckoutIndexRouteImport } from './routes/marketplace/_layout/checkout/index'
+import { Route as MarketplaceLayoutCartIndexRouteImport } from './routes/marketplace/_layout/cart/index'
+import { Route as MarketplaceLayoutOrderTrackRouteImport } from './routes/marketplace/_layout/order/track'
+import { Route as MarketplaceLayoutOrderIdRouteImport } from './routes/marketplace/_layout/order/$id'
+import { Route as MarketplaceLayoutMerchantIdIndexRouteImport } from './routes/marketplace/_layout/merchant/$id/index'
+import { Route as MarketplaceLayoutListingSlugIndexRouteImport } from './routes/marketplace/_layout/listing/$slug/index'
+import { Route as MarketplaceLayoutDashboardSettingsIndexRouteImport } from './routes/marketplace/_layout/dashboard/settings/index'
+import { Route as MarketplaceLayoutDashboardOrdersIndexRouteImport } from './routes/marketplace/_layout/dashboard/orders/index'
+import { Route as MarketplaceLayoutDashboardListingsIndexRouteImport } from './routes/marketplace/_layout/dashboard/listings/index'
+import { Route as MarketplaceLayoutDashboardBookingsIndexRouteImport } from './routes/marketplace/_layout/dashboard/bookings/index'
+import { Route as MarketplaceLayoutDashboardOrdersAllRouteImport } from './routes/marketplace/_layout/dashboard/orders/all'
+import { Route as MarketplaceLayoutDashboardOrderIdRouteImport } from './routes/marketplace/_layout/dashboard/order/$id'
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as ClerkRouteImport } from './routes/clerk/route'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
-import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
-import { Route as MarketplaceLayoutImport } from './routes/marketplace/_layout'
-import { Route as errors503Import } from './routes/(errors)/503'
-import { Route as errors500Import } from './routes/(errors)/500'
-import { Route as errors404Import } from './routes/(errors)/404'
-import { Route as errors403Import } from './routes/(errors)/403'
-import { Route as errors401Import } from './routes/(errors)/401'
-import { Route as authSignUpImport } from './routes/(auth)/sign-up'
-import { Route as authSignIn2Import } from './routes/(auth)/sign-in-2'
-import { Route as authSignInImport } from './routes/(auth)/sign-in'
-import { Route as authOtpImport } from './routes/(auth)/otp'
-import { Route as authForgotPasswordImport } from './routes/(auth)/forgot-password'
-import { Route as ClerkAuthenticatedRouteImport } from './routes/clerk/_authenticated/route'
-import { Route as ClerkauthRouteImport } from './routes/clerk/(auth)/route'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
-import { Route as MarketplaceLayoutIndexImport } from './routes/marketplace/_layout/index'
-import { Route as AuthenticatedWarehouseIndexImport } from './routes/_authenticated/warehouse/index'
-import { Route as AuthenticatedUsersIndexImport } from './routes/_authenticated/users/index'
-import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
-import { Route as AuthenticatedSettingsIndexImport } from './routes/_authenticated/settings/index'
-import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authenticated/help-center/index'
-import { Route as AuthenticatedFleetIndexImport } from './routes/_authenticated/fleet/index'
-import { Route as AuthenticatedDriversIndexImport } from './routes/_authenticated/drivers/index'
-import { Route as AuthenticatedDeliveryIndexImport } from './routes/_authenticated/delivery/index'
-import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
-import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
-import { Route as MarketplaceLayoutMyOrdersImport } from './routes/marketplace/_layout/my-orders'
-import { Route as ClerkAuthenticatedUserManagementImport } from './routes/clerk/_authenticated/user-management'
-import { Route as ClerkauthSignUpImport } from './routes/clerk/(auth)/sign-up'
-import { Route as ClerkauthSignInImport } from './routes/clerk/(auth)/sign-in'
-import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_authenticated/settings/notifications'
-import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
-import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
-import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
-import { Route as MarketplaceLayoutListingsIndexImport } from './routes/marketplace/_layout/listings/index'
-import { Route as MarketplaceLayoutDashboardIndexImport } from './routes/marketplace/_layout/dashboard/index'
-import { Route as MarketplaceLayoutCheckoutIndexImport } from './routes/marketplace/_layout/checkout/index'
-import { Route as MarketplaceLayoutCartIndexImport } from './routes/marketplace/_layout/cart/index'
-import { Route as MarketplaceLayoutOrderTrackImport } from './routes/marketplace/_layout/order/track'
-import { Route as MarketplaceLayoutOrderIdImport } from './routes/marketplace/_layout/order/$id'
-import { Route as MarketplaceLayoutMerchantIdIndexImport } from './routes/marketplace/_layout/merchant/$id/index'
-import { Route as MarketplaceLayoutListingSlugIndexImport } from './routes/marketplace/_layout/listing/$slug/index'
-import { Route as MarketplaceLayoutDashboardSettingsIndexImport } from './routes/marketplace/_layout/dashboard/settings/index'
-import { Route as MarketplaceLayoutDashboardOrdersIndexImport } from './routes/marketplace/_layout/dashboard/orders/index'
-import { Route as MarketplaceLayoutDashboardListingsIndexImport } from './routes/marketplace/_layout/dashboard/listings/index'
-import { Route as MarketplaceLayoutDashboardBookingsIndexImport } from './routes/marketplace/_layout/dashboard/bookings/index'
-import { Route as MarketplaceLayoutDashboardOrdersAllImport } from './routes/marketplace/_layout/dashboard/orders/all'
-import { Route as MarketplaceLayoutDashboardOrderIdImport } from './routes/marketplace/_layout/dashboard/order/$id'
+const MarketplaceRouteImport = createFileRoute('/marketplace')()
 
-// Create Virtual Routes
-
-const MarketplaceImport = createFileRoute('/marketplace')()
-
-// Create/Update Routes
-
-const MarketplaceRoute = MarketplaceImport.update({
+const MarketplaceRoute = MarketplaceRouteImport.update({
   id: '/marketplace',
   path: '/marketplace',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const ClerkRouteRoute = ClerkRouteImport.update({
+const ClerkRouteRoute = ClerkRouteRouteImport.update({
   id: '/clerk',
   path: '/clerk',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const MarketplaceLayoutRoute = MarketplaceLayoutImport.update({
+const MarketplaceLayoutRoute = MarketplaceLayoutRouteImport.update({
   id: '/_layout',
   getParentRoute: () => MarketplaceRoute,
 } as any)
-
-const errors503Route = errors503Import.update({
+const errors503Route = errors503RouteImport.update({
   id: '/(errors)/503',
   path: '/503',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors500Route = errors500Import.update({
+const errors500Route = errors500RouteImport.update({
   id: '/(errors)/500',
   path: '/500',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors404Route = errors404Import.update({
+const errors404Route = errors404RouteImport.update({
   id: '/(errors)/404',
   path: '/404',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors403Route = errors403Import.update({
+const errors403Route = errors403RouteImport.update({
   id: '/(errors)/403',
   path: '/403',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const errors401Route = errors401Import.update({
+const errors401Route = errors401RouteImport.update({
   id: '/(errors)/401',
   path: '/401',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignUpRoute = authSignUpImport.update({
+const authSignUpRoute = authSignUpRouteImport.update({
   id: '/(auth)/sign-up',
   path: '/sign-up',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignIn2Route = authSignIn2Import.update({
+const authSignIn2Route = authSignIn2RouteImport.update({
   id: '/(auth)/sign-in-2',
   path: '/sign-in-2',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSignInRoute = authSignInImport.update({
+const authSignInRoute = authSignInRouteImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authOtpRoute = authOtpImport.update({
+const authOtpRoute = authOtpRouteImport.update({
   id: '/(auth)/otp',
   path: '/otp',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authForgotPasswordRoute = authForgotPasswordImport.update({
+const authForgotPasswordRoute = authForgotPasswordRouteImport.update({
   id: '/(auth)/forgot-password',
   path: '/forgot-password',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const ClerkAuthenticatedRouteRoute = ClerkAuthenticatedRouteImport.update({
+const ClerkAuthenticatedRouteRoute = ClerkAuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => ClerkRouteRoute,
 } as any)
-
-const ClerkauthRouteRoute = ClerkauthRouteImport.update({
+const ClerkauthRouteRoute = ClerkauthRouteRouteImport.update({
   id: '/(auth)',
   getParentRoute: () => ClerkRouteRoute,
 } as any)
-
-const AuthenticatedSettingsRouteRoute = AuthenticatedSettingsRouteImport.update(
-  {
+const AuthenticatedSettingsRouteRoute =
+  AuthenticatedSettingsRouteRouteImport.update({
     id: '/settings',
     path: '/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
-const MarketplaceLayoutIndexRoute = MarketplaceLayoutIndexImport.update({
+  } as any)
+const MarketplaceLayoutIndexRoute = MarketplaceLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => MarketplaceLayoutRoute,
 } as any)
-
 const AuthenticatedWarehouseIndexRoute =
-  AuthenticatedWarehouseIndexImport.update({
+  AuthenticatedWarehouseIndexRouteImport.update({
     id: '/warehouse/',
     path: '/warehouse/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-
-const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexImport.update({
+const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexImport.update({
+const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   id: '/tasks/',
   path: '/tasks/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedSettingsIndexRoute = AuthenticatedSettingsIndexImport.update(
-  {
+const AuthenticatedSettingsIndexRoute =
+  AuthenticatedSettingsIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
-  } as any,
-)
-
+  } as any)
 const AuthenticatedHelpCenterIndexRoute =
-  AuthenticatedHelpCenterIndexImport.update({
+  AuthenticatedHelpCenterIndexRouteImport.update({
     id: '/help-center/',
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-
-const AuthenticatedFleetIndexRoute = AuthenticatedFleetIndexImport.update({
+const AuthenticatedFleetIndexRoute = AuthenticatedFleetIndexRouteImport.update({
   id: '/fleet/',
   path: '/fleet/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedDriversIndexRoute = AuthenticatedDriversIndexImport.update({
-  id: '/drivers/',
-  path: '/drivers/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
-const AuthenticatedDeliveryIndexRoute = AuthenticatedDeliveryIndexImport.update(
-  {
+const AuthenticatedDriversIndexRoute =
+  AuthenticatedDriversIndexRouteImport.update({
+    id: '/drivers/',
+    path: '/drivers/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedDeliveryIndexRoute =
+  AuthenticatedDeliveryIndexRouteImport.update({
     id: '/delivery/',
     path: '/delivery/',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-)
-
-const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexImport.update({
+  } as any)
+const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
   id: '/chats/',
   path: '/chats/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexImport.update({
+const AuthenticatedAppsIndexRoute = AuthenticatedAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const MarketplaceLayoutMyOrdersRoute = MarketplaceLayoutMyOrdersImport.update({
-  id: '/my-orders',
-  path: '/my-orders',
-  getParentRoute: () => MarketplaceLayoutRoute,
-} as any)
-
+const MarketplaceLayoutMyOrdersRoute =
+  MarketplaceLayoutMyOrdersRouteImport.update({
+    id: '/my-orders',
+    path: '/my-orders',
+    getParentRoute: () => MarketplaceLayoutRoute,
+  } as any)
 const ClerkAuthenticatedUserManagementRoute =
-  ClerkAuthenticatedUserManagementImport.update({
+  ClerkAuthenticatedUserManagementRouteImport.update({
     id: '/user-management',
     path: '/user-management',
     getParentRoute: () => ClerkAuthenticatedRouteRoute,
   } as any)
-
-const ClerkauthSignUpRoute = ClerkauthSignUpImport.update({
+const ClerkauthSignUpRoute = ClerkauthSignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
   getParentRoute: () => ClerkauthRouteRoute,
 } as any)
-
-const ClerkauthSignInRoute = ClerkauthSignInImport.update({
+const ClerkauthSignInRoute = ClerkauthSignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
   getParentRoute: () => ClerkauthRouteRoute,
 } as any)
-
 const AuthenticatedSettingsNotificationsRoute =
-  AuthenticatedSettingsNotificationsImport.update({
+  AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsDisplayRoute =
-  AuthenticatedSettingsDisplayImport.update({
+  AuthenticatedSettingsDisplayRouteImport.update({
     id: '/display',
     path: '/display',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsAppearanceRoute =
-  AuthenticatedSettingsAppearanceImport.update({
+  AuthenticatedSettingsAppearanceRouteImport.update({
     id: '/appearance',
     path: '/appearance',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const AuthenticatedSettingsAccountRoute =
-  AuthenticatedSettingsAccountImport.update({
+  AuthenticatedSettingsAccountRouteImport.update({
     id: '/account',
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
-
 const MarketplaceLayoutListingsIndexRoute =
-  MarketplaceLayoutListingsIndexImport.update({
+  MarketplaceLayoutListingsIndexRouteImport.update({
     id: '/listings/',
     path: '/listings/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardIndexRoute =
-  MarketplaceLayoutDashboardIndexImport.update({
+  MarketplaceLayoutDashboardIndexRouteImport.update({
     id: '/dashboard/',
     path: '/dashboard/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutCheckoutIndexRoute =
-  MarketplaceLayoutCheckoutIndexImport.update({
+  MarketplaceLayoutCheckoutIndexRouteImport.update({
     id: '/checkout/',
     path: '/checkout/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
-const MarketplaceLayoutCartIndexRoute = MarketplaceLayoutCartIndexImport.update(
-  {
+const MarketplaceLayoutCartIndexRoute =
+  MarketplaceLayoutCartIndexRouteImport.update({
     id: '/cart/',
     path: '/cart/',
     getParentRoute: () => MarketplaceLayoutRoute,
-  } as any,
-)
-
+  } as any)
 const MarketplaceLayoutOrderTrackRoute =
-  MarketplaceLayoutOrderTrackImport.update({
+  MarketplaceLayoutOrderTrackRouteImport.update({
     id: '/order/track',
     path: '/order/track',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
-const MarketplaceLayoutOrderIdRoute = MarketplaceLayoutOrderIdImport.update({
-  id: '/order/$id',
-  path: '/order/$id',
-  getParentRoute: () => MarketplaceLayoutRoute,
-} as any)
-
+const MarketplaceLayoutOrderIdRoute =
+  MarketplaceLayoutOrderIdRouteImport.update({
+    id: '/order/$id',
+    path: '/order/$id',
+    getParentRoute: () => MarketplaceLayoutRoute,
+  } as any)
 const MarketplaceLayoutMerchantIdIndexRoute =
-  MarketplaceLayoutMerchantIdIndexImport.update({
+  MarketplaceLayoutMerchantIdIndexRouteImport.update({
     id: '/merchant/$id/',
     path: '/merchant/$id/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutListingSlugIndexRoute =
-  MarketplaceLayoutListingSlugIndexImport.update({
+  MarketplaceLayoutListingSlugIndexRouteImport.update({
     id: '/listing/$slug/',
     path: '/listing/$slug/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardSettingsIndexRoute =
-  MarketplaceLayoutDashboardSettingsIndexImport.update({
+  MarketplaceLayoutDashboardSettingsIndexRouteImport.update({
     id: '/dashboard/settings/',
     path: '/dashboard/settings/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardOrdersIndexRoute =
-  MarketplaceLayoutDashboardOrdersIndexImport.update({
+  MarketplaceLayoutDashboardOrdersIndexRouteImport.update({
     id: '/dashboard/orders/',
     path: '/dashboard/orders/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardListingsIndexRoute =
-  MarketplaceLayoutDashboardListingsIndexImport.update({
+  MarketplaceLayoutDashboardListingsIndexRouteImport.update({
     id: '/dashboard/listings/',
     path: '/dashboard/listings/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardBookingsIndexRoute =
-  MarketplaceLayoutDashboardBookingsIndexImport.update({
+  MarketplaceLayoutDashboardBookingsIndexRouteImport.update({
     id: '/dashboard/bookings/',
     path: '/dashboard/bookings/',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardOrdersAllRoute =
-  MarketplaceLayoutDashboardOrdersAllImport.update({
+  MarketplaceLayoutDashboardOrdersAllRouteImport.update({
     id: '/dashboard/orders/all',
     path: '/dashboard/orders/all',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
-
 const MarketplaceLayoutDashboardOrderIdRoute =
-  MarketplaceLayoutDashboardOrderIdImport.update({
+  MarketplaceLayoutDashboardOrderIdRouteImport.update({
     id: '/dashboard/order/$id',
     path: '/dashboard/order/$id',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
 
-// Populate the FileRoutesByPath interface
+export interface FileRoutesByFullPath {
+  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/clerk/': typeof ClerkauthRouteRouteWithChildren
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/otp': typeof authOtpRoute
+  '/sign-in': typeof authSignInRoute
+  '/sign-in-2': typeof authSignIn2Route
+  '/sign-up': typeof authSignUpRoute
+  '/401': typeof errors401Route
+  '/403': typeof errors403Route
+  '/404': typeof errors404Route
+  '/500': typeof errors500Route
+  '/503': typeof errors503Route
+  '/marketplace': typeof MarketplaceLayoutRouteWithChildren
+  '/': typeof AuthenticatedIndexRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/clerk/sign-in': typeof ClerkauthSignInRoute
+  '/clerk/sign-up': typeof ClerkauthSignUpRoute
+  '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
+  '/apps': typeof AuthenticatedAppsIndexRoute
+  '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
+  '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
+  '/marketplace/': typeof MarketplaceLayoutIndexRoute
+  '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
+  '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
+  '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
+  '/marketplace/listings': typeof MarketplaceLayoutListingsIndexRoute
+  '/marketplace/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
+  '/marketplace/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
+  '/marketplace/dashboard/bookings': typeof MarketplaceLayoutDashboardBookingsIndexRoute
+  '/marketplace/dashboard/listings': typeof MarketplaceLayoutDashboardListingsIndexRoute
+  '/marketplace/dashboard/orders': typeof MarketplaceLayoutDashboardOrdersIndexRoute
+  '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
+  '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
+  '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
+}
+export interface FileRoutesByTo {
+  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/forgot-password': typeof authForgotPasswordRoute
+  '/otp': typeof authOtpRoute
+  '/sign-in': typeof authSignInRoute
+  '/sign-in-2': typeof authSignIn2Route
+  '/sign-up': typeof authSignUpRoute
+  '/401': typeof errors401Route
+  '/403': typeof errors403Route
+  '/404': typeof errors404Route
+  '/500': typeof errors500Route
+  '/503': typeof errors503Route
+  '/marketplace': typeof MarketplaceLayoutIndexRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/clerk/sign-in': typeof ClerkauthSignInRoute
+  '/clerk/sign-up': typeof ClerkauthSignUpRoute
+  '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
+  '/apps': typeof AuthenticatedAppsIndexRoute
+  '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
+  '/help-center': typeof AuthenticatedHelpCenterIndexRoute
+  '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/tasks': typeof AuthenticatedTasksIndexRoute
+  '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
+  '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
+  '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
+  '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
+  '/marketplace/listings': typeof MarketplaceLayoutListingsIndexRoute
+  '/marketplace/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
+  '/marketplace/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
+  '/marketplace/dashboard/bookings': typeof MarketplaceLayoutDashboardBookingsIndexRoute
+  '/marketplace/dashboard/listings': typeof MarketplaceLayoutDashboardListingsIndexRoute
+  '/marketplace/dashboard/orders': typeof MarketplaceLayoutDashboardOrdersIndexRoute
+  '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
+  '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
+  '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
+}
+export interface FileRoutesById {
+  __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/clerk': typeof ClerkRouteRouteWithChildren
+  '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
+  '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
+  '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/(auth)/forgot-password': typeof authForgotPasswordRoute
+  '/(auth)/otp': typeof authOtpRoute
+  '/(auth)/sign-in': typeof authSignInRoute
+  '/(auth)/sign-in-2': typeof authSignIn2Route
+  '/(auth)/sign-up': typeof authSignUpRoute
+  '/(errors)/401': typeof errors401Route
+  '/(errors)/403': typeof errors403Route
+  '/(errors)/404': typeof errors404Route
+  '/(errors)/500': typeof errors500Route
+  '/(errors)/503': typeof errors503Route
+  '/marketplace': typeof MarketplaceRouteWithChildren
+  '/marketplace/_layout': typeof MarketplaceLayoutRouteWithChildren
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
+  '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
+  '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
+  '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
+  '/marketplace/_layout/my-orders': typeof MarketplaceLayoutMyOrdersRoute
+  '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
+  '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/delivery/': typeof AuthenticatedDeliveryIndexRoute
+  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
+  '/_authenticated/fleet/': typeof AuthenticatedFleetIndexRoute
+  '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
+  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
+  '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/warehouse/': typeof AuthenticatedWarehouseIndexRoute
+  '/marketplace/_layout/': typeof MarketplaceLayoutIndexRoute
+  '/marketplace/_layout/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/_layout/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/_layout/cart/': typeof MarketplaceLayoutCartIndexRoute
+  '/marketplace/_layout/checkout/': typeof MarketplaceLayoutCheckoutIndexRoute
+  '/marketplace/_layout/dashboard/': typeof MarketplaceLayoutDashboardIndexRoute
+  '/marketplace/_layout/listings/': typeof MarketplaceLayoutListingsIndexRoute
+  '/marketplace/_layout/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
+  '/marketplace/_layout/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
+  '/marketplace/_layout/dashboard/bookings/': typeof MarketplaceLayoutDashboardBookingsIndexRoute
+  '/marketplace/_layout/dashboard/listings/': typeof MarketplaceLayoutDashboardListingsIndexRoute
+  '/marketplace/_layout/dashboard/orders/': typeof MarketplaceLayoutDashboardOrdersIndexRoute
+  '/marketplace/_layout/dashboard/settings/': typeof MarketplaceLayoutDashboardSettingsIndexRoute
+  '/marketplace/_layout/listing/$slug/': typeof MarketplaceLayoutListingSlugIndexRoute
+  '/marketplace/_layout/merchant/$id/': typeof MarketplaceLayoutMerchantIdIndexRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/clerk'
+    | '/settings'
+    | '/clerk/'
+    | '/forgot-password'
+    | '/otp'
+    | '/sign-in'
+    | '/sign-in-2'
+    | '/sign-up'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
+    | '/marketplace'
+    | '/'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/display'
+    | '/settings/notifications'
+    | '/clerk/sign-in'
+    | '/clerk/sign-up'
+    | '/clerk/user-management'
+    | '/marketplace/my-orders'
+    | '/apps'
+    | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
+    | '/help-center'
+    | '/settings/'
+    | '/tasks'
+    | '/users'
+    | '/warehouse'
+    | '/marketplace/'
+    | '/marketplace/order/$id'
+    | '/marketplace/order/track'
+    | '/marketplace/cart'
+    | '/marketplace/checkout'
+    | '/marketplace/dashboard'
+    | '/marketplace/listings'
+    | '/marketplace/dashboard/order/$id'
+    | '/marketplace/dashboard/orders/all'
+    | '/marketplace/dashboard/bookings'
+    | '/marketplace/dashboard/listings'
+    | '/marketplace/dashboard/orders'
+    | '/marketplace/dashboard/settings'
+    | '/marketplace/listing/$slug'
+    | '/marketplace/merchant/$id'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/clerk'
+    | '/forgot-password'
+    | '/otp'
+    | '/sign-in'
+    | '/sign-in-2'
+    | '/sign-up'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
+    | '/marketplace'
+    | '/'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/display'
+    | '/settings/notifications'
+    | '/clerk/sign-in'
+    | '/clerk/sign-up'
+    | '/clerk/user-management'
+    | '/marketplace/my-orders'
+    | '/apps'
+    | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
+    | '/help-center'
+    | '/settings'
+    | '/tasks'
+    | '/users'
+    | '/warehouse'
+    | '/marketplace/order/$id'
+    | '/marketplace/order/track'
+    | '/marketplace/cart'
+    | '/marketplace/checkout'
+    | '/marketplace/dashboard'
+    | '/marketplace/listings'
+    | '/marketplace/dashboard/order/$id'
+    | '/marketplace/dashboard/orders/all'
+    | '/marketplace/dashboard/bookings'
+    | '/marketplace/dashboard/listings'
+    | '/marketplace/dashboard/orders'
+    | '/marketplace/dashboard/settings'
+    | '/marketplace/listing/$slug'
+    | '/marketplace/merchant/$id'
+  id:
+    | '__root__'
+    | '/_authenticated'
+    | '/clerk'
+    | '/_authenticated/settings'
+    | '/clerk/(auth)'
+    | '/clerk/_authenticated'
+    | '/(auth)/forgot-password'
+    | '/(auth)/otp'
+    | '/(auth)/sign-in'
+    | '/(auth)/sign-in-2'
+    | '/(auth)/sign-up'
+    | '/(errors)/401'
+    | '/(errors)/403'
+    | '/(errors)/404'
+    | '/(errors)/500'
+    | '/(errors)/503'
+    | '/marketplace'
+    | '/marketplace/_layout'
+    | '/_authenticated/'
+    | '/_authenticated/settings/account'
+    | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/display'
+    | '/_authenticated/settings/notifications'
+    | '/clerk/(auth)/sign-in'
+    | '/clerk/(auth)/sign-up'
+    | '/clerk/_authenticated/user-management'
+    | '/marketplace/_layout/my-orders'
+    | '/_authenticated/apps/'
+    | '/_authenticated/chats/'
+    | '/_authenticated/delivery/'
+    | '/_authenticated/drivers/'
+    | '/_authenticated/fleet/'
+    | '/_authenticated/help-center/'
+    | '/_authenticated/settings/'
+    | '/_authenticated/tasks/'
+    | '/_authenticated/users/'
+    | '/_authenticated/warehouse/'
+    | '/marketplace/_layout/'
+    | '/marketplace/_layout/order/$id'
+    | '/marketplace/_layout/order/track'
+    | '/marketplace/_layout/cart/'
+    | '/marketplace/_layout/checkout/'
+    | '/marketplace/_layout/dashboard/'
+    | '/marketplace/_layout/listings/'
+    | '/marketplace/_layout/dashboard/order/$id'
+    | '/marketplace/_layout/dashboard/orders/all'
+    | '/marketplace/_layout/dashboard/bookings/'
+    | '/marketplace/_layout/dashboard/listings/'
+    | '/marketplace/_layout/dashboard/orders/'
+    | '/marketplace/_layout/dashboard/settings/'
+    | '/marketplace/_layout/listing/$slug/'
+    | '/marketplace/_layout/merchant/$id/'
+  fileRoutesById: FileRoutesById
+}
+export interface RootRouteChildren {
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  ClerkRouteRoute: typeof ClerkRouteRouteWithChildren
+  authForgotPasswordRoute: typeof authForgotPasswordRoute
+  authOtpRoute: typeof authOtpRoute
+  authSignInRoute: typeof authSignInRoute
+  authSignIn2Route: typeof authSignIn2Route
+  authSignUpRoute: typeof authSignUpRoute
+  errors401Route: typeof errors401Route
+  errors403Route: typeof errors403Route
+  errors404Route: typeof errors404Route
+  errors500Route: typeof errors500Route
+  errors503Route: typeof errors503Route
+  MarketplaceRoute: typeof MarketplaceRouteWithChildren
+}
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRoute
+    '/marketplace': {
+      id: '/marketplace'
+      path: '/marketplace'
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof MarketplaceRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/clerk': {
       id: '/clerk'
       path: '/clerk'
       fullPath: '/clerk'
-      preLoaderRoute: typeof ClerkRouteImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof ClerkRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/clerk/(auth)': {
-      id: '/clerk/(auth)'
-      path: '/'
-      fullPath: '/clerk/'
-      preLoaderRoute: typeof ClerkauthRouteImport
-      parentRoute: typeof ClerkRouteImport
-    }
-    '/clerk/_authenticated': {
-      id: '/clerk/_authenticated'
+    '/_authenticated': {
+      id: '/_authenticated'
       path: ''
-      fullPath: '/clerk'
-      preLoaderRoute: typeof ClerkAuthenticatedRouteImport
-      parentRoute: typeof ClerkRouteImport
-    }
-    '/(auth)/forgot-password': {
-      id: '/(auth)/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof authForgotPasswordImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/otp': {
-      id: '/(auth)/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof authOtpImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in': {
-      id: '/(auth)/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof authSignInImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in-2': {
-      id: '/(auth)/sign-in-2'
-      path: '/sign-in-2'
-      fullPath: '/sign-in-2'
-      preLoaderRoute: typeof authSignIn2Import
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-up': {
-      id: '/(auth)/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof authSignUpImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/401': {
-      id: '/(errors)/401'
-      path: '/401'
-      fullPath: '/401'
-      preLoaderRoute: typeof errors401Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/403': {
-      id: '/(errors)/403'
-      path: '/403'
-      fullPath: '/403'
-      preLoaderRoute: typeof errors403Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/404': {
-      id: '/(errors)/404'
-      path: '/404'
-      fullPath: '/404'
-      preLoaderRoute: typeof errors404Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/500': {
-      id: '/(errors)/500'
-      path: '/500'
-      fullPath: '/500'
-      preLoaderRoute: typeof errors500Import
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/503': {
-      id: '/(errors)/503'
-      path: '/503'
-      fullPath: '/503'
-      preLoaderRoute: typeof errors503Import
-      parentRoute: typeof rootRoute
-    }
-    '/marketplace': {
-      id: '/marketplace'
-      path: '/marketplace'
-      fullPath: '/marketplace'
-      preLoaderRoute: typeof MarketplaceImport
-      parentRoute: typeof rootRoute
-    }
-    '/marketplace/_layout': {
-      id: '/marketplace/_layout'
-      path: '/marketplace'
-      fullPath: '/marketplace'
-      preLoaderRoute: typeof MarketplaceLayoutImport
-      parentRoute: typeof MarketplaceRoute
+      fullPath: ''
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/settings/account': {
-      id: '/_authenticated/settings/account'
-      path: '/account'
-      fullPath: '/settings/account'
-      preLoaderRoute: typeof AuthenticatedSettingsAccountImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
+    '/marketplace/_layout': {
+      id: '/marketplace/_layout'
+      path: '/marketplace'
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof MarketplaceLayoutRouteImport
+      parentRoute: typeof MarketplaceRoute
     }
-    '/_authenticated/settings/appearance': {
-      id: '/_authenticated/settings/appearance'
-      path: '/appearance'
-      fullPath: '/settings/appearance'
-      preLoaderRoute: typeof AuthenticatedSettingsAppearanceImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
+    '/(errors)/503': {
+      id: '/(errors)/503'
+      path: '/503'
+      fullPath: '/503'
+      preLoaderRoute: typeof errors503RouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/display': {
-      id: '/_authenticated/settings/display'
-      path: '/display'
-      fullPath: '/settings/display'
-      preLoaderRoute: typeof AuthenticatedSettingsDisplayImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
+    '/(errors)/500': {
+      id: '/(errors)/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof errors500RouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/notifications': {
-      id: '/_authenticated/settings/notifications'
-      path: '/notifications'
-      fullPath: '/settings/notifications'
-      preLoaderRoute: typeof AuthenticatedSettingsNotificationsImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
+    '/(errors)/404': {
+      id: '/(errors)/404'
+      path: '/404'
+      fullPath: '/404'
+      preLoaderRoute: typeof errors404RouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/clerk/(auth)/sign-in': {
-      id: '/clerk/(auth)/sign-in'
-      path: '/sign-in'
-      fullPath: '/clerk/sign-in'
-      preLoaderRoute: typeof ClerkauthSignInImport
-      parentRoute: typeof ClerkauthRouteImport
+    '/(errors)/403': {
+      id: '/(errors)/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof errors403RouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/clerk/(auth)/sign-up': {
-      id: '/clerk/(auth)/sign-up'
+    '/(errors)/401': {
+      id: '/(errors)/401'
+      path: '/401'
+      fullPath: '/401'
+      preLoaderRoute: typeof errors401RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/sign-up': {
+      id: '/(auth)/sign-up'
       path: '/sign-up'
-      fullPath: '/clerk/sign-up'
-      preLoaderRoute: typeof ClerkauthSignUpImport
-      parentRoute: typeof ClerkauthRouteImport
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof authSignUpRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/clerk/_authenticated/user-management': {
-      id: '/clerk/_authenticated/user-management'
-      path: '/user-management'
-      fullPath: '/clerk/user-management'
-      preLoaderRoute: typeof ClerkAuthenticatedUserManagementImport
-      parentRoute: typeof ClerkAuthenticatedRouteImport
+    '/(auth)/sign-in-2': {
+      id: '/(auth)/sign-in-2'
+      path: '/sign-in-2'
+      fullPath: '/sign-in-2'
+      preLoaderRoute: typeof authSignIn2RouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/marketplace/_layout/my-orders': {
-      id: '/marketplace/_layout/my-orders'
-      path: '/my-orders'
-      fullPath: '/marketplace/my-orders'
-      preLoaderRoute: typeof MarketplaceLayoutMyOrdersImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/(auth)/sign-in': {
+      id: '/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof authSignInRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/apps/': {
-      id: '/_authenticated/apps/'
-      path: '/apps'
-      fullPath: '/apps'
-      preLoaderRoute: typeof AuthenticatedAppsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/otp': {
+      id: '/(auth)/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof authOtpRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/chats/': {
-      id: '/_authenticated/chats/'
-      path: '/chats'
-      fullPath: '/chats'
-      preLoaderRoute: typeof AuthenticatedChatsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/forgot-password': {
+      id: '/(auth)/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof authForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/delivery/': {
-      id: '/_authenticated/delivery/'
-      path: '/delivery'
-      fullPath: '/delivery'
-      preLoaderRoute: typeof AuthenticatedDeliveryIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/clerk/_authenticated': {
+      id: '/clerk/_authenticated'
+      path: ''
+      fullPath: '/clerk'
+      preLoaderRoute: typeof ClerkAuthenticatedRouteRouteImport
+      parentRoute: typeof ClerkRouteRoute
     }
-    '/_authenticated/drivers/': {
-      id: '/_authenticated/drivers/'
-      path: '/drivers'
-      fullPath: '/drivers'
-      preLoaderRoute: typeof AuthenticatedDriversIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/fleet/': {
-      id: '/_authenticated/fleet/'
-      path: '/fleet'
-      fullPath: '/fleet'
-      preLoaderRoute: typeof AuthenticatedFleetIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/help-center/': {
-      id: '/_authenticated/help-center/'
-      path: '/help-center'
-      fullPath: '/help-center'
-      preLoaderRoute: typeof AuthenticatedHelpCenterIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings/': {
-      id: '/_authenticated/settings/'
+    '/clerk/(auth)': {
+      id: '/clerk/(auth)'
       path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AuthenticatedSettingsIndexImport
-      parentRoute: typeof AuthenticatedSettingsRouteImport
+      fullPath: '/clerk/'
+      preLoaderRoute: typeof ClerkauthRouteRouteImport
+      parentRoute: typeof ClerkRouteRoute
     }
-    '/_authenticated/tasks/': {
-      id: '/_authenticated/tasks/'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof AuthenticatedTasksIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/users/': {
-      id: '/_authenticated/users/'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof AuthenticatedUsersIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/warehouse/': {
-      id: '/_authenticated/warehouse/'
-      path: '/warehouse'
-      fullPath: '/warehouse'
-      preLoaderRoute: typeof AuthenticatedWarehouseIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/marketplace/_layout/': {
       id: '/marketplace/_layout/'
       path: '/'
       fullPath: '/marketplace/'
-      preLoaderRoute: typeof MarketplaceLayoutIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+      preLoaderRoute: typeof MarketplaceLayoutIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/order/$id': {
-      id: '/marketplace/_layout/order/$id'
-      path: '/order/$id'
-      fullPath: '/marketplace/order/$id'
-      preLoaderRoute: typeof MarketplaceLayoutOrderIdImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/_authenticated/warehouse/': {
+      id: '/_authenticated/warehouse/'
+      path: '/warehouse'
+      fullPath: '/warehouse'
+      preLoaderRoute: typeof AuthenticatedWarehouseIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/marketplace/_layout/order/track': {
-      id: '/marketplace/_layout/order/track'
-      path: '/order/track'
-      fullPath: '/marketplace/order/track'
-      preLoaderRoute: typeof MarketplaceLayoutOrderTrackImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/_authenticated/users/': {
+      id: '/_authenticated/users/'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof AuthenticatedUsersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/marketplace/_layout/cart/': {
-      id: '/marketplace/_layout/cart/'
-      path: '/cart'
-      fullPath: '/marketplace/cart'
-      preLoaderRoute: typeof MarketplaceLayoutCartIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/_authenticated/tasks/': {
+      id: '/_authenticated/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/marketplace/_layout/checkout/': {
-      id: '/marketplace/_layout/checkout/'
-      path: '/checkout'
-      fullPath: '/marketplace/checkout'
-      preLoaderRoute: typeof MarketplaceLayoutCheckoutIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/_authenticated/settings/': {
+      id: '/_authenticated/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
-    '/marketplace/_layout/dashboard/': {
-      id: '/marketplace/_layout/dashboard/'
-      path: '/dashboard'
-      fullPath: '/marketplace/dashboard'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/_authenticated/help-center/': {
+      id: '/_authenticated/help-center/'
+      path: '/help-center'
+      fullPath: '/help-center'
+      preLoaderRoute: typeof AuthenticatedHelpCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/fleet/': {
+      id: '/_authenticated/fleet/'
+      path: '/fleet'
+      fullPath: '/fleet'
+      preLoaderRoute: typeof AuthenticatedFleetIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/drivers/': {
+      id: '/_authenticated/drivers/'
+      path: '/drivers'
+      fullPath: '/drivers'
+      preLoaderRoute: typeof AuthenticatedDriversIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/delivery/': {
+      id: '/_authenticated/delivery/'
+      path: '/delivery'
+      fullPath: '/delivery'
+      preLoaderRoute: typeof AuthenticatedDeliveryIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/chats/': {
+      id: '/_authenticated/chats/'
+      path: '/chats'
+      fullPath: '/chats'
+      preLoaderRoute: typeof AuthenticatedChatsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/apps/': {
+      id: '/_authenticated/apps/'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof AuthenticatedAppsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/marketplace/_layout/my-orders': {
+      id: '/marketplace/_layout/my-orders'
+      path: '/my-orders'
+      fullPath: '/marketplace/my-orders'
+      preLoaderRoute: typeof MarketplaceLayoutMyOrdersRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/clerk/_authenticated/user-management': {
+      id: '/clerk/_authenticated/user-management'
+      path: '/user-management'
+      fullPath: '/clerk/user-management'
+      preLoaderRoute: typeof ClerkAuthenticatedUserManagementRouteImport
+      parentRoute: typeof ClerkAuthenticatedRouteRoute
+    }
+    '/clerk/(auth)/sign-up': {
+      id: '/clerk/(auth)/sign-up'
+      path: '/sign-up'
+      fullPath: '/clerk/sign-up'
+      preLoaderRoute: typeof ClerkauthSignUpRouteImport
+      parentRoute: typeof ClerkauthRouteRoute
+    }
+    '/clerk/(auth)/sign-in': {
+      id: '/clerk/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/clerk/sign-in'
+      preLoaderRoute: typeof ClerkauthSignInRouteImport
+      parentRoute: typeof ClerkauthRouteRoute
+    }
+    '/_authenticated/settings/notifications': {
+      id: '/_authenticated/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/display': {
+      id: '/_authenticated/settings/display'
+      path: '/display'
+      fullPath: '/settings/display'
+      preLoaderRoute: typeof AuthenticatedSettingsDisplayRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/appearance': {
+      id: '/_authenticated/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof AuthenticatedSettingsAppearanceRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/account': {
+      id: '/_authenticated/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
     '/marketplace/_layout/listings/': {
       id: '/marketplace/_layout/listings/'
       path: '/listings'
       fullPath: '/marketplace/listings'
-      preLoaderRoute: typeof MarketplaceLayoutListingsIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+      preLoaderRoute: typeof MarketplaceLayoutListingsIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/dashboard/order/$id': {
-      id: '/marketplace/_layout/dashboard/order/$id'
-      path: '/dashboard/order/$id'
-      fullPath: '/marketplace/dashboard/order/$id'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardOrderIdImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/marketplace/_layout/dashboard/': {
+      id: '/marketplace/_layout/dashboard/'
+      path: '/dashboard'
+      fullPath: '/marketplace/dashboard'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/dashboard/orders/all': {
-      id: '/marketplace/_layout/dashboard/orders/all'
-      path: '/dashboard/orders/all'
-      fullPath: '/marketplace/dashboard/orders/all'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardOrdersAllImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/marketplace/_layout/checkout/': {
+      id: '/marketplace/_layout/checkout/'
+      path: '/checkout'
+      fullPath: '/marketplace/checkout'
+      preLoaderRoute: typeof MarketplaceLayoutCheckoutIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/dashboard/bookings/': {
-      id: '/marketplace/_layout/dashboard/bookings/'
-      path: '/dashboard/bookings'
-      fullPath: '/marketplace/dashboard/bookings'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardBookingsIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/marketplace/_layout/cart/': {
+      id: '/marketplace/_layout/cart/'
+      path: '/cart'
+      fullPath: '/marketplace/cart'
+      preLoaderRoute: typeof MarketplaceLayoutCartIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/dashboard/listings/': {
-      id: '/marketplace/_layout/dashboard/listings/'
-      path: '/dashboard/listings'
-      fullPath: '/marketplace/dashboard/listings'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardListingsIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/marketplace/_layout/order/track': {
+      id: '/marketplace/_layout/order/track'
+      path: '/order/track'
+      fullPath: '/marketplace/order/track'
+      preLoaderRoute: typeof MarketplaceLayoutOrderTrackRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
-    '/marketplace/_layout/dashboard/orders/': {
-      id: '/marketplace/_layout/dashboard/orders/'
-      path: '/dashboard/orders'
-      fullPath: '/marketplace/dashboard/orders'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardOrdersIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
-    }
-    '/marketplace/_layout/dashboard/settings/': {
-      id: '/marketplace/_layout/dashboard/settings/'
-      path: '/dashboard/settings'
-      fullPath: '/marketplace/dashboard/settings'
-      preLoaderRoute: typeof MarketplaceLayoutDashboardSettingsIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
-    }
-    '/marketplace/_layout/listing/$slug/': {
-      id: '/marketplace/_layout/listing/$slug/'
-      path: '/listing/$slug'
-      fullPath: '/marketplace/listing/$slug'
-      preLoaderRoute: typeof MarketplaceLayoutListingSlugIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+    '/marketplace/_layout/order/$id': {
+      id: '/marketplace/_layout/order/$id'
+      path: '/order/$id'
+      fullPath: '/marketplace/order/$id'
+      preLoaderRoute: typeof MarketplaceLayoutOrderIdRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
     '/marketplace/_layout/merchant/$id/': {
       id: '/marketplace/_layout/merchant/$id/'
       path: '/merchant/$id'
       fullPath: '/marketplace/merchant/$id'
-      preLoaderRoute: typeof MarketplaceLayoutMerchantIdIndexImport
-      parentRoute: typeof MarketplaceLayoutImport
+      preLoaderRoute: typeof MarketplaceLayoutMerchantIdIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/listing/$slug/': {
+      id: '/marketplace/_layout/listing/$slug/'
+      path: '/listing/$slug'
+      fullPath: '/marketplace/listing/$slug'
+      preLoaderRoute: typeof MarketplaceLayoutListingSlugIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/settings/': {
+      id: '/marketplace/_layout/dashboard/settings/'
+      path: '/dashboard/settings'
+      fullPath: '/marketplace/dashboard/settings'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardSettingsIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/orders/': {
+      id: '/marketplace/_layout/dashboard/orders/'
+      path: '/dashboard/orders'
+      fullPath: '/marketplace/dashboard/orders'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardOrdersIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/listings/': {
+      id: '/marketplace/_layout/dashboard/listings/'
+      path: '/dashboard/listings'
+      fullPath: '/marketplace/dashboard/listings'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardListingsIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/bookings/': {
+      id: '/marketplace/_layout/dashboard/bookings/'
+      path: '/dashboard/bookings'
+      fullPath: '/marketplace/dashboard/bookings'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardBookingsIndexRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/orders/all': {
+      id: '/marketplace/_layout/dashboard/orders/all'
+      path: '/dashboard/orders/all'
+      fullPath: '/marketplace/dashboard/orders/all'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardOrdersAllRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
+    }
+    '/marketplace/_layout/dashboard/order/$id': {
+      id: '/marketplace/_layout/dashboard/order/$id'
+      path: '/dashboard/order/$id'
+      fullPath: '/marketplace/dashboard/order/$id'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardOrderIdRouteImport
+      parentRoute: typeof MarketplaceLayoutRoute
     }
   }
 }
-
-// Create and export the route tree
 
 interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
@@ -922,332 +1181,6 @@ const MarketplaceRouteWithChildren = MarketplaceRoute._addFileChildren(
   MarketplaceRouteChildren,
 )
 
-export interface FileRoutesByFullPath {
-  '': typeof AuthenticatedRouteRouteWithChildren
-  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
-  '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
-  '/clerk/': typeof ClerkauthRouteRouteWithChildren
-  '/forgot-password': typeof authForgotPasswordRoute
-  '/otp': typeof authOtpRoute
-  '/sign-in': typeof authSignInRoute
-  '/sign-in-2': typeof authSignIn2Route
-  '/sign-up': typeof authSignUpRoute
-  '/401': typeof errors401Route
-  '/403': typeof errors403Route
-  '/404': typeof errors404Route
-  '/500': typeof errors500Route
-  '/503': typeof errors503Route
-  '/marketplace': typeof MarketplaceLayoutRouteWithChildren
-  '/': typeof AuthenticatedIndexRoute
-  '/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/clerk/sign-in': typeof ClerkauthSignInRoute
-  '/clerk/sign-up': typeof ClerkauthSignUpRoute
-  '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
-  '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
-  '/apps': typeof AuthenticatedAppsIndexRoute
-  '/chats': typeof AuthenticatedChatsIndexRoute
-  '/delivery': typeof AuthenticatedDeliveryIndexRoute
-  '/drivers': typeof AuthenticatedDriversIndexRoute
-  '/fleet': typeof AuthenticatedFleetIndexRoute
-  '/help-center': typeof AuthenticatedHelpCenterIndexRoute
-  '/settings/': typeof AuthenticatedSettingsIndexRoute
-  '/tasks': typeof AuthenticatedTasksIndexRoute
-  '/users': typeof AuthenticatedUsersIndexRoute
-  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
-  '/marketplace/': typeof MarketplaceLayoutIndexRoute
-  '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
-  '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
-  '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
-  '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
-  '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
-  '/marketplace/listings': typeof MarketplaceLayoutListingsIndexRoute
-  '/marketplace/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
-  '/marketplace/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
-  '/marketplace/dashboard/bookings': typeof MarketplaceLayoutDashboardBookingsIndexRoute
-  '/marketplace/dashboard/listings': typeof MarketplaceLayoutDashboardListingsIndexRoute
-  '/marketplace/dashboard/orders': typeof MarketplaceLayoutDashboardOrdersIndexRoute
-  '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
-  '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
-  '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
-}
-
-export interface FileRoutesByTo {
-  '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
-  '/forgot-password': typeof authForgotPasswordRoute
-  '/otp': typeof authOtpRoute
-  '/sign-in': typeof authSignInRoute
-  '/sign-in-2': typeof authSignIn2Route
-  '/sign-up': typeof authSignUpRoute
-  '/401': typeof errors401Route
-  '/403': typeof errors403Route
-  '/404': typeof errors404Route
-  '/500': typeof errors500Route
-  '/503': typeof errors503Route
-  '/marketplace': typeof MarketplaceLayoutIndexRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/clerk/sign-in': typeof ClerkauthSignInRoute
-  '/clerk/sign-up': typeof ClerkauthSignUpRoute
-  '/clerk/user-management': typeof ClerkAuthenticatedUserManagementRoute
-  '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
-  '/apps': typeof AuthenticatedAppsIndexRoute
-  '/chats': typeof AuthenticatedChatsIndexRoute
-  '/delivery': typeof AuthenticatedDeliveryIndexRoute
-  '/drivers': typeof AuthenticatedDriversIndexRoute
-  '/fleet': typeof AuthenticatedFleetIndexRoute
-  '/help-center': typeof AuthenticatedHelpCenterIndexRoute
-  '/settings': typeof AuthenticatedSettingsIndexRoute
-  '/tasks': typeof AuthenticatedTasksIndexRoute
-  '/users': typeof AuthenticatedUsersIndexRoute
-  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
-  '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
-  '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
-  '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
-  '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
-  '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
-  '/marketplace/listings': typeof MarketplaceLayoutListingsIndexRoute
-  '/marketplace/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
-  '/marketplace/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
-  '/marketplace/dashboard/bookings': typeof MarketplaceLayoutDashboardBookingsIndexRoute
-  '/marketplace/dashboard/listings': typeof MarketplaceLayoutDashboardListingsIndexRoute
-  '/marketplace/dashboard/orders': typeof MarketplaceLayoutDashboardOrdersIndexRoute
-  '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
-  '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
-  '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
-}
-
-export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/clerk': typeof ClerkRouteRouteWithChildren
-  '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
-  '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
-  '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
-  '/(auth)/forgot-password': typeof authForgotPasswordRoute
-  '/(auth)/otp': typeof authOtpRoute
-  '/(auth)/sign-in': typeof authSignInRoute
-  '/(auth)/sign-in-2': typeof authSignIn2Route
-  '/(auth)/sign-up': typeof authSignUpRoute
-  '/(errors)/401': typeof errors401Route
-  '/(errors)/403': typeof errors403Route
-  '/(errors)/404': typeof errors404Route
-  '/(errors)/500': typeof errors500Route
-  '/(errors)/503': typeof errors503Route
-  '/marketplace': typeof MarketplaceRouteWithChildren
-  '/marketplace/_layout': typeof MarketplaceLayoutRouteWithChildren
-  '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
-  '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
-  '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
-  '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
-  '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
-  '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
-  '/clerk/_authenticated/user-management': typeof ClerkAuthenticatedUserManagementRoute
-  '/marketplace/_layout/my-orders': typeof MarketplaceLayoutMyOrdersRoute
-  '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
-  '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
-  '/_authenticated/delivery/': typeof AuthenticatedDeliveryIndexRoute
-  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
-  '/_authenticated/fleet/': typeof AuthenticatedFleetIndexRoute
-  '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
-  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
-  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
-  '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
-  '/_authenticated/warehouse/': typeof AuthenticatedWarehouseIndexRoute
-  '/marketplace/_layout/': typeof MarketplaceLayoutIndexRoute
-  '/marketplace/_layout/order/$id': typeof MarketplaceLayoutOrderIdRoute
-  '/marketplace/_layout/order/track': typeof MarketplaceLayoutOrderTrackRoute
-  '/marketplace/_layout/cart/': typeof MarketplaceLayoutCartIndexRoute
-  '/marketplace/_layout/checkout/': typeof MarketplaceLayoutCheckoutIndexRoute
-  '/marketplace/_layout/dashboard/': typeof MarketplaceLayoutDashboardIndexRoute
-  '/marketplace/_layout/listings/': typeof MarketplaceLayoutListingsIndexRoute
-  '/marketplace/_layout/dashboard/order/$id': typeof MarketplaceLayoutDashboardOrderIdRoute
-  '/marketplace/_layout/dashboard/orders/all': typeof MarketplaceLayoutDashboardOrdersAllRoute
-  '/marketplace/_layout/dashboard/bookings/': typeof MarketplaceLayoutDashboardBookingsIndexRoute
-  '/marketplace/_layout/dashboard/listings/': typeof MarketplaceLayoutDashboardListingsIndexRoute
-  '/marketplace/_layout/dashboard/orders/': typeof MarketplaceLayoutDashboardOrdersIndexRoute
-  '/marketplace/_layout/dashboard/settings/': typeof MarketplaceLayoutDashboardSettingsIndexRoute
-  '/marketplace/_layout/listing/$slug/': typeof MarketplaceLayoutListingSlugIndexRoute
-  '/marketplace/_layout/merchant/$id/': typeof MarketplaceLayoutMerchantIdIndexRoute
-}
-
-export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | ''
-    | '/clerk'
-    | '/settings'
-    | '/clerk/'
-    | '/forgot-password'
-    | '/otp'
-    | '/sign-in'
-    | '/sign-in-2'
-    | '/sign-up'
-    | '/401'
-    | '/403'
-    | '/404'
-    | '/500'
-    | '/503'
-    | '/marketplace'
-    | '/'
-    | '/settings/account'
-    | '/settings/appearance'
-    | '/settings/display'
-    | '/settings/notifications'
-    | '/clerk/sign-in'
-    | '/clerk/sign-up'
-    | '/clerk/user-management'
-    | '/marketplace/my-orders'
-    | '/apps'
-    | '/chats'
-    | '/delivery'
-    | '/drivers'
-    | '/fleet'
-    | '/help-center'
-    | '/settings/'
-    | '/tasks'
-    | '/users'
-    | '/warehouse'
-    | '/marketplace/'
-    | '/marketplace/order/$id'
-    | '/marketplace/order/track'
-    | '/marketplace/cart'
-    | '/marketplace/checkout'
-    | '/marketplace/dashboard'
-    | '/marketplace/listings'
-    | '/marketplace/dashboard/order/$id'
-    | '/marketplace/dashboard/orders/all'
-    | '/marketplace/dashboard/bookings'
-    | '/marketplace/dashboard/listings'
-    | '/marketplace/dashboard/orders'
-    | '/marketplace/dashboard/settings'
-    | '/marketplace/listing/$slug'
-    | '/marketplace/merchant/$id'
-  fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/clerk'
-    | '/forgot-password'
-    | '/otp'
-    | '/sign-in'
-    | '/sign-in-2'
-    | '/sign-up'
-    | '/401'
-    | '/403'
-    | '/404'
-    | '/500'
-    | '/503'
-    | '/marketplace'
-    | '/'
-    | '/settings/account'
-    | '/settings/appearance'
-    | '/settings/display'
-    | '/settings/notifications'
-    | '/clerk/sign-in'
-    | '/clerk/sign-up'
-    | '/clerk/user-management'
-    | '/marketplace/my-orders'
-    | '/apps'
-    | '/chats'
-    | '/delivery'
-    | '/drivers'
-    | '/fleet'
-    | '/help-center'
-    | '/settings'
-    | '/tasks'
-    | '/users'
-    | '/warehouse'
-    | '/marketplace/order/$id'
-    | '/marketplace/order/track'
-    | '/marketplace/cart'
-    | '/marketplace/checkout'
-    | '/marketplace/dashboard'
-    | '/marketplace/listings'
-    | '/marketplace/dashboard/order/$id'
-    | '/marketplace/dashboard/orders/all'
-    | '/marketplace/dashboard/bookings'
-    | '/marketplace/dashboard/listings'
-    | '/marketplace/dashboard/orders'
-    | '/marketplace/dashboard/settings'
-    | '/marketplace/listing/$slug'
-    | '/marketplace/merchant/$id'
-  id:
-    | '__root__'
-    | '/_authenticated'
-    | '/clerk'
-    | '/_authenticated/settings'
-    | '/clerk/(auth)'
-    | '/clerk/_authenticated'
-    | '/(auth)/forgot-password'
-    | '/(auth)/otp'
-    | '/(auth)/sign-in'
-    | '/(auth)/sign-in-2'
-    | '/(auth)/sign-up'
-    | '/(errors)/401'
-    | '/(errors)/403'
-    | '/(errors)/404'
-    | '/(errors)/500'
-    | '/(errors)/503'
-    | '/marketplace'
-    | '/marketplace/_layout'
-    | '/_authenticated/'
-    | '/_authenticated/settings/account'
-    | '/_authenticated/settings/appearance'
-    | '/_authenticated/settings/display'
-    | '/_authenticated/settings/notifications'
-    | '/clerk/(auth)/sign-in'
-    | '/clerk/(auth)/sign-up'
-    | '/clerk/_authenticated/user-management'
-    | '/marketplace/_layout/my-orders'
-    | '/_authenticated/apps/'
-    | '/_authenticated/chats/'
-    | '/_authenticated/delivery/'
-    | '/_authenticated/drivers/'
-    | '/_authenticated/fleet/'
-    | '/_authenticated/help-center/'
-    | '/_authenticated/settings/'
-    | '/_authenticated/tasks/'
-    | '/_authenticated/users/'
-    | '/_authenticated/warehouse/'
-    | '/marketplace/_layout/'
-    | '/marketplace/_layout/order/$id'
-    | '/marketplace/_layout/order/track'
-    | '/marketplace/_layout/cart/'
-    | '/marketplace/_layout/checkout/'
-    | '/marketplace/_layout/dashboard/'
-    | '/marketplace/_layout/listings/'
-    | '/marketplace/_layout/dashboard/order/$id'
-    | '/marketplace/_layout/dashboard/orders/all'
-    | '/marketplace/_layout/dashboard/bookings/'
-    | '/marketplace/_layout/dashboard/listings/'
-    | '/marketplace/_layout/dashboard/orders/'
-    | '/marketplace/_layout/dashboard/settings/'
-    | '/marketplace/_layout/listing/$slug/'
-    | '/marketplace/_layout/merchant/$id/'
-  fileRoutesById: FileRoutesById
-}
-
-export interface RootRouteChildren {
-  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  ClerkRouteRoute: typeof ClerkRouteRouteWithChildren
-  authForgotPasswordRoute: typeof authForgotPasswordRoute
-  authOtpRoute: typeof authOtpRoute
-  authSignInRoute: typeof authSignInRoute
-  authSignIn2Route: typeof authSignIn2Route
-  authSignUpRoute: typeof authSignUpRoute
-  errors401Route: typeof errors401Route
-  errors403Route: typeof errors403Route
-  errors404Route: typeof errors404Route
-  errors500Route: typeof errors500Route
-  errors503Route: typeof errors503Route
-  MarketplaceRoute: typeof MarketplaceRouteWithChildren
-}
-
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ClerkRouteRoute: ClerkRouteRouteWithChildren,
@@ -1263,275 +1196,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors503Route: errors503Route,
   MarketplaceRoute: MarketplaceRouteWithChildren,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/_authenticated",
-        "/clerk",
-        "/(auth)/forgot-password",
-        "/(auth)/otp",
-        "/(auth)/sign-in",
-        "/(auth)/sign-in-2",
-        "/(auth)/sign-up",
-        "/(errors)/401",
-        "/(errors)/403",
-        "/(errors)/404",
-        "/(errors)/500",
-        "/(errors)/503",
-        "/marketplace"
-      ]
-    },
-    "/_authenticated": {
-      "filePath": "_authenticated/route.tsx",
-      "children": [
-        "/_authenticated/settings",
-        "/_authenticated/",
-        "/_authenticated/apps/",
-        "/_authenticated/chats/",
-        "/_authenticated/delivery/",
-        "/_authenticated/drivers/",
-        "/_authenticated/fleet/",
-        "/_authenticated/help-center/",
-        "/_authenticated/tasks/",
-        "/_authenticated/users/",
-        "/_authenticated/warehouse/"
-      ]
-    },
-    "/clerk": {
-      "filePath": "clerk/route.tsx",
-      "children": [
-        "/clerk/(auth)",
-        "/clerk/_authenticated"
-      ]
-    },
-    "/_authenticated/settings": {
-      "filePath": "_authenticated/settings/route.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/settings/account",
-        "/_authenticated/settings/appearance",
-        "/_authenticated/settings/display",
-        "/_authenticated/settings/notifications",
-        "/_authenticated/settings/"
-      ]
-    },
-    "/clerk/(auth)": {
-      "filePath": "clerk/(auth)/route.tsx",
-      "parent": "/clerk",
-      "children": [
-        "/clerk/(auth)/sign-in",
-        "/clerk/(auth)/sign-up"
-      ]
-    },
-    "/clerk/_authenticated": {
-      "filePath": "clerk/_authenticated/route.tsx",
-      "parent": "/clerk",
-      "children": [
-        "/clerk/_authenticated/user-management"
-      ]
-    },
-    "/(auth)/forgot-password": {
-      "filePath": "(auth)/forgot-password.tsx"
-    },
-    "/(auth)/otp": {
-      "filePath": "(auth)/otp.tsx"
-    },
-    "/(auth)/sign-in": {
-      "filePath": "(auth)/sign-in.tsx"
-    },
-    "/(auth)/sign-in-2": {
-      "filePath": "(auth)/sign-in-2.tsx"
-    },
-    "/(auth)/sign-up": {
-      "filePath": "(auth)/sign-up.tsx"
-    },
-    "/(errors)/401": {
-      "filePath": "(errors)/401.tsx"
-    },
-    "/(errors)/403": {
-      "filePath": "(errors)/403.tsx"
-    },
-    "/(errors)/404": {
-      "filePath": "(errors)/404.tsx"
-    },
-    "/(errors)/500": {
-      "filePath": "(errors)/500.tsx"
-    },
-    "/(errors)/503": {
-      "filePath": "(errors)/503.tsx"
-    },
-    "/marketplace": {
-      "filePath": "marketplace",
-      "children": [
-        "/marketplace/_layout"
-      ]
-    },
-    "/marketplace/_layout": {
-      "filePath": "marketplace/_layout.tsx",
-      "parent": "/marketplace",
-      "children": [
-        "/marketplace/_layout/my-orders",
-        "/marketplace/_layout/",
-        "/marketplace/_layout/order/$id",
-        "/marketplace/_layout/order/track",
-        "/marketplace/_layout/cart/",
-        "/marketplace/_layout/checkout/",
-        "/marketplace/_layout/dashboard/",
-        "/marketplace/_layout/listings/",
-        "/marketplace/_layout/dashboard/order/$id",
-        "/marketplace/_layout/dashboard/orders/all",
-        "/marketplace/_layout/dashboard/bookings/",
-        "/marketplace/_layout/dashboard/listings/",
-        "/marketplace/_layout/dashboard/orders/",
-        "/marketplace/_layout/dashboard/settings/",
-        "/marketplace/_layout/listing/$slug/",
-        "/marketplace/_layout/merchant/$id/"
-      ]
-    },
-    "/_authenticated/": {
-      "filePath": "_authenticated/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/account": {
-      "filePath": "_authenticated/settings/account.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/appearance": {
-      "filePath": "_authenticated/settings/appearance.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/display": {
-      "filePath": "_authenticated/settings/display.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/notifications": {
-      "filePath": "_authenticated/settings/notifications.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/clerk/(auth)/sign-in": {
-      "filePath": "clerk/(auth)/sign-in.tsx",
-      "parent": "/clerk/(auth)"
-    },
-    "/clerk/(auth)/sign-up": {
-      "filePath": "clerk/(auth)/sign-up.tsx",
-      "parent": "/clerk/(auth)"
-    },
-    "/clerk/_authenticated/user-management": {
-      "filePath": "clerk/_authenticated/user-management.tsx",
-      "parent": "/clerk/_authenticated"
-    },
-    "/marketplace/_layout/my-orders": {
-      "filePath": "marketplace/_layout/my-orders.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/_authenticated/apps/": {
-      "filePath": "_authenticated/apps/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/chats/": {
-      "filePath": "_authenticated/chats/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/delivery/": {
-      "filePath": "_authenticated/delivery/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/drivers/": {
-      "filePath": "_authenticated/drivers/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/fleet/": {
-      "filePath": "_authenticated/fleet/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/help-center/": {
-      "filePath": "_authenticated/help-center/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/": {
-      "filePath": "_authenticated/settings/index.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/tasks/": {
-      "filePath": "_authenticated/tasks/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/users/": {
-      "filePath": "_authenticated/users/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/warehouse/": {
-      "filePath": "_authenticated/warehouse/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/marketplace/_layout/": {
-      "filePath": "marketplace/_layout/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/order/$id": {
-      "filePath": "marketplace/_layout/order/$id.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/order/track": {
-      "filePath": "marketplace/_layout/order/track.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/cart/": {
-      "filePath": "marketplace/_layout/cart/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/checkout/": {
-      "filePath": "marketplace/_layout/checkout/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/": {
-      "filePath": "marketplace/_layout/dashboard/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/listings/": {
-      "filePath": "marketplace/_layout/listings/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/order/$id": {
-      "filePath": "marketplace/_layout/dashboard/order/$id.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/orders/all": {
-      "filePath": "marketplace/_layout/dashboard/orders/all.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/bookings/": {
-      "filePath": "marketplace/_layout/dashboard/bookings/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/listings/": {
-      "filePath": "marketplace/_layout/dashboard/listings/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/orders/": {
-      "filePath": "marketplace/_layout/dashboard/orders/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/dashboard/settings/": {
-      "filePath": "marketplace/_layout/dashboard/settings/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/listing/$slug/": {
-      "filePath": "marketplace/_layout/listing/$slug/index.tsx",
-      "parent": "/marketplace/_layout"
-    },
-    "/marketplace/_layout/merchant/$id/": {
-      "filePath": "marketplace/_layout/merchant/$id/index.tsx",
-      "parent": "/marketplace/_layout"
-    }
-  }
-}
-ROUTE_MANIFEST_END */

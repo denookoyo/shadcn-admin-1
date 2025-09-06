@@ -74,7 +74,15 @@ export function createApiRouter() {
 
   router.post('/products', ensureAuth, async (req, res) => {
     try {
-      const data = { ...req.body, ownerId: req.user.uid }
+      let { images, description, ...rest } = req.body || {}
+      if (typeof images === 'string') {
+        images = images
+          .split(/\n|,/) // split on newlines or commas
+          .map((s) => String(s).trim())
+          .filter(Boolean)
+      }
+      if (!Array.isArray(images)) images = undefined
+      const data = { ...rest, description: description ?? null, images, ownerId: req.user.uid }
       const created = await prisma.product.create({ data })
       res.status(201).json(created)
     } catch (e) {
@@ -86,9 +94,21 @@ export function createApiRouter() {
 
   router.put('/products', ensureAuth, async (req, res) => {
     try {
-      const { id, ...patch } = req.body
+      const { id, images, description, ...rest } = req.body || {}
       if (!id) return res.status(400).send('Missing id')
-      const updated = await prisma.product.update({ where: { id }, data: patch })
+      let imagesArr = images
+      if (typeof images === 'string') {
+        imagesArr = images
+          .split(/\n|,/) // split on newlines or commas
+          .map((s) => String(s).trim())
+          .filter(Boolean)
+      }
+      const data = {
+        ...rest,
+        description: description ?? undefined,
+        images: Array.isArray(imagesArr) ? imagesArr : undefined,
+      }
+      const updated = await prisma.product.update({ where: { id }, data })
       res.json(updated)
     } catch (e) {
       // eslint-disable-next-line no-console

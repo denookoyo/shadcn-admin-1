@@ -19,6 +19,8 @@ model Product {
   rating    Float?
   type      ProductType
   img       String
+  description String?
+  images     String[]
   ownerId   Int?
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
