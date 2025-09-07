@@ -11,12 +11,12 @@ import { Button } from '@/components/ui/button'
 import { SearchProvider } from '@/context/search-context'
 import { SidebarProvider } from '@/components/ui/sidebar'
 
-export const Route = createFileRoute('/blog/$slug/')({
+export const Route = createFileRoute('/blog//')({
   component: BlogPost,
 })
 
 function BlogPost() {
-  const { slug } = useParams({ from: '/blog/$slug/' })
+  const { slug } = useParams({ from: '/blog//' })
   const [post, setPost] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -26,8 +26,6 @@ function BlogPost() {
       try {
         const p = await db.getBlogPostBySlug?.(slug)
         if (mounted) setPost(p || null)
-      } catch {
-        if (mounted) setPost(null)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -51,13 +49,14 @@ function BlogPost() {
               <Link to='/blog'><Button variant='outline'>&larr; Back</Button></Link>
               <h1 className='text-2xl font-bold'>{post?.title || 'Post'}</h1>
             </div>
-            <div className='text-xs text-gray-500'>
-              {post?.createdAt ? new Date(post.createdAt).toLocaleDateString() : null}
-              {post?.published ? ' • Published' : post ? ' • Draft' : null}
-            </div>
+            <div className='flex items-center gap-3'>
+              <div className='text-xs text-gray-500'>
+                {post?.createdAt ? new Date(post.createdAt).toLocaleDateString() : null}
+                {post?.published ? ' • Published' : post ? ' • Draft' : null}
+              </div>
               {post?.slug ? (
-                <Link to='/blog/$slug/edit' params={{ slug: post.slug }}>
-                  <button className='rounded-md border px-3 py-1.5 text-sm'>Edit</button>
+                <Link to='/blog//edit' params={{ slug: post.slug }}>
+                  <Button size='sm' variant='outline'>Edit</Button>
                 </Link>
               ) : null}
             </div>
@@ -80,4 +79,3 @@ function BlogPost() {
     </SearchProvider>
   )
 }
-
