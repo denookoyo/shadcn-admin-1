@@ -20,7 +20,8 @@ const allowedUrls = [
   "/settings/account", "/settings/appearance", "/settings/billing", "/settings/integrations",
   "/settings/notifications", "/settings/security", "/settings/team", "/settings/plans", "/settings/profile",
   "/settings/password", "/settings/email", "/settings/connected-accounts", "/settings/domains",
-  "/settings/api-keys", "/settings/logs", "/settings/usage", "/settings/support", "/settings/feedback"
+  "/settings/api-keys", "/settings/logs", "/settings/usage", "/settings/support", "/settings/feedback",
+  "/blog"
 ] as const
 
 type AllowedUrl = typeof allowedUrls[number]

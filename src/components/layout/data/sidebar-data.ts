@@ -122,6 +122,11 @@ export const sidebarData: SidebarData = {
           icon: IconReportAnalytics,
         },
         {
+          title: 'Blog',
+          url: '/blog',
+          icon: IconPackages,
+        },
+        {
           title: 'Task Scheduler',
           url: '/tasks',
           icon: IconChecklist,
