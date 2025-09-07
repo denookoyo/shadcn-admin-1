@@ -9,6 +9,8 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
 import { BlogEditor, type BlogDraft } from '@/features/blog/editor'
+import { SearchProvider } from '@/context/search-context'
+import { SidebarProvider } from '@/components/ui/sidebar'
 
 export const Route = createFileRoute('/blog/new')({
   component: NewPost,
@@ -19,8 +21,9 @@ function NewPost() {
   const [draft, setDraft] = useState<BlogDraft>({ title: '', slug: '', coverImage: '', tags: '', content: '', published: false })
   const [saving, setSaving] = useState(false)
   return (
-    <>
-      <Header>
+    <SearchProvider>
+      <SidebarProvider defaultOpen={false}>
+        <Header>
         <Search />
         <div className='ml-auto flex items-center space-x-4'>
           <ThemeSwitch />
@@ -44,6 +47,7 @@ function NewPost() {
         </div>
         <BlogEditor value={draft} onChange={setDraft} onGenerate={undefined} />
       </Main>
-    </>
+      </SidebarProvider>
+    </SearchProvider>
   )
 }
