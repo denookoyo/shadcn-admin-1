@@ -16,6 +16,18 @@ export const Header = ({
 }: HeaderProps) => {
   const [offset, setOffset] = React.useState(0)
 
+  // Gracefully handle missing SidebarProvider for pages that don't include it
+  // If SidebarTrigger throws (no provider), render nothing instead of crashing
+  class SidebarTriggerBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+    constructor(props: { children: React.ReactNode }) {
+      super(props)
+      this.state = { hasError: false }
+    }
+    static getDerivedStateFromError() { return { hasError: true } }
+    override componentDidCatch(_error: unknown) {}
+    override render() { return this.state.hasError ? null : this.props.children as any }
+  }
+
   React.useEffect(() => {
     const onScroll = () => {
       setOffset(document.body.scrollTop || document.documentElement.scrollTop)
@@ -38,7 +50,9 @@ export const Header = ({
       )}
       {...props}
     >
-      <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
+      <SidebarTriggerBoundary>
+        <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
+      </SidebarTriggerBoundary>
       <Separator orientation='vertical' className='h-6' />
       {children}
     </header>
