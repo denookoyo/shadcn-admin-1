@@ -8,6 +8,8 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Button } from '@/components/ui/button'
+import { SearchProvider } from '@/context/search-context'
+import { SidebarProvider } from '@/components/ui/sidebar'
 
 export const Route = createFileRoute('/blog/')({
   component: BlogList,
@@ -17,7 +19,8 @@ function BlogList() {
   const [posts, setPosts] = useState<any[]>([])
   useEffect(() => { (async () => { try { const p = await db.listBlogPosts?.(); setPosts(p || []) } catch {} })() }, [])
   return (
-    <>
+    <SearchProvider>
+      <SidebarProvider defaultOpen={false}>
       <Header>
         <Search />
         <div className='ml-auto flex items-center space-x-4'>
@@ -28,7 +31,10 @@ function BlogList() {
       <Main>
         <div className='mb-4 flex items-center justify-between'>
           <h1 className='text-2xl font-bold'>Blog</h1>
-          <Link to='/blog/new'><Button>New post</Button></Link>
+          <div className='flex gap-2'>
+            <Link to='/blog/manage'><Button variant='outline'>Manage</Button></Link>
+            <Link to='/blog/new'><Button>New post</Button></Link>
+          </div>
         </div>
         <div className='grid gap-4 md:grid-cols-3'>
           {posts.map((p) => (
@@ -41,6 +47,7 @@ function BlogList() {
           {posts.length === 0 && <div className='text-sm text-gray-500'>No posts yet.</div>}
         </div>
       </Main>
-    </>
+      </SidebarProvider>
+    </SearchProvider>
   )
 }
