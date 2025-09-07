@@ -55,6 +55,12 @@ function BlogPost() {
               {post?.createdAt ? new Date(post.createdAt).toLocaleDateString() : null}
               {post?.published ? ' • Published' : post ? ' • Draft' : null}
             </div>
+              {post?.slug ? (
+                <Link to='/blog/$slug/edit' params={{ slug: post.slug }}>
+                  <button className='rounded-md border px-3 py-1.5 text-sm'>Edit</button>
+                </Link>
+              ) : null}
+            </div>
           </div>
 
           {loading ? (
