@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Developer Integration — FleetOps</title>
+    <meta name="description" content="Integrate preexisting seller apps with FleetOps: APIs, webhooks, and import options." />
+    <style>
+      :root { --bg:#0b0e14; --card:#10141e; --muted:#a3acc5; --text:#e6edf3; --accent:#7c98ff; --border:#1e2433; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans; background: var(--bg); color: var(--text); }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { position: sticky; top: 0; background: rgba(11,14,20,0.85); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+      .wrap { max-width: 980px; margin: 0 auto; padding: 1rem; }
+      .title { font-size: 1.5rem; font-weight: 700; }
+      .subtitle { color: var(--muted); font-size: .95rem; }
+      main { padding: 2rem 0; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+      h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+      h3 { margin: 1rem 0 .5rem; font-size: 1.05rem; }
+      ul, ol { margin: .25rem 0 .75rem 1.25rem; }
+      pre { background:#0f1320; border:1px solid var(--border); border-radius:10px; padding:.75rem; overflow:auto; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      .tip { border-left: 3px solid var(--accent); padding:.5rem .75rem; background:#0f1320; border-radius: 8px; margin:.75rem 0; color:#dbe3ff; }
+      .muted { color: var(--muted); }
+      .grid { display:grid; grid-template-columns:1fr; gap:1rem; }
+      @media (min-width: 900px) { .grid { grid-template-columns:1fr 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="title">Developer Integration</div>
+        <div class="subtitle">Ways to onboard preexisting seller apps quickly and safely.</div>
+      </div>
+    </header>
+    <main>
+      <div class="wrap">
+        <section class="card">
+          <h2>Pick Your Path</h2>
+          <ul>
+            <li><strong>No‑code</strong>: CSV import or Google Sheets template for catalog/price updates.</li>
+            <li><strong>Low‑code</strong>: Zapier/Make flows to post products and fetch orders.</li>
+            <li><strong>API</strong>: REST endpoints for products, orders, and appointments. Webhooks for order events.</li>
+          </ul>
+          <p class="muted">Start simple (CSV), then graduate to API as volume grows.</p>
+        </section>
+
+        <section class="card">
+          <h2>Catalog API (Products)</h2>
+          <p>Create/update products programmatically. Use your seller account and an authenticated session. API keys will be available soon for backend‑to‑backend integrations.</p>
+          <h3>Create</h3>
+<pre><code>POST /api/products
+Content-Type: application/json
+Cookie: session=&lt;JWT from seller login&gt;
+{
+  "title": "Blue Hoodie",
+  "price": 59,
+  "type": "goods", // or "service"
+  "slug": "blue-hoodie",
+  "description": "Soft cotton hoodie",
+  "images": ["https://example.com/hoodie.jpg"],
+  "categoryId": "cat_abc123"
+}
+</code></pre>
+          <h3>Update</h3>
+<pre><code>PUT /api/products
+Content-Type: application/json
+Cookie: session=&lt;JWT&gt;
+{
+  "id": "prod_abc123",
+  "price": 62,
+  "description": "Now with thicker lining"
+}
+</code></pre>
+          <h3>Delete</h3>
+<pre><code>DELETE /api/products
+Content-Type: application/json
+Cookie: session=&lt;JWT&gt;
+{
+  "id": "prod_abc123"
+}
+</code></pre>
+          <p>More fields and behaviors: see <a href="/docs/API.md">/docs/API.md</a>.</p>
+          <div class="tip">CSV import alternative: provide columns <code>title,slug,price,type,category,description,images</code> (images as comma‑separated URLs). Build a small script to POST rows to <code>/api/products</code>.</div>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Orders API</h2>
+            <ul>
+              <li><code>GET /api/seller/orders</code> — your orders (auth)</li>
+              <li><code>GET /api/orders/:id</code> — details (auth)</li>
+              <li><code>POST /api/orders/:id/ship</code> — mark shipped (goods)</li>
+              <li><code>POST /api/orders/:id/confirm-appointment</code> — confirm date (services)</li>
+              <li><code>POST /api/orders/:id/appointment/reject-propose</code> — propose alternates</li>
+            </ul>
+            <p class="muted">Polling is fine to start. We’ll add webhooks for <code>order.created</code>, <code>order.paid</code>, <code>order.updated</code>.</p>
+          </div>
+          <div class="card">
+            <h2>Appointments (Services)</h2>
+<pre><code>POST /api/orders/:id/appointment/reject-propose
+Cookie: session=&lt;JWT&gt;
+{
+  "proposals": [
+    "2025-09-18T10:00:00+10:00",
+    "2025-09-18T14:30:00+10:00"
+  ]
+}
+</code></pre>
+<pre><code>POST /api/orders/:id/confirm-appointment
+Cookie: session=&lt;JWT&gt;
+{
+  "date": "2025-09-19T09:00:00+10:00"
+}
+</code></pre>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Auth Options</h2>
+          <ul>
+            <li><strong>Session Cookie</strong> (today): log in once as the seller in a headless session and reuse the cookie.</li>
+            <li><strong>API Keys</strong> (coming): create/rotate keys in Seller Settings; pass <code>Authorization: Bearer &lt;key&gt;</code>.</li>
+            <li><strong>Webhooks</strong> (coming): receive signed events with an <code>X-Signature</code> HMAC header.</li>
+          </ul>
+          <div class="tip">For production integrations, use API keys + webhooks. Session cookies are best for quick pilots.</div>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Code Snippets</h2>
+            <h3>Node (fetch)</h3>
+<pre><code>const res = await fetch('https://yourapp.com/api/products', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    // Temporary: cookie from a logged-in seller session
+    'Cookie': `session=${process.env.SELLER_SESSION_TOKEN}`,
+  },
+  body: JSON.stringify({ title:'Blue Hoodie', price:59, type:'goods' })
+})
+if (!res.ok) throw new Error(await res.text())
+</code></pre>
+            <h3>Python (requests)</h3>
+<pre><code>import requests
+cookies = { 'session': '...seller session jwt...' }
+r = requests.post('https://yourapp.com/api/products',
+  json={'title':'Blue Hoodie','price':59,'type':'goods'}, cookies=cookies)
+r.raise_for_status()
+</code></pre>
+          </div>
+          <div class="card">
+            <h2>CSV Template</h2>
+            <p>Columns: <code>title,slug,price,type,category,description,images</code></p>
+            <p>Images: comma‑separated URLs. Type: <code>goods</code> or <code>service</code>.</p>
+            <p class="muted">Upload the CSV to your system and script POSTs to <code>/api/products</code>.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Best Practices</h2>
+          <ul>
+            <li>Use <strong>idempotency</strong> with a unique header (e.g., <code>Idempotency-Key</code>) to avoid duplicates if you retry.</li>
+            <li>Batch updates off‑peak; respect rate limits (e.g., 10 req/sec per seller).</li>
+            <li>Keep a local catalog ID ↔ platform ID map for updates.</li>
+            <li>For services, store appointment confirmations and proposals in your system too.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Support</h2>
+          <p>For API keys, webhook setup, or high‑volume onboarding, contact support in the portal. We can help migrate catalogs and set up pilot sellers.</p>
+        </section>
+      </div>
+    </main>
+  </body>
+  </html>
+

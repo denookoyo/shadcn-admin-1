@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Seller Guide — FleetOps</title>
+    <meta name="description" content="Step-by-step seller guide: add products, accept orders, reschedule appointments, ship, get paid." />
+    <style>
+      :root { --bg:#0b0e14; --card:#10141e; --muted:#a3acc5; --text:#e6edf3; --accent:#7c98ff; --border:#1e2433; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans; background: var(--bg); color: var(--text); }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { position: sticky; top: 0; background: rgba(11,14,20,0.85); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 1rem; }
+      .title { font-size: 1.5rem; font-weight: 700; }
+      .subtitle { color: var(--muted); font-size: .95rem; }
+      main { padding: 2rem 0; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+      h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+      h3 { margin: 1rem 0 .5rem; font-size: 1.05rem; }
+      ul, ol { margin: .25rem 0 .75rem 1.25rem; }
+      .tip { border-left: 3px solid var(--accent); padding:.5rem .75rem; background:#0f1320; border-radius: 8px; margin:.75rem 0; color:#dbe3ff; }
+      .muted { color: var(--muted); }
+      .kbd { border: 1px solid var(--border); background: #0f1320; padding: .05rem .4rem; border-radius: 6px; font-size: .9em; }
+      .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+      @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="title">Seller Guide</div>
+        <div class="subtitle">Everything you need to start selling on FleetOps.</div>
+      </div>
+    </header>
+    <main>
+      <div class="wrap">
+        <section class="card">
+          <h2>Before You Start</h2>
+          <ul>
+            <li>Sign in with Google and complete your <strong>Profile</strong> (name, image, contact).</li>
+            <li>For business sellers, have your <strong>ABN/ID</strong> and bank payout details ready (if required).</li>
+            <li>Decide if you are selling <strong>Goods</strong> (physical items) or <strong>Services</strong> (appointments/jobs) — or both.</li>
+          </ul>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Add a Product (Goods)</h2>
+            <ol>
+              <li>Go to <span class="kbd">Products</span> → <strong>Add Product</strong>.</li>
+              <li>Fill in <strong>Title</strong>, <strong>Price</strong>, and set <strong>Type</strong> to <strong>Goods</strong>.</li>
+              <li>Upload images and write a clear description (benefits, size/materials, what’s included).</li>
+              <li>Choose a <strong>Category</strong>. Save.</li>
+            </ol>
+            <div class="tip">Use high‑quality photos on a clean background. Include measurements and care instructions if relevant.</div>
+          </div>
+          <div class="card">
+            <h2>Add a Service</h2>
+            <ol>
+              <li>Go to <span class="kbd">Products</span> → <strong>Add Product</strong>.</li>
+              <li>Set <strong>Type</strong> to <strong>Service</strong>. Describe what you do and typical duration.</li>
+              <li>Add price (fixed or starting price) and any location/coverage notes.</li>
+              <li>Upload images of past work or representative visuals. Save.</li>
+            </ol>
+            <div class="tip">Mention availability windows (e.g., weekdays 9–5), required access, and what the customer should prepare.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Manage Your Listings</h2>
+          <ul>
+            <li>Edit a listing anytime from <span class="kbd">Products</span> → select an item → <strong>Edit</strong>.</li>
+            <li>Keep prices and stock current. Pause a listing if out of stock.</li>
+            <li>Update descriptions if you receive repeated questions.</li>
+          </ul>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Accept & Fulfil Orders (Goods)</h2>
+            <ol>
+              <li>Open <span class="kbd">Orders</span> → <strong>Seller Orders</strong>.</li>
+              <li>New orders appear as <strong>Pending</strong>. Review details and confirm you can fulfil.</li>
+              <li>Pack and <strong>Ship</strong> by the promised timeframe (add tracking in the order notes if available).</li>
+              <li>Mark <strong>Shipped</strong> in the order when dispatched.</li>
+              <li>After the buyer confirms receipt, the order moves to <strong>Completed</strong> and payout is scheduled.</li>
+            </ol>
+            <div class="tip">If you cannot fulfil an item, message the buyer promptly with options (refund, alternative, or delay) and use the dispute tools if needed.</div>
+          </div>
+          <div class="card">
+            <h2>Accept & Schedule Orders (Services)</h2>
+            <ol>
+              <li>Open <span class="kbd">Orders</span> → <strong>Seller Orders</strong>.</li>
+              <li>For service items, confirm the buyer’s requested time or click <strong>Propose Alternates</strong> to offer 1–3 new times.</li>
+              <li>When the buyer accepts a time, the appointment becomes <strong>Scheduled</strong>.</li>
+              <li>Complete the job and update the order to <strong>Completed</strong>.</li>
+            </ol>
+            <div class="tip">Be specific when proposing times (date, time window). If weather or access is a factor, note it in the message.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Rescheduling (Reappointment)</h2>
+          <ul>
+            <li>From the order page, choose <strong>Reject/Propose</strong> and enter alternate date/time options.</li>
+            <li>If the buyer proposes a new time, review and <strong>Accept</strong> if you can make it.</li>
+            <li>Keep all scheduling messages inside the order to maintain a clear record.</li>
+          </ul>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Messaging & Customer Care</h2>
+            <ul>
+              <li>Respond within <strong>24 hours</strong>. Be polite and solution‑oriented.</li>
+              <li>Share only necessary details. No personal payment links or contact info.</li>
+              <li>Use photos or short videos to clarify issues when helpful.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h2>Payments & Payouts</h2>
+            <ul>
+              <li>Buyers pay inside the portal via secure providers (cards, wallets).</li>
+              <li>Funds are held until shipment (goods) or completion (services), then paid out to you minus fees.</li>
+              <li>Chargebacks/disputes are handled through the provider — keep evidence.</li>
+            </ul>
+            <p class="muted">Never ask for off‑platform payment; it voids protection and may lead to account actions.</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Cancellations, Returns, and Disputes</h2>
+          <ul>
+            <li><strong>Cancellations</strong>: if you cannot fulfil, cancel promptly and explain why.</li>
+            <li><strong>Returns</strong> (goods): share a return address and conditions (unused, original packaging).</li>
+            <li><strong>Disputes</strong>: submit clear evidence (photos, tracking, chat) for a fair outcome.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Best Practices</h2>
+          <ul>
+            <li>Maintain accurate stock and availability.</li>
+            <li>Use templates for common replies (shipping times, preparation steps).</li>
+            <li>Ask satisfied buyers to leave a review — it builds trust.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Need Help?</h2>
+          <p>Check the <a href="/docs/user-guides/marketplace-rules">Marketplace Rules & Safety</a> for required conduct and protections. For account issues, use the portal’s Help link.</p>
+        </section>
+      </div>
+    </main>
+  </body>
+  </html>
+

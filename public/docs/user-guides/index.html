@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>User Guide — FleetOps Portal</title>
+    <meta name="description" content="End‑user guide for the FleetOps portal" />
+    <style>
+      :root { --bg:#0b0e14; --card:#10141e; --muted:#a3acc5; --text:#e6edf3; --accent:#7c98ff; --border:#1e2433; }
+      * { box-sizing: border-box; }
+      body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans; background: var(--bg); color: var(--text); }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { position: sticky; top: 0; background: rgba(11,14,20,0.85); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 1rem; }
+      .title { font-size: 1.5rem; font-weight: 700; }
+      .subtitle { color: var(--muted); font-size: .95rem; }
+      main { padding: 2rem 0; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+      h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+      h3 { margin: 1rem 0 .5rem; font-size: 1.05rem; }
+      ul, ol { margin: .25rem 0 .75rem 1.25rem; }
+      .tip { border-left: 3px solid var(--accent); padding:.5rem .75rem; background:#0f1320; border-radius: 8px; margin:.75rem 0; color:#dbe3ff; }
+      .muted { color: var(--muted); }
+      .kbd { border: 1px solid var(--border); background: #0f1320; padding: .05rem .4rem; border-radius: 6px; font-size: .9em; }
+      .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+      @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="title">FleetOps Portal — User Guide</div>
+        <div class="subtitle">Simple, practical steps to use the portal. No coding needed.</div>
+      </div>
+    </header>
+    <main>
+      <div class="wrap">
+        <section class="card">
+          <h2>Guides</h2>
+          <ul>
+            <li><a href="/docs/user-guides/marketplace-rules">Marketplace Rules & Safety</a> — interactions, fraud prevention, and payments.</li>
+            <li><a href="/docs/user-guides/seller-guide">Seller Guide</a> — add products, accept/schedule orders, and get paid.</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h2>What is FleetOps?</h2>
+          <p>FleetOps is a modern web portal to browse products and services, place orders, schedule appointments (for services), and track your purchases — all in one place.</p>
+          <p class="muted">If you’re just getting started, follow the steps below. You can always come back to this page from <a href="/docs">Docs</a>.</p>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>1) Sign In</h2>
+            <ol>
+              <li>Open the site and click <strong>Sign In</strong>.</li>
+              <li>Choose <strong>Continue with Google</strong> and approve the prompt.</li>
+            </ol>
+            <div class="tip">We use a secure cookie to keep you signed in. If you switch devices or browsers, you may need to sign in again.</div>
+          </div>
+          <div class="card">
+            <h2>2) Your Profile</h2>
+            <ol>
+              <li>Open the user menu (top right) → <strong>Profile</strong>.</li>
+              <li>Fill in your <strong>Name</strong>, <strong>Phone</strong>, and any optional details.</li>
+              <li>Click <strong>Save</strong>.</li>
+            </ol>
+            <div class="tip">This information appears to sellers when needed for delivery or scheduling.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3) Browse Products & Services</h2>
+          <ul>
+            <li>Use the left sidebar to explore categories.</li>
+            <li>Use the search bar at the top to find items quickly.</li>
+            <li>Each item shows a title, price, and seller info. Click an item to see its details and photos.</li>
+          </ul>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>4) Add to Cart</h2>
+            <ul>
+              <li>On the item page, choose the quantity and click <strong>Add to cart</strong>.</li>
+              <li>Open the cart from the top bar to review items.</li>
+              <li>Change quantities or remove items anytime.</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h2>5) Checkout</h2>
+            <ol>
+              <li>Go to the cart and click <strong>Checkout</strong>.</li>
+              <li>Confirm your contact details and delivery preferences.</li>
+              <li>Place your order. You’ll get an order <strong>ID</strong>.</li>
+            </ol>
+            <div class="tip">Keep your order ID — you can use it to track your order later.</div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>6) Orders & Appointments</h2>
+          <h3>Goods (physical products)</h3>
+          <ul>
+            <li><strong>Paid → Shipped → Completed</strong>: we’ll notify you as the order progresses.</li>
+            <li>Mark <strong>Received</strong> when your package arrives to finalize the order.</li>
+          </ul>
+          <h3>Services (appointments)</h3>
+          <ul>
+            <li>Choose a preferred date/time during checkout, or your seller may propose alternatives.</li>
+            <li>Accept a proposed time from the order page to schedule it.</li>
+            <li>After the service is completed, you can proceed to payment (if applicable).</li>
+          </ul>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>7) Track an Order</h2>
+            <ol>
+              <li>Go to <span class="kbd">Orders</span> from the sidebar, or open <span class="kbd">Track Order</span>.</li>
+              <li>Enter your order ID and email (if using public tracking).</li>
+              <li>See the current status and any next steps.</li>
+            </ol>
+          </div>
+          <div class="card">
+            <h2>8) Reviews & Reports</h2>
+            <ul>
+              <li>After completion, leave a <strong>rating</strong> and <strong>feedback</strong> for the seller.</li>
+              <li>If you had a negative experience, you can file a <strong>report</strong> from the seller’s page. We take reports seriously.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>9) Tips</h2>
+          <ul>
+            <li>Use the <strong>search</strong> bar to quickly find items.</li>
+            <li>Switch between <strong>light/dark</strong> themes using the toggle on the header.</li>
+            <li>Keep your profile up to date to streamline checkout and delivery.</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Help & Support</h2>
+          <p>If you need help, first check the order page for notes from the seller. For account issues, ensure you’re signed in with the correct Google account. For anything else, contact support through the portal’s help link.</p>
+          <p class="muted">Developer or admin? See the technical docs at <a href="/docs">/docs</a>.</p>
+        </section>
+      </div>
+    </main>
+  </body>
+  </html>

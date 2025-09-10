@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shadcn Admin + API Documentation</title>
+    <meta name="description" content="Documentation for the Shadcn Admin + API project (FleetOps)" />
+    <style>
+      :root { --bg:#0b0e14; --card:#10141e; --muted:#a3acc5; --text:#e6edf3; --accent:#7c98ff; --border:#1e2433; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji"; background: var(--bg); color: var(--text); }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      header { position: sticky; top: 0; background: rgba(11,14,20,0.8); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+      .wrap { max-width: 980px; margin: 0 auto; padding: 1rem; }
+      .title { font-size: 1.5rem; font-weight: 700; }
+      main { padding: 2rem 0; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+      h2 { margin: 0 0 .75rem; font-size: 1.25rem; }
+      h3 { margin: 1.25rem 0 .5rem; font-size: 1rem; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+      pre { background: #0f1320; color: #e6edf3; border: 1px solid var(--border); border-radius: 10px; padding: .75rem; overflow-x: auto; }
+      .grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+      @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+      ul { margin: .5rem 0 .5rem 1.25rem; }
+      .muted { color: var(--muted); }
+      .kbd { border: 1px solid var(--border); background: #0f1320; padding: .05rem .4rem; border-radius: 6px; font-size: .9em; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="title">Shadcn Admin + API Docs</div>
+        <div class="muted">FleetOps — React + Vite + Express + Prisma</div>
+      </div>
+    </header>
+    <main>
+      <div class="wrap">
+        <section class="card">
+          <h2>Introduction</h2>
+          <p>Modern admin dashboard built with React, Vite, TailwindCSS, and Radix UI — paired with an Express API (Prisma + Postgres) and serverless adapters for Vercel/Netlify.</p>
+          <p>
+            Source and README live in the repository. For the raw API reference in Markdown, see
+            <a href="/docs/API.md" target="_blank" rel="noreferrer">/docs/API.md</a> (if deployed) or the repo path <span class="kbd">docs/API.md</span>.
+          </p>
+          <p>
+            Looking for non‑technical instructions? Open the <a href="/docs/user-guides" rel="noreferrer">User Guide</a>.
+          </p>
+          <p>
+            Integrating an existing seller system? See the <a href="/docs/developers" rel="noreferrer">Developer Integration</a> guide.
+          </p>
+        </section>
+
+        <section class="grid">
+          <div class="card">
+            <h2>Quick Start</h2>
+            <ol>
+              <li>Install deps: <code>pnpm install</code></li>
+              <li>Configure <code>.env</code> (DATABASE_URL, JWT_SECRET, VITE_GOOGLE_CLIENT_ID, OPENAI_API_KEY)</li>
+              <li>Prisma: <code>pnpm prisma:generate</code>, <code>pnpm prisma:push</code></li>
+              <li>Run dev server: <code>pnpm dev</code></li>
+            </ol>
+            <p>App: <code>http://localhost:5173</code> — API: <code>/api</code></p>
+          </div>
+          <div class="card">
+            <h2>Testing</h2>
+            <ul>
+              <li>Run tests: <code>pnpm test</code></li>
+              <li>Watch mode: <code>pnpm test:watch</code></li>
+              <li>Vitest + Supertest with Prisma mocked</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Key Endpoints</h2>
+          <ul>
+            <li><strong>GET</strong> <code>/api/health</code> — health check</li>
+            <li><strong>Auth</strong> <code>/api/auth/google</code>, <code>/api/auth/me</code>, <code>/api/auth/logout</code>, <code>/api/auth/me</code> (PUT/POST)</li>
+            <li><strong>Products</strong> <code>/api/products</code> (GET/POST/PUT/DELETE)</li>
+            <li><strong>Categories</strong> <code>/api/categories</code> (GET/POST/PUT/DELETE)</li>
+            <li><strong>Cart</strong> <code>/api/cart</code> (GET/POST/DELETE)</li>
+            <li><strong>Checkout</strong> <code>/api/checkout</code> (POST)</li>
+            <li><strong>Orders</strong> <code>/api/orders</code>, <code>/api/orders/:id</code>, <code>/api/orders/track</code>, transitions via <code>/api/orders/:id/*</code></li>
+            <li><strong>Users</strong> <code>/api/users/:id</code>, <code>/api/users/:id/reviews</code>, <code>/api/users/:id/rate-negative</code></li>
+            <li><strong>Blog</strong> <code>/api/blog/posts</code> (+ <code>:slug</code>, CRUD)</li>
+            <li><strong>AI</strong> <code>/api/ai/description</code> (requires OPENAI_API_KEY)</li>
+          </ul>
+          <p class="muted">Full descriptions live in <code>docs/API.md</code>.</p>
+        </section>
+
+        <section class="card">
+          <h2>Examples</h2>
+          <h3>Health</h3>
+          <pre><code>$ curl -s http://localhost:5173/api/health
+{"ok":true}
+          </code></pre>
+          <h3>Products</h3>
+          <pre><code>$ curl -s http://localhost:5173/api/products | jq '.[0]'</code></pre>
+          <h3>Create Product (auth)</h3>
+          <pre><code>$ curl -s -X POST http://localhost:5173/api/products \ 
+  -H 'Content-Type: application/json' \ 
+  -H 'Cookie: session=&lt;JWT&gt;' \ 
+  -d '{"title":"Sample","price":50,"type":"goods"}'</code></pre>
+        </section>
+
+        <section class="card">
+          <h2>Deployment Notes</h2>
+          <ul>
+            <li><strong>Vercel</strong>: API adapters under <code>api/</code>, rewrites in <code>vercel.json</code></li>
+            <li><strong>Netlify</strong>: functions under <code>netlify/functions</code>, redirects in <code>netlify.toml</code></li>
+            <li><strong>Prod server</strong>: <code>pnpm serve</code> serves <code>dist</code> and mounts API</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Links</h2>
+          <ul>
+            <li>README: <a href="https://github.com/denookoyo/shadcn-admin-1" target="_blank" rel="noreferrer">Repository</a></li>
+            <li>API (Markdown): <code>docs/API.md</code></li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+  </html>

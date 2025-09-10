@@ -1,0 +1,55 @@
+[functions]
+  directory = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-prisma"
+
+[[redirects]]
+  from = "/api/products"
+  to = "/.netlify/functions/products"
+  status = 200
+
+[[redirects]]
+  from = "/api/cart"
+  to = "/.netlify/functions/cart"
+  status = 200
+
+[[redirects]]
+  from = "/api/checkout"
+  to = "/.netlify/functions/checkout"
+  status = 200
+
+[[redirects]]
+  from = "/api/orders"
+  to = "/.netlify/functions/orders"
+  status = 200
+
+[[redirects]]
+  from = "/docs"
+  to = "/docs/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/docs/user-guides"
+  to = "/docs/user-guides/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/docs/user-guides/marketplace-rules"
+  to = "/docs/user-guides/marketplace-rules.html"
+  status = 200
+
+[[redirects]]
+  from = "/docs/user-guides/seller-guide"
+  to = "/docs/user-guides/seller-guide.html"
+  status = 200
+
+[[redirects]]
+  from = "/docs/developers"
+  to = "/docs/developers/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

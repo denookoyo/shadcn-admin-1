@@ -1,0 +1,61 @@
+// @ts-nocheck
+import { createFileRoute, useParams } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { db } from '@/lib/data'
+import { Header } from '@/components/layout/header'
+import { Main } from '@/components/layout/main'
+import { Search } from '@/components/search'
+import { ThemeSwitch } from '@/components/theme-switch'
+import { ProfileDropdown } from '@/components/profile-dropdown'
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>""]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", """: "&quot;', "'": "&#39;" }[c] as string))
+}
+function mdToHtml(md: string) {
+  const esc = escapeHtml(md)
+  return esc
+    .replace(/^###\s(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^##\s(.+)$/gm, '<h2>$1</h2>')
+    .replace(/^#\s(.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^\-\s(.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)(\n?)/gs, '<ul>$1</ul>')
+    .replace(/\n\n+/g, '</p><p>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>')
+}
+
+export const Route = createFileRoute('/blog/$slug/index 2')({
+  component: BlogPost,
+})
+
+function BlogPost() {
+  const { slug } = useParams({ from: '/blog/$slug/' })
+  const [post, setPost] = useState<any | null>(null)
+  useEffect(() => { (async () => { try { const p = await db.getBlogPostBySlug?.(slug); setPost(p || null) } catch {} })() }, [slug])
+
+  return (
+    <>
+      <Header>
+        <Search />
+        <div className='ml-auto flex items-center space-x-4'>
+          <ThemeSwitch />
+          <ProfileDropdown />
+        </div>
+      </Header>
+      <Main>
+        {!post ? (
+          <div className='text-sm text-gray-500'>Loading…</div>
+        ) : (
+          <article className='prose max-w-3xl'>
+            <h1>{post.title}</h1>
+            {post.coverImage && <img src={post.coverImage} alt='' className='mb-4 w-full rounded-lg object-cover' />}
+            <div className='text-xs text-gray-500 mb-4'>{new Date(post.createdAt).toLocaleString()} {post.published ? '• Published' : '• Draft'}</div>
+            <div className='prose' dangerouslySetInnerHTML={{ __html: mdToHtml(String(post.content || '')) }} />
+          </article>
+        )}
+      </Main>
+    </>
+  )
+}
