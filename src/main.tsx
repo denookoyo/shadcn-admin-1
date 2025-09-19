@@ -102,3 +102,14 @@ fetch('/api/auth/me')
     if (user) useAuthStore.getState().auth.setUser(user)
   })
   .catch(() => {})
+
+// Register service worker for PWA install / offline POS
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .catch(() => {
+        // no-op
+      })
+  })
+}

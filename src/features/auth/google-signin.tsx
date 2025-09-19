@@ -37,18 +37,18 @@ export function GoogleSignInButton() {
       client_id: clientId,
       callback: async (resp: any) => {
         try {
-          const r = await fetch('/api/auth/google', {
+          const r: Response = await fetch('/api/auth/google', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ credential: resp.credential }),
           })
           if (!r.ok) throw new Error('Sign-in failed')
-          const resp = await r.json()
-          if ((resp as any)?.mfaRequired) {
+          const data: any = await r.json()
+          if (data?.mfaRequired) {
             router.navigate({ to: '/(auth)/otp' as any })
             return
           }
-          useAuthStore.getState().auth.setUser(resp as any)
+          useAuthStore.getState().auth.setUser(data as any)
           // Redirect to requested page or dashboard
           const params = new URL(window.location.href).searchParams
           const redirect = params.get('redirect')

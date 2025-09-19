@@ -9,9 +9,11 @@ export default function SettingsAccount() {
       desc='Update your account settings. Set your preferred language and
           timezone.'
     >
-      <AccountForm />
-      <div className='mt-8'>
-        <MfaSection />
+      <div className='space-y-8'>
+        <AccountForm />
+        <div className='mt-8'>
+          <MfaSection />
+        </div>
       </div>
     </ContentSection>
   )

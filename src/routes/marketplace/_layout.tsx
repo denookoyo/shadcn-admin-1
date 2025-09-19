@@ -58,6 +58,7 @@ function Nav() {
     { href: '/marketplace/checkout', label: 'Checkout' },
     { href: '/marketplace/my-orders', label: 'My Orders' },
     { href: '/marketplace/dashboard/orders', label: 'My Shop Orders' },
+    { href: '/marketplace/dashboard/pos', label: 'POS' },
   ]
   function onSearch(e: FormEvent) {
     e.preventDefault()

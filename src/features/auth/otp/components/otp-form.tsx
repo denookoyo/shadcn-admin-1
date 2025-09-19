@@ -4,7 +4,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import { showSubmittedData } from '@/utils/show-submitted-data'
+import { db } from '@/lib/data'
+import { useAuthStore } from '@/stores/authStore'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -94,9 +96,7 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
             </FormItem>
           )}
         />
-import { db } from '@/lib/data'
-import { useAuthStore } from '@/stores/authStore'
-import { toast } from 'sonner'
+        
         <Button className='mt-2' disabled={otp.length < 6 || isLoading}>
           Verify
         </Button>
