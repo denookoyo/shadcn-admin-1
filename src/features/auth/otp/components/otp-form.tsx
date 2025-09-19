@@ -38,14 +38,21 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
 
   const otp = form.watch('otp')
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true)
-    showSubmittedData(data)
-
-    setTimeout(() => {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      setIsLoading(true)
+      const user = await db.mfaVerify?.(data.otp)
+      if (user) {
+        useAuthStore.getState().auth.setUser(user)
+        navigate({ to: '/' })
+      } else {
+        toast.error('Verification failed')
+      }
+    } catch (e) {
+      toast.error('Invalid code')
+    } finally {
       setIsLoading(false)
-      navigate({ to: '/' })
-    }, 1000)
+    }
   }
 
   return (
@@ -87,6 +94,9 @@ export function OtpForm({ className, ...props }: OtpFormProps) {
             </FormItem>
           )}
         />
+import { db } from '@/lib/data'
+import { useAuthStore } from '@/stores/authStore'
+import { toast } from 'sonner'
         <Button className='mt-2' disabled={otp.length < 6 || isLoading}>
           Verify
         </Button>

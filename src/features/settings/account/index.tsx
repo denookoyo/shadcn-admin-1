@@ -1,5 +1,6 @@
 import ContentSection from '../components/content-section'
 import { AccountForm } from './account-form'
+import { MfaSection } from './mfa'
 
 export default function SettingsAccount() {
   return (
@@ -9,6 +10,9 @@ export default function SettingsAccount() {
           timezone.'
     >
       <AccountForm />
+      <div className='mt-8'>
+        <MfaSection />
+      </div>
     </ContentSection>
   )
 }

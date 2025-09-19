@@ -50,6 +50,12 @@ export type DataAPI = {
   createBlogPost?: (input: { title: string; slug: string; content: string; coverImage?: string; tags?: string[]; published?: boolean }) => Promise<any>
   updateBlogPost?: (id: string, patch: Partial<{ title: string; slug: string; content: string; coverImage?: string | null; tags?: string[]; published?: boolean }>) => Promise<any>
   deleteBlogPost?: (id: string) => Promise<void>
+  // MFA
+  getMfaStatus?: () => Promise<{ enabled: boolean }>
+  mfaSetup?: () => Promise<{ secret: string; otpauth: string }>
+  mfaEnable?: (token: string) => Promise<{ enabled: boolean }>
+  mfaDisable?: (token: string) => Promise<{ enabled: boolean }>
+  mfaVerify?: (token: string) => Promise<any>
 }
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -204,6 +210,21 @@ const api: DataAPI = {
   async deleteBlogPost(id: string) {
     await http<void>(`/api/blog/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
+  async getMfaStatus() {
+    return http<{ enabled: boolean }>(`/api/auth/mfa/status`)
+  },
+  async mfaSetup() {
+    return http<{ secret: string; otpauth: string }>(`/api/auth/mfa/setup`, { method: 'POST' })
+  },
+  async mfaEnable(token: string) {
+    return http<{ enabled: boolean }>(`/api/auth/mfa/enable`, { method: 'POST', body: JSON.stringify({ token }) })
+  },
+  async mfaDisable(token: string) {
+    return http<{ enabled: boolean }>(`/api/auth/mfa/disable`, { method: 'POST', body: JSON.stringify({ token }) })
+  },
+  async mfaVerify(token: string) {
+    return http<any>(`/api/auth/mfa/verify`, { method: 'POST', body: JSON.stringify({ token }) })
+  },
 }
 
 const localWrapper: DataAPI = {
@@ -254,6 +275,11 @@ const localWrapper: DataAPI = {
   async deleteCategory(id: string) { return localCategories.remove(id) },
   async getMe() { return null },
   async updateMe(_patch) { return null },
+  async getMfaStatus() { return { enabled: false } },
+  async mfaSetup() { return { secret: 'LOCALONLY', otpauth: '' } },
+  async mfaEnable(_token: string) { return { enabled: false } },
+  async mfaDisable(_token: string) { return { enabled: false } },
+  async mfaVerify(_token: string) { return null },
   async getUserById(_id: number) { return null },
   async rateNegative(_id: number, _reason: string) { return { negativeCount: 0, rating: 5 } },
   async listSellerReviews(_sellerId: number) { return { avg: 0, count: 0, histogram: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, reviews: [] } },

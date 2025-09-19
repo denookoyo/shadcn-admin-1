@@ -19,8 +19,7 @@ export default function Otp() {
             Two-factor Authentication
           </CardTitle>
           <CardDescription>
-            Please enter the authentication code. <br /> We have sent the
-            authentication code to your email.
+            Open your authenticator app and enter the 6-digit code.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -28,14 +27,7 @@ export default function Otp() {
         </CardContent>
         <CardFooter>
           <p className='text-muted-foreground px-8 text-center text-sm'>
-            Haven't received it?{' '}
-            <Link
-              to='/sign-in'
-              className='hover:text-primary underline underline-offset-4'
-            >
-              Resend a new code.
-            </Link>
-            .
+            Lost access to your app? Contact support to recover your account.
           </p>
         </CardFooter>
       </Card>
