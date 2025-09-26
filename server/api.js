@@ -24,6 +24,296 @@ export function createApiRouter() {
 
   router.get('/health', (_req, res) => res.json({ ok: true }))
 
+  // ---------------- Amazing Freight (Drivers) ----------------
+  // Create a docket
+  router.post('/driver/dockets', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const { date, truckId, project, startTime, endTime, hours, details, files } = req.body || {}
+      const created = await prisma.docket.create({
+        data: {
+          driverId,
+          date: new Date(date || Date.now()),
+          truckId: truckId || null,
+          project: project || null,
+          startTime: startTime || null,
+          endTime: endTime || null,
+          hours: Number.isFinite(Number(hours)) ? Number(hours) : null,
+          details: details || null,
+          files: Array.isArray(files) ? files : [],
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/driver/dockets error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // List my dockets
+  router.get('/driver/dockets', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.docket.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/dockets error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Submit hours (shift)
+  router.post('/driver/shifts', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const { date, truckId, startTime, endTime, breakMin = 0 } = req.body || {}
+      // compute total hours naive (expects HH:mm)
+      function parseHM(s) { const [h, m] = String(s||'').split(':').map((x) => Number(x)||0); return h*60+m }
+      const startM = parseHM(startTime)
+      const endM = parseHM(endTime)
+      let mins = Math.max(0, endM - startM - Number(breakMin||0))
+      const totalHours = Math.round((mins/60) * 100) / 100
+      const created = await prisma.shift.create({
+        data: {
+          driverId,
+          date: new Date(date || Date.now()),
+          truckId: truckId || null,
+          startTime: startTime || '00:00',
+          endTime: endTime || '00:00',
+          breakMin: Number(breakMin || 0),
+          totalHours,
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/driver/shifts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // List my shifts
+  router.get('/driver/shifts', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.shift.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/shifts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Maintenance request
+  router.post('/driver/maintenance', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const { date, truckId, category, severity, description, files } = req.body || {}
+      const created = await prisma.maintenanceRequest.create({
+        data: {
+          driverId,
+          date: date ? new Date(date) : new Date(),
+          truckId: truckId || null,
+          category: String(category || 'general'),
+          severity: severity || null,
+          description: String(description || ''),
+          files: Array.isArray(files) ? files : [],
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/driver/maintenance error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/driver/maintenance', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.maintenanceRequest.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/maintenance error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Accident report
+  router.post('/driver/accidents', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const { occurredAt, truckId, location, description, injuries, policeReport, files } = req.body || {}
+      const created = await prisma.accidentReport.create({
+        data: {
+          driverId,
+          occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
+          truckId: truckId || null,
+          location: location || null,
+          description: String(description || ''),
+          injuries: Boolean(injuries),
+          policeReport: Boolean(policeReport),
+          files: Array.isArray(files) ? files : [],
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/driver/accidents error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/driver/accidents', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.accidentReport.findMany({ where: { driverId }, orderBy: { occurredAt: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/accidents error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Fuel receipts
+  router.post('/driver/receipts', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const { date, truckId, liters, amount, odometer, fileUrl } = req.body || {}
+      const created = await prisma.fuelReceipt.create({
+        data: {
+          driverId,
+          date: date ? new Date(date) : new Date(),
+          truckId: truckId || null,
+          liters: Number(liters || 0),
+          amount: Number(amount || 0),
+          odometer: odometer ? Number(odometer) : null,
+          fileUrl: fileUrl || null,
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/driver/receipts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/driver/receipts', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.fuelReceipt.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/receipts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Payments
+  router.get('/driver/payments', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const list = await prisma.payment.findMany({ where: { driverId }, orderBy: { periodStart: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/driver/payments error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/driver/payslips', ensureAuth, async (req, res) => {
+    try {
+      const driverId = Number(req.user.uid)
+      const payslips = await prisma.payslip.findMany({ where: { payment: { driverId } }, orderBy: { createdAt: 'desc' } })
+      res.json(payslips)
+    } catch (e) {
+      console.error('GET /api/driver/payslips error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // ---------------- Amazing Freight (Admin) ----------------
+  // Simple role gate: requires req.user.role === 'admin' (tokens include role)
+  function ensureAdmin(req, res, next) {
+    if (req.user?.role === 'admin') return next()
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+
+  router.get('/admin/drivers', ensureAuth, ensureAdmin, async (_req, res) => {
+    try {
+      const drivers = await prisma.user.findMany({ select: { id: true, email: true, name: true, image: true, role: true }, orderBy: { id: 'asc' } })
+      res.json(drivers)
+    } catch (e) {
+      console.error('GET /api/admin/drivers error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/admin/dockets', ensureAuth, ensureAdmin, async (_req, res) => {
+    try {
+      const list = await prisma.docket.findMany({ orderBy: { date: 'desc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/admin/dockets error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/admin/shifts', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const group = String(req.query.group || 'day')
+      const shifts = await prisma.shift.findMany({})
+      if (group === 'week') {
+        // naive weekly grouping by ISO week number
+        function weekKey(d) {
+          const dt = new Date(d)
+          const target = new Date(dt.valueOf())
+          const dayNr = (dt.getDay() + 6) % 7
+          target.setDate(target.getDate() - dayNr + 3)
+          const jan4 = new Date(target.getFullYear(), 0, 4)
+          const dayDiff = (target.valueOf() - jan4.valueOf()) / 86400000
+          const week = 1 + Math.floor(dayDiff / 7)
+          return `${target.getFullYear()}-W${String(week).padStart(2, '0')}`
+        }
+        const agg = {}
+        for (const s of shifts) {
+          const k = weekKey(s.date)
+          agg[k] = (agg[k] || 0) + (s.totalHours || 0)
+        }
+        return res.json({ group: 'week', data: agg })
+      }
+      // default: by day
+      const agg = {}
+      for (const s of shifts) {
+        const k = new Date(s.date).toISOString().slice(0, 10)
+        agg[k] = (agg[k] || 0) + (s.totalHours || 0)
+      }
+      res.json({ group: 'day', data: agg })
+    } catch (e) {
+      console.error('GET /api/admin/shifts error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/admin/trucks', ensureAuth, ensureAdmin, async (_req, res) => {
+    try {
+      const list = await prisma.truck.findMany({ orderBy: { name: 'asc' } })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/admin/trucks error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/admin/trucks', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const { rego, name, active = true } = req.body || {}
+      const t = await prisma.truck.create({ data: { rego, name, active: Boolean(active) } })
+      res.status(201).json(t)
+    } catch (e) {
+      console.error('POST /api/admin/trucks error:', e)
+      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate rego' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
   router.get('/products', async (_req, res) => {
     try {
       const products = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })

@@ -56,6 +56,25 @@ export type DataAPI = {
   mfaEnable?: (token: string) => Promise<{ enabled: boolean }>
   mfaDisable?: (token: string) => Promise<{ enabled: boolean }>
   mfaVerify?: (token: string) => Promise<any>
+  // Amazing Freight
+  createDocket?: (input: { date: string; truckId?: string; project?: string; startTime?: string; endTime?: string; hours?: number; details?: string; files?: string[] }) => Promise<any>
+  listMyDockets?: () => Promise<any[]>
+  createShift?: (input: { date: string; truckId?: string; startTime: string; endTime: string; breakMin?: number }) => Promise<any>
+  listMyShifts?: () => Promise<any[]>
+  createMaintenance?: (input: { date?: string; truckId?: string; category: string; severity?: string; description: string; files?: string[] }) => Promise<any>
+  listMyMaintenance?: () => Promise<any[]>
+  createAccident?: (input: { occurredAt?: string; truckId?: string; location?: string; description: string; injuries?: boolean; policeReport?: boolean; files?: string[] }) => Promise<any>
+  listMyAccidents?: () => Promise<any[]>
+  createFuelReceipt?: (input: { date: string; truckId?: string; liters: number; amount: number; odometer?: number; fileUrl?: string }) => Promise<any>
+  listMyFuelReceipts?: () => Promise<any[]>
+  listMyPayments?: () => Promise<any[]>
+  listMyPayslips?: () => Promise<any[]>
+  // Admin
+  adminListDrivers?: () => Promise<any[]>
+  adminListDockets?: () => Promise<any[]>
+  adminShiftsAgg?: (group?: 'day' | 'week') => Promise<{ group: string; data: Record<string, number> }>
+  adminListTrucks?: () => Promise<any[]>
+  adminCreateTruck?: (input: { rego: string; name: string; active?: boolean }) => Promise<any>
 }
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -210,6 +229,24 @@ const api: DataAPI = {
   async deleteBlogPost(id: string) {
     await http<void>(`/api/blog/posts/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
+  // Amazing Freight
+  async createDocket(input) { return http<any>('/api/driver/dockets', { method: 'POST', body: JSON.stringify(input) }) },
+  async listMyDockets() { return http<any[]>('/api/driver/dockets') },
+  async createShift(input) { return http<any>('/api/driver/shifts', { method: 'POST', body: JSON.stringify(input) }) },
+  async listMyShifts() { return http<any[]>('/api/driver/shifts') },
+  async createMaintenance(input) { return http<any>('/api/driver/maintenance', { method: 'POST', body: JSON.stringify(input) }) },
+  async listMyMaintenance() { return http<any[]>('/api/driver/maintenance') },
+  async createAccident(input) { return http<any>('/api/driver/accidents', { method: 'POST', body: JSON.stringify(input) }) },
+  async listMyAccidents() { return http<any[]>('/api/driver/accidents') },
+  async createFuelReceipt(input) { return http<any>('/api/driver/receipts', { method: 'POST', body: JSON.stringify(input) }) },
+  async listMyFuelReceipts() { return http<any[]>('/api/driver/receipts') },
+  async listMyPayments() { return http<any[]>('/api/driver/payments') },
+  async listMyPayslips() { return http<any[]>('/api/driver/payslips') },
+  async adminListDrivers() { return http<any[]>('/api/admin/drivers') },
+  async adminListDockets() { return http<any[]>('/api/admin/dockets') },
+  async adminShiftsAgg(group = 'day') { return http<{ group: string; data: Record<string, number> }>(`/api/admin/shifts?group=${group}`) },
+  async adminListTrucks() { return http<any[]>('/api/admin/trucks') },
+  async adminCreateTruck(input) { return http<any>('/api/admin/trucks', { method: 'POST', body: JSON.stringify(input) }) },
   async getMfaStatus() {
     return http<{ enabled: boolean }>(`/api/auth/mfa/status`)
   },
@@ -283,6 +320,24 @@ const localWrapper: DataAPI = {
   async getUserById(_id: number) { return null },
   async rateNegative(_id: number, _reason: string) { return { negativeCount: 0, rating: 5 } },
   async listSellerReviews(_sellerId: number) { return { avg: 0, count: 0, histogram: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, reviews: [] } },
+  // Amazing Freight (local no-op)
+  async createDocket(_input) { return {} as any },
+  async listMyDockets() { return [] },
+  async createShift(_input) { return {} as any },
+  async listMyShifts() { return [] },
+  async createMaintenance(_input) { return {} as any },
+  async listMyMaintenance() { return [] },
+  async createAccident(_input) { return {} as any },
+  async listMyAccidents() { return [] },
+  async createFuelReceipt(_input) { return {} as any },
+  async listMyFuelReceipts() { return [] },
+  async listMyPayments() { return [] },
+  async listMyPayslips() { return [] },
+  async adminListDrivers() { return [] },
+  async adminListDockets() { return [] },
+  async adminShiftsAgg(_group = 'day') { return { group: 'day', data: {} } },
+  async adminListTrucks() { return [] },
+  async adminCreateTruck(_input) { return {} as any },
 }
 
 export const db: DataAPI = useApi ? api : localWrapper

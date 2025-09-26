@@ -137,6 +137,130 @@ model User {
   orderReviewsGiven OrderReview[] @relation("OrderReviewBuyer")
   orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
   blogPosts BlogPost[]
+
+  // Relations
+  dockets        Docket[]
+  shifts         Shift[]
+  maintenance    MaintenanceRequest[]
+  accidents      AccidentReport[]
+  fuelReceipts   FuelReceipt[]
+  payments       Payment[]
+}
+
+model Truck {
+  id        String   @id @default(cuid())
+  rego      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dockets   Docket[]
+  shifts    Shift[]
+  maint     MaintenanceRequest[]
+  accidents AccidentReport[]
+  receipts  FuelReceipt[]
+}
+
+model Docket {
+  id          String   @id @default(cuid())
+  driverId    Int
+  truckId     String?
+  date        DateTime
+  project     String?
+  startTime   String?
+  endTime     String?
+  hours       Float?
+  details     String?
+  files       String[]
+  createdAt   DateTime @default(now())
+
+  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  truck  Truck? @relation(fields: [truckId], references: [id])
+}
+
+model Shift {
+  id          String   @id @default(cuid())
+  driverId    Int
+  truckId     String?
+  date        DateTime
+  startTime   String
+  endTime     String
+  breakMin    Int      @default(0)
+  totalHours  Float
+  createdAt   DateTime @default(now())
+
+  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  truck  Truck? @relation(fields: [truckId], references: [id])
+}
+
+model MaintenanceRequest {
+  id          String   @id @default(cuid())
+  driverId    Int
+  truckId     String?
+  date        DateTime @default(now())
+  category    String
+  severity    String?
+  description String
+  status      String   @default("open")
+  files       String[]
+
+  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  truck  Truck? @relation(fields: [truckId], references: [id])
+}
+
+model AccidentReport {
+  id            String   @id @default(cuid())
+  driverId      Int
+  truckId       String?
+  occurredAt    DateTime
+  location      String?
+  description   String
+  injuries      Boolean  @default(false)
+  policeReport  Boolean  @default(false)
+  files         String[]
+  status        String   @default("submitted")
+
+  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  truck  Truck? @relation(fields: [truckId], references: [id])
+}
+
+model FuelReceipt {
+  id        String   @id @default(cuid())
+  driverId  Int
+  truckId   String?
+  date      DateTime
+  liters    Float
+  amount    Int      // minor units (cents)
+  odometer  Int?
+  fileUrl   String?
+
+  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  truck  Truck? @relation(fields: [truckId], references: [id])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  driverId    Int
+  periodStart DateTime
+  periodEnd   DateTime
+  gross       Int // cents
+  net         Int // cents
+  status      String   @default("pending")
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  driver  User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  payslips Payslip[]
+}
+
+model Payslip {
+  id        String   @id @default(cuid())
+  paymentId String
+  url       String
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
 
 enum UserRole {

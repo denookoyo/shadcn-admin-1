@@ -150,6 +150,61 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
+      title: 'Amazing Freight',
+      items: [
+        {
+          title: 'My Dockets',
+          url: '/driver/dockets',
+          icon: IconChecklist,
+        },
+        {
+          title: 'My Hours',
+          url: '/driver/hours',
+          icon: IconBrowserCheck,
+        },
+        {
+          title: 'Maintenance',
+          url: '/driver/maintenance',
+          icon: IconTool,
+        },
+        {
+          title: 'Accidents',
+          url: '/driver/accidents',
+          icon: IconReportAnalytics,
+        },
+        {
+          title: 'Fuel Receipts',
+          url: '/driver/receipts',
+          icon: IconPackages,
+        },
+        {
+          title: 'Payments',
+          url: '/driver/payments',
+          icon: IconBrowserCheck,
+        },
+        {
+          title: 'Admin: Drivers',
+          url: '/admin/drivers',
+          icon: IconUsers,
+        },
+        {
+          title: 'Admin: Dockets',
+          url: '/admin/dockets',
+          icon: IconChecklist,
+        },
+        {
+          title: 'Admin: Hours',
+          url: '/admin/hours',
+          icon: IconBrowserCheck,
+        },
+        {
+          title: 'Admin: Trucks',
+          url: '/admin/trucks',
+          icon: IconTruckDelivery,
+        },
+      ],
+    },
+    {
       title: 'System',
       items: [
         {
