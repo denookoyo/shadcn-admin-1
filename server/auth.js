@@ -9,6 +9,8 @@ import { authenticator } from 'otplib'
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID
 const client = new OAuth2Client(GOOGLE_CLIENT_ID)
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'devsecret'
+const ALLOWED_DOMAINS = (process.env.ALLOWED_GOOGLE_DOMAINS || '').split(',').map((s) => s.trim()).filter(Boolean)
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
 
 export function authMiddleware(app) {
   app.use(cookieParser())
@@ -44,12 +46,20 @@ export function createAuthRouter() {
       const email = payload.email
       const name = payload.name || null
       const image = payload.picture || null
+      // Optional domain restriction
+      if (ALLOWED_DOMAINS.length > 0) {
+        const domain = String(email.split('@')[1] || '').toLowerCase()
+        const ok = ALLOWED_DOMAINS.includes(domain)
+        if (!ok) return res.status(403).json({ error: 'Email domain not allowed' })
+      }
+      // Assign role: admin if email in ADMIN_EMAILS else driver by default
+      const role = ADMIN_EMAILS.includes(String(email).toLowerCase()) ? 'admin' : 'driver'
       // Upsert by email to avoid races and ensure creation
       const user = await prisma.user.upsert({
         where: { email },
-        update: { googleSub, name: name || null, image: image || null },
+        update: { googleSub, name: name || null, image: image || null, role },
         // Provide defaults for legacy NOT NULL columns (phoneNo/ABN) in existing DB
-        create: { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null },
+        create: { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null, role },
       })
 
       // If MFA is enabled, set a temporary cookie and require OTP verification
@@ -59,9 +69,9 @@ export function createAuthRouter() {
         return res.json({ mfaRequired: true })
       }
 
-      const token = jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+      const token = jwt.sign({ uid: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
       res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
-      res.json({ id: user.id, email: user.email, name: user.name, image: user.image })
+      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('POST /api/auth/google error:', e)
@@ -94,6 +104,7 @@ export function createAuthRouter() {
               ABN: user.ABN,
               bio: user.bio,
               mfaEnabled: Boolean(user.mfaEnabled),
+              role: user.role,
             }
           : null
       )
@@ -119,7 +130,7 @@ export function createAuthRouter() {
         update: data,
         create: { email: req.user.email || `user${Date.now()}@local`, ...data },
       })
-      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled) })
+      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled), role: updated.role })
     } catch (e) {
       console.error('PUT /api/auth/me error:', e)
       res.status(500).json({ error: e?.message || 'Auth update error' })
@@ -138,7 +149,7 @@ export function createAuthRouter() {
         update: data,
         create: { email: req.user.email || `user${Date.now()}@local`, ...data },
       })
-      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled) })
+      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled), role: updated.role })
     } catch (e) {
       console.error('POST /api/auth/me error:', e)
       res.status(500).json({ error: e?.message || 'Auth update error' })
@@ -234,10 +245,10 @@ export function createAuthRouter() {
       const isValid = authenticator.verify({ token: String(token), secret: user.mfaSecret })
       if (!isValid) return res.status(400).json({ error: 'Invalid code' })
       // Issue a full session and clear pending MFA
-      const session = jwt.sign({ uid: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' })
+      const session = jwt.sign({ uid: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
       res.clearCookie('mfa')
       res.cookie('session', session, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
-      res.json({ id: user.id, email: user.email, name: user.name, image: user.image })
+      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
     } catch (e) {
       console.error('POST /api/auth/mfa/verify error:', e)
       res.status(500).json({ error: e?.message || 'MFA verify error' })

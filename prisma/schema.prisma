@@ -116,6 +116,7 @@ model User {
   name       String?
   image      String?
   googleSub  String?   @unique
+  role       UserRole  @default(driver)
   phoneNo    String?   // legacy column in existing DB, keep optional here
   ABN        String?   // legacy column in existing DB, keep optional here
   bio        String?
@@ -136,6 +137,12 @@ model User {
   orderReviewsGiven OrderReview[] @relation("OrderReviewBuyer")
   orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
   blogPosts BlogPost[]
+}
+
+enum UserRole {
+  driver
+  manager
+  admin
 }
 
 model BlogPost {
