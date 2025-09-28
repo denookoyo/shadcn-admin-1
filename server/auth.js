@@ -59,6 +59,13 @@ export function createAuthRouter() {
       const baseUpdate = { googleSub, name: name || null, image: image || null }
       const baseCreate = { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null }
 
+      const upsertWithoutRole = async () =>
+        prisma.user.upsert({
+          where: { email },
+          update: baseUpdate,
+          create: baseCreate,
+        })
+
       let user
       try {
         user = await prisma.user.upsert({
@@ -67,17 +74,19 @@ export function createAuthRouter() {
           create: { ...baseCreate, role },
         })
       } catch (err) {
-        // Some legacy databases may not yet have the `role` column; fall back gracefully
-        if (err instanceof Prisma.PrismaClientValidationError && err.message.includes('Unknown argument `role`')) {
-          user = await prisma.user.upsert({
-            where: { email },
-            update: baseUpdate,
-            create: baseCreate,
-          })
+        const isMissingRoleColumn =
+          err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2022' && err.meta?.column === 'role'
+        const isLegacySchema =
+          err instanceof Prisma.PrismaClientValidationError && err.message.includes('Unknown argument `role`')
+
+        if (isMissingRoleColumn || isLegacySchema) {
+          user = await upsertWithoutRole()
         } else {
           throw err
         }
       }
+
+      const normalizedRole = typeof user.role === 'string' ? user.role : role
 
       // If MFA is enabled, set a temporary cookie and require OTP verification
       if (user.mfaEnabled && user.mfaSecret) {
@@ -86,9 +95,9 @@ export function createAuthRouter() {
         return res.json({ mfaRequired: true })
       }
 
-      const token = jwt.sign({ uid: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
+      const token = jwt.sign({ uid: user.id, email: user.email, role: normalizedRole }, JWT_SECRET, { expiresIn: '7d' })
       res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
-      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
+      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: normalizedRole })
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('POST /api/auth/google error:', e)

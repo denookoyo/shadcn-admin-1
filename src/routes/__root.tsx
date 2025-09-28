@@ -17,7 +17,7 @@ export const Route = createRootRouteWithContext<{
 
     useEffect(() => {
       if (location.pathname === '/') {
-        router.navigate({ to: '/marketplace', replace: true })
+        router.navigate({ to: '/marketplace/listings', replace: true })
       }
     }, [location.pathname, router])
 
