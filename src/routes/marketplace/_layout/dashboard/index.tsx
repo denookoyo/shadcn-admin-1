@@ -134,11 +134,11 @@ function SellerDashboard() {
                 <DialogTrigger asChild>
                   <Button onClick={() => setOpen(true)} className='mt-4 w-full rounded-full'><Plus className='mr-2 h-4 w-4' /> Add product</Button>
                 </DialogTrigger>
-                <DialogContent className='sm:max-w-xl'>
+                <DialogContent className='sm:max-w-xl max-h-[85vh] grid-rows-[auto,minmax(0,1fr),auto] overflow-hidden'>
                   <DialogHeader>
                     <DialogTitle>{editing ? 'Edit product' : 'Add product'}</DialogTitle>
                   </DialogHeader>
-                  <div className='grid gap-4'>
+                  <div className='grid gap-4 overflow-y-auto pr-2'>
                     <div>
                       <Label htmlFor='title'>Title</Label>
                       <Input id='title' value={form.title} onChange={(event) => setForm((state) => ({ ...state, title: event.target.value, slug: slugify(event.target.value) }))} />

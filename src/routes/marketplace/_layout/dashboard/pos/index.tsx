@@ -4,7 +4,9 @@ import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useUiStore } from '@/stores/uiStore'
 
@@ -24,12 +26,25 @@ function PosPage() {
   const [payMethod, setPayMethod] = useState<'cash' | 'card'>('cash')
   const [submitting, setSubmitting] = useState(false)
   const [receiptId, setReceiptId] = useState<string | null>(null)
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null)
+  const [lineQuantity, setLineQuantity] = useState('1')
+  const [linePrice, setLinePrice] = useState('0')
 
   useEffect(() => { (async () => setProducts(await db.listProducts()))() }, [])
   // No-op: POS can request/exit fullscreen via buttons; we don't need to track state.
   useEffect(() => {
     return () => { setHideChrome(false); if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{}) }
   }, [setHideChrome])
+
+  useEffect(() => {
+    if (editingLine) {
+      setLineQuantity(String(editingLine.quantity))
+      setLinePrice(editingLine.price.toString())
+    } else {
+      setLineQuantity('1')
+      setLinePrice('0')
+    }
+  }, [editingLine])
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
@@ -63,6 +78,19 @@ function PosPage() {
   }
   function removeLine(id: string) { setCart((cur) => cur.filter((c) => c.id !== id)) }
   function clearCart() { setCart([]) }
+
+  function updateLineFromDialog() {
+    if (!editingLine) return
+    const parsedQty = Number(lineQuantity)
+    const nextQuantity = Number.isFinite(parsedQty) && parsedQty > 0 ? Math.round(parsedQty) || 1 : editingLine.quantity
+    const parsedPrice = Number(linePrice)
+    const nextPrice = Number.isFinite(parsedPrice) && parsedPrice >= 0 ? Number(parsedPrice.toFixed(2)) : editingLine.price
+
+    setCart((cur) =>
+      cur.map((line) => (line.id === editingLine.id ? { ...line, quantity: nextQuantity, price: nextPrice } : line))
+    )
+    setEditingLine(null)
+  }
 
   async function addByBarcode(code: string) {
     const trimmed = code.trim()
@@ -160,7 +188,7 @@ function PosPage() {
               {filtered.map((p) => (
                 <button key={p.id} onClick={() => addToCart(p)} className='rounded-xl border p-3 text-left transition hover:shadow'>
                   {p.img ? <img src={p.img} alt='' className='mb-2 h-24 w-full rounded object-cover' /> : <div className='mb-2 h-24 w-full rounded bg-gray-100' />}
-                  <div className='line-clamp-2 text-sm font-medium'>{p.title}</div>
+                  <div className='text-sm font-medium'>{p.title}</div>
                   <div className='text-xs text-gray-500'>{p.type}</div>
                   <div className='mt-1 font-semibold'>A${p.price}</div>
                 </button>
@@ -179,17 +207,56 @@ function PosPage() {
             <div className='space-y-2'>
               {cart.length === 0 && <div className='text-sm text-gray-500'>No items added yet.</div>}
               {cart.map((c) => (
-                <div key={c.id} className='flex items-center justify-between rounded-lg border p-2'>
+                <div
+                  key={c.id}
+                  role='button'
+                  tabIndex={0}
+                  onClick={() => setEditingLine(c)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setEditingLine(c)
+                    }
+                  }}
+                  className='flex items-center justify-between rounded-lg border p-2 cursor-pointer select-none transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 focus:ring-offset-2 focus:ring-offset-white'
+                >
                   <div>
                     <div className='text-sm font-medium'>{c.title}</div>
                     <div className='text-xs text-gray-500'>A${c.price} • {c.type}</div>
                   </div>
                   <div className='flex items-center gap-2'>
-                    <button className='rounded-md border px-2 py-1' onClick={() => inc(c.id, -1)}>-</button>
+                    <button
+                      type='button'
+                      className='rounded-md border px-2 py-1'
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        inc(c.id, -1)
+                      }}
+                    >
+                      -
+                    </button>
                     <div className='w-6 text-center text-sm'>{c.quantity}</div>
-                    <button className='rounded-md border px-2 py-1' onClick={() => inc(c.id, +1)}>+</button>
+                    <button
+                      type='button'
+                      className='rounded-md border px-2 py-1'
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        inc(c.id, +1)
+                      }}
+                    >
+                      +
+                    </button>
                     <div className='w-16 text-right text-sm font-semibold'>A${c.price * c.quantity}</div>
-                    <button className='rounded-md border px-2 py-1 text-xs' onClick={() => removeLine(c.id)}>Remove</button>
+                    <button
+                      type='button'
+                      className='rounded-md border px-2 py-1 text-xs'
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        removeLine(c.id)
+                      }}
+                    >
+                      Remove
+                    </button>
                   </div>
                 </div>
               ))}
@@ -224,6 +291,61 @@ function PosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={Boolean(editingLine)} onOpenChange={(open) => { if (!open) setEditingLine(null) }}>
+        <DialogContent className='sm:max-w-md'>
+          <DialogHeader>
+            <DialogTitle>Edit receipt line</DialogTitle>
+          </DialogHeader>
+          <div className='grid gap-4'>
+            {editingLine ? (
+              <div>
+                <div className='text-sm font-semibold text-slate-900'>{editingLine.title}</div>
+                <div className='text-xs text-gray-500'>SKU: {editingLine.productId}</div>
+              </div>
+            ) : null}
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <div className='grid gap-1'>
+                <Label htmlFor='pos-line-quantity' className='text-xs font-medium text-gray-600'>Quantity</Label>
+                <Input
+                  id='pos-line-quantity'
+                  type='number'
+                  min={1}
+                  value={lineQuantity}
+                  onChange={(event) => setLineQuantity(event.target.value)}
+                />
+              </div>
+              <div className='grid gap-1'>
+                <Label htmlFor='pos-line-price' className='text-xs font-medium text-gray-600'>Unit price (A$)</Label>
+                <Input
+                  id='pos-line-price'
+                  type='number'
+                  min={0}
+                  step='0.01'
+                  value={linePrice}
+                  onChange={(event) => setLinePrice(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            {editingLine ? (
+              <Button
+                type='button'
+                variant='destructive'
+                onClick={() => {
+                  removeLine(editingLine.id)
+                  setEditingLine(null)
+                }}
+              >
+                Remove line
+              </Button>
+            ) : null}
+            <Button type='button' variant='ghost' onClick={() => setEditingLine(null)}>Cancel</Button>
+            <Button type='button' onClick={updateLineFromDialog}>Update line</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
