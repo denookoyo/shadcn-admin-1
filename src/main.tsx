@@ -107,7 +107,7 @@ fetch('/api/auth/me')
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/sw.js')
+      .register('/sw.js?v=hedgetech-v2')
       .catch(() => {
         // no-op
       })

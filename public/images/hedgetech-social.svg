@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102534" />
+      <stop offset="1" stop-color="#0f766e" />
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399" stop-opacity="0.8" />
+      <stop offset="1" stop-color="#0f766e" stop-opacity="0.2" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" filterUnits="objectBoundingBox">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-opacity="0.35" flood-color="#000" />
+    </filter>
+  </defs>
+  <rect width="1200" height="630" rx="48" fill="url(#bg)" />
+  <g transform="translate(160 140)">
+    <rect width="320" height="320" rx="32" fill="rgba(18, 36, 52, 0.85)" filter="url(#shadow)" />
+    <circle cx="160" cy="120" r="120" fill="url(#pulse)" />
+    <path d="M160 32c54 0 100 14.9 100 42.4v90.8c0 52.4-38.7 98.2-100 116-61.3-17.8-100-63.6-100-116V74.4C60 46.9 106 32 160 32Z" fill="#17b091" />
+    <path d="M217 84.5c0-10.2-5.3-15.2-19.2-18.5-9.6-2.2-21.4-3.1-37.8-3.1s-28.2.9-37.8 3.1C108.3 69.3 103 74.3 103 84.5v51.4c0 33.3 25 64.2 57 72.9 32-8.7 57-39.6 57-72.9V84.5Z" fill="rgba(255,255,255,0.35)" />
+    <path d="M199 113.9c0-7.4-4.8-11-15.3-13.3-6.8-1.5-15.3-2.3-23.7-2.3s-16.9.8-23.7 2.3c-10.5 2.3-15.3 5.9-15.3 13.3v24.1c0 18 13.5 34.9 30.6 40.1 17.1-5.2 30.6-22.1 30.6-40.1v-24.1Z" fill="rgba(255,255,255,0.55)" />
+  </g>
+  <g transform="translate(520 170)" fill="#f8fafc">
+    <text x="0" y="0" font-size="20" font-family="'Inter', 'Segoe UI', sans-serif" opacity="0.8">INTERACTIVE MARKETPLACE PLATFORM</text>
+    <text x="0" y="88" font-size="72" font-family="'Manrope', 'Segoe UI', sans-serif" font-weight="700">Hedgetech Marketplace</text>
+    <text x="0" y="150" font-size="26" font-family="'Inter', 'Segoe UI', sans-serif" opacity="0.85">Where smart buyers and resilient sellers trade with confidence.</text>
+    <g transform="translate(0 210)" font-family="'Inter', 'Segoe UI', sans-serif" font-size="24" opacity="0.9">
+      <text>• 12k+ verified sellers</text>
+      <text y="48">• Instant POS & fulfillment tools</text>
+      <text y="96">• Buyer protection and support desk</text>
+    </g>
+  </g>
+</svg>

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { ShieldCheck, CreditCard, CheckCircle2 } from 'lucide-react'
 import { db, type CartItem, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Input } from '@/components/ui/input'
@@ -24,7 +25,6 @@ function CheckoutPage() {
   useEffect(() => {
     let mounted = true
     ;(async () => {
-      // Prefill guest checkout details from localStorage
       try {
         if (!user) {
           const raw = localStorage.getItem('guest_checkout')
@@ -46,9 +46,8 @@ function CheckoutPage() {
     return () => {
       mounted = false
     }
-  }, [ns])
+  }, [ns, user])
 
-  // Persist guest details for future checkouts
   useEffect(() => {
     try {
       if (!user) {
@@ -61,11 +60,11 @@ function CheckoutPage() {
     () =>
       cart
         .map((c) => ({ quantity: c.quantity, product: productsById[c.productId], meta: c.meta }))
-        .filter((x) => x.product),
+        .filter((entry) => entry.product),
     [cart, productsById]
   )
 
-  const total = detailed.reduce((a, c) => a + c.product.price * c.quantity, 0)
+  const total = detailed.reduce((acc, entry) => acc + entry.product.price * entry.quantity, 0)
 
   async function handlePlaceOrder() {
     if (placing) return
@@ -76,7 +75,6 @@ function CheckoutPage() {
         title: d.product.title,
         price: d.product.price,
         quantity: d.quantity,
-        // Pass service preferred time to backend so it can become appointmentAt
         meta: d.product.type === 'service' ? d.meta : undefined,
       }))
       const order: any = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)
@@ -91,91 +89,152 @@ function CheckoutPage() {
 
   if (orderId) {
     return (
-      <div className="mx-auto max-w-3xl px-4 py-10 text-center">
-        <h1 className="text-2xl font-bold">Order placed!</h1>
-        <p className="mt-2 text-sm text-gray-600">Your order ID is {orderId}. A confirmation was sent to {email || 'your email'}.</p>
+      <div className='mx-auto max-w-3xl space-y-6 px-4 py-12 text-center'>
+        <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
+          Checkout complete
+        </div>
+        <CheckCircle2 className='mx-auto h-16 w-16 text-emerald-500' />
+        <h1 className='text-2xl font-semibold text-slate-900'>Order confirmed</h1>
+        <p className='text-sm text-slate-600'>Your order ID is <span className='font-semibold text-emerald-700'>#{orderId}</span>. A confirmation was sent to {email || 'your email'}.</p>
         {isGuest && accessCode ? (
-          <div className="mt-4 rounded-xl border p-3 text-left">
-            <div className="text-sm font-medium">Track your order</div>
-            <div className="text-xs text-gray-600">Save this link to view your order status any time without logging in.</div>
+          <div className='mx-auto max-w-md rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800'>
+            <div className='text-sm font-semibold mb-2'>Guest tracking link</div>
+            <p className='text-xs text-emerald-700'>Save this code to follow your order without creating an account.</p>
             <Link
-              to="/marketplace/order/track"
+              to='/marketplace/order/track'
               search={{ code: accessCode }}
-              className="mt-2 block truncate rounded-md bg-black px-3 py-2 text-white"
+              className='mt-3 block truncate rounded-full bg-white px-4 py-2 text-center text-xs font-semibold text-emerald-700 shadow-sm'
             >
               /marketplace/order/track?code={accessCode}
             </Link>
           </div>
         ) : null}
-        <div className="mt-6 flex justify-center gap-2">
-          <Link to="/marketplace/listings" className="rounded-xl border px-4 py-2 text-sm">Continue shopping</Link>
-          {user ? <Button onClick={() => router.navigate({ to: '/marketplace/dashboard' })}>Go to dashboard</Button> : null}
+        <div className='flex justify-center gap-3 text-sm'>
+          <Link to='/marketplace/listings' className='rounded-full border border-slate-200 px-4 py-2 text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700'>Continue shopping</Link>
+          {user ? (
+            <Button onClick={() => router.navigate({ to: '/marketplace/dashboard' })} className='rounded-full px-4 py-2'>Go to dashboard</Button>
+          ) : null}
         </div>
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-4 text-2xl font-bold">Checkout</h1>
-      {!user && (
-        <div className="mb-4 rounded-2xl border p-4 text-sm text-gray-700">
-          <div className="font-semibold">Checkout as guest or sign in</div>
-          <div className="mt-1">You don’t need an account to place this order. If you sign in, you’ll see your order under your account.</div>
-          <div className="mt-2 flex gap-2">
-            <Link to="/sign-in" search={{ redirect: '/marketplace/checkout' }} className="rounded-md border px-3 py-1.5">Sign in</Link>
-            <span className="rounded-md bg-gray-100 px-3 py-1.5">Guest checkout</span>
+    <div className='mx-auto max-w-6xl space-y-8 px-4 py-10'>
+      <header className='rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm'>
+        <div className='flex flex-wrap items-start justify-between gap-4'>
+          <div>
+            <span className='inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
+              Step 2 • Secure checkout
+            </span>
+            <h1 className='mt-3 text-2xl font-semibold text-slate-900'>Confirm delivery & contact details</h1>
+            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Protect your order with verified contact details. Hedgetech uses this information to issue invoices, delivery updates, and support.</p>
           </div>
-        </div>
-      )}
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-4 md:col-span-2">
-          <div className="rounded-2xl border p-4">
-            <h2 className="mb-3 font-semibold">Contact</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <Label htmlFor="name">Full name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
-              </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+61…" />
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City" />
-              </div>
+          <div className='flex items-center gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm'>
+            <ShieldCheck className='h-4 w-4 text-emerald-600' />
+            <div>
+              <div className='font-semibold text-slate-800'>Buyer protection active</div>
+              <div>Escrow + instant refunds if seller cancels</div>
             </div>
           </div>
         </div>
+      </header>
 
-        <div className="rounded-2xl border p-4">
-          <div className="mb-2 text-lg font-semibold">Summary</div>
-          <div className="space-y-2 text-sm">
-            {detailed.map((d, i) => (
-              <div key={i} className="grid grid-cols-1 items-start gap-1 sm:grid-cols-2">
-                <div>
-                  <div className="flex items-center justify-between sm:justify-start sm:gap-2">
-                    <span>{d.product.title} × {d.quantity}</span>
-                    <span className="sm:hidden">A${d.product.price * d.quantity}</span>
-                  </div>
-                  {d.product.type === 'service' && d.meta && (
-                    <div className="text-xs text-gray-500">Preferred: {new Date(d.meta).toLocaleString?.() || d.meta}</div>
-                  )}
-                </div>
-                <div className="hidden sm:block text-right">A${d.product.price * d.quantity}</div>
-              </div>
-            ))}
+      {!user && (
+        <div className='rounded-3xl border border-dashed border-emerald-200 bg-white p-6 text-sm text-slate-600'>
+          <div className='font-semibold text-slate-900'>Checking out as a guest</div>
+          <p className='mt-1 text-xs text-slate-500'>You can complete payment without an account. Create an account later to manage saved addresses and payment methods.</p>
+          <div className='mt-3 flex gap-2 text-xs'>
+            <Link to='/sign-in' search={{ redirect: '/marketplace/checkout' }} className='rounded-full border border-emerald-200 px-4 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-50'>Sign in</Link>
+            <span className='inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-slate-500'>Guest mode</span>
           </div>
-          <div className="mt-2 flex justify-between text-sm"><span>Shipping</span><span>Free</span></div>
-          <div className="mt-2 flex justify-between font-semibold"><span>Total</span><span>A${total}</span></div>
-          <Button disabled={placing || detailed.length === 0} onClick={handlePlaceOrder} className="mt-3 w-full">Place order</Button>
-          <Link to="/marketplace/cart" className="mt-2 block text-center text-sm text-gray-600">Back to cart</Link>
         </div>
+      )}
+
+      <div className='grid gap-6 lg:grid-cols-[1.4fr_1fr]'>
+        <section className='space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+          <div>
+            <h2 className='text-lg font-semibold text-slate-900'>Contact details</h2>
+            <div className='mt-4 grid gap-4 md:grid-cols-2'>
+              <div>
+                <Label htmlFor='name'>Full name</Label>
+                <Input id='name' value={name} onChange={(e) => setName(e.target.value)} placeholder='Jordan Williams' className='rounded-full border-slate-200 px-4 py-3 text-sm' />
+              </div>
+              <div>
+                <Label htmlFor='email'>Email</Label>
+                <Input id='email' type='email' value={email} onChange={(e) => setEmail(e.target.value)} placeholder='jordan@company.com' className='rounded-full border-slate-200 px-4 py-3 text-sm' />
+              </div>
+              <div>
+                <Label htmlFor='phone'>Phone</Label>
+                <Input id='phone' value={phone} onChange={(e) => setPhone(e.target.value)} placeholder='+61…' className='rounded-full border-slate-200 px-4 py-3 text-sm' />
+              </div>
+              <div className='md:col-span-2'>
+                <Label htmlFor='address'>Delivery address</Label>
+                <Input id='address' value={address} onChange={(e) => setAddress(e.target.value)} placeholder='123 Market Street, Sydney NSW' className='rounded-full border-slate-200 px-4 py-3 text-sm' />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className='text-lg font-semibold text-slate-900'>Payment method</h2>
+            <div className='mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-3'>
+              <div className='rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800'>
+                <CreditCard className='mb-2 h-5 w-5' />
+                Pay securely on Hedgetech (cards, bank transfer, BNPL).
+              </div>
+              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                Automatically issue invoices and receipts.
+              </div>
+              <div className='rounded-2xl border border-slate-200 bg-white p-4'>
+                Connect saved payment methods from your dashboard.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside className='space-y-4'>
+          <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <div className='text-lg font-semibold text-slate-900'>Order summary</div>
+            <div className='mt-3 space-y-3 text-sm text-slate-600'>
+              {detailed.map((entry, idx) => (
+                <div key={idx} className='rounded-2xl border border-slate-200 px-4 py-3'>
+                  <div className='flex items-center justify-between gap-2'>
+                    <span className='font-semibold text-slate-800'>{entry.product.title}</span>
+                    <span className='text-emerald-700'>A${(entry.product.price * entry.quantity).toFixed(2)}</span>
+                  </div>
+                  <div className='text-xs text-slate-500'>Qty {entry.quantity}{entry.meta && entry.product.type === 'service' ? ` • Scheduled ${entry.meta}` : ''}</div>
+                </div>
+              ))}
+            </div>
+            <div className='mt-4 flex justify-between text-sm text-slate-600'>
+              <span>Shipping</span>
+              <span>Free</span>
+            </div>
+            <div className='mt-2 flex justify-between text-sm text-slate-600'>
+              <span>Platform fee</span>
+              <span>Included</span>
+            </div>
+            <div className='mt-4 flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700'>
+              <span>Total due</span>
+              <span>A${total.toFixed(2)}</span>
+            </div>
+            <Button disabled={placing || detailed.length === 0} onClick={handlePlaceOrder} className='mt-5 w-full rounded-full py-3'>
+              {placing ? 'Placing order…' : 'Place order'}
+            </Button>
+            <Link to='/marketplace/cart' className='mt-3 block text-center text-xs font-semibold text-emerald-700 hover:underline'>Back to cart</Link>
+          </div>
+
+          <div className='rounded-3xl border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600'>
+            <div className='flex items-center gap-3'>
+              <ShieldCheck className='h-4 w-4 text-emerald-600' />
+              Hedgetech keeps your payment in escrow until the order is fulfilled.
+            </div>
+            <div className='mt-2 flex items-center gap-3'>
+              <CheckCircle2 className='h-4 w-4 text-emerald-600' />
+              Get instant status updates via email and dashboard notifications.
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   )

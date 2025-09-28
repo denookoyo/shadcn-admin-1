@@ -9,22 +9,32 @@ import { NavGroup } from '@/components/layout/nav-group'
 import { NavUser } from '@/components/layout/nav-user'
 import { TeamSwitcher } from '@/components/layout/team-switcher'
 import { sidebarData } from './data/sidebar-data'
-import type { NavLink } from '@/components/layout/types'
+import type { NavCollapsible, NavItem, NavLink } from '@/components/layout/types'
 
 // Keep URLs within known routes to satisfy router literal types
-const allowedUrls = [
-  "/", "/marketplace", "/clerk", "/forgot-password", "/otp", "/sign-in", "/sign-in-2", "/sign-up",
-  "/401", "/403", "/404", "/500", "/503", "/settings", "/apps", "/chats",
-  "/delivery", "/drivers", "/fleet", "/warehouse",
-  "/marketplace/dashboard", "/marketplace/dashboard/orders",
-  "/settings/account", "/settings/appearance", "/settings/billing", "/settings/integrations",
-  "/settings/notifications", "/settings/security", "/settings/team", "/settings/plans", "/settings/profile",
-  "/settings/password", "/settings/email", "/settings/connected-accounts", "/settings/domains",
-  "/settings/api-keys", "/settings/logs", "/settings/usage", "/settings/support", "/settings/feedback",
-  "/blog"
-] as const
-
-type AllowedUrl = typeof allowedUrls[number]
+const allowedUrlSet = new Set<string>([
+  '/',
+  '/marketplace',
+  '/marketplace/dashboard',
+  '/marketplace/dashboard/listings',
+  '/marketplace/dashboard/import',
+  '/marketplace/dashboard/labels',
+  '/marketplace/dashboard/bookings',
+  '/marketplace/dashboard/orders',
+  '/marketplace/dashboard/pos',
+  '/marketplace/my-orders',
+  '/_authenticated/',
+  '/_authenticated/apps/',
+  '/_authenticated/chats/',
+  '/_authenticated/help-center/',
+  '/_authenticated/users/',
+  '/_authenticated/settings',
+  '/_authenticated/settings/account',
+  '/_authenticated/settings/appearance',
+  '/_authenticated/settings/notifications',
+  '/_authenticated/settings/display',
+  '/_authenticated/settings/',
+])
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -34,26 +44,41 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        {sidebarData.navGroups.map((group) => (
-          <NavGroup
-            key={group.title}
-            title={group.title}
-            items={
-              group.items
-                .map((item) => {
-                  if (allowedUrls.includes(item.url as AllowedUrl)) {
-                    return {
-                      ...item,
-                      url: item.url as AllowedUrl,
-                      items: undefined,
-                    }
-                  }
-                  return undefined
-                })
-                .filter(Boolean) as NavLink[]
+        {sidebarData.navGroups.map((group) => {
+          const items = group.items.flatMap<NavItem>((item) => {
+            if ('items' in item && item.items?.length) {
+              const validSub = item.items
+                .filter((sub) => allowedUrlSet.has(sub.url as string))
+                .map((sub) => ({ ...sub, url: sub.url as NavLink['url'] }))
+
+              if (!validSub.length) return []
+
+              const collapsible: NavCollapsible = {
+                title: item.title,
+                badge: item.badge,
+                icon: item.icon,
+                items: validSub,
+              }
+              return [collapsible]
             }
-          />
-        ))}
+
+            if ('url' in item && item.url && allowedUrlSet.has(item.url as string)) {
+              const link: NavLink = {
+                title: item.title,
+                badge: item.badge,
+                icon: item.icon,
+                url: item.url as NavLink['url'],
+              }
+              return [link]
+            }
+
+            return []
+          })
+
+          if (!items.length) return null
+
+          return <NavGroup key={group.title} title={group.title} items={items} />
+        })}
       </SidebarContent>
 
       <SidebarFooter>

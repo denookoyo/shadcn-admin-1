@@ -1,25 +1,18 @@
 import {
-  IconBrowserCheck,
- 
-  IconChecklist,
-  IconHelp,
-  IconLayoutDashboard,
-  
-  IconMessages,
-  IconNotification,
-  IconPackages,
-  IconPalette,
-  IconSettings,
-  IconTool,
-  IconUserCog,
-  IconUsers,
-  IconTruckDelivery,
-  IconMapPin,
-  IconRoad,
-  IconBuildingWarehouse,
-  IconReportAnalytics
-} from '@tabler/icons-react'
-import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
+  Boxes,
+  CalendarClock,
+  ClipboardList,
+  CreditCard,
+  LayoutDashboard,
+  LifeBuoy,
+  MessageCircle,
+  PackageCheck,
+  Settings,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Users,
+} from 'lucide-react'
 
 interface BaseNavItem {
   title: string
@@ -56,192 +49,135 @@ interface SidebarData {
 
 export const sidebarData: SidebarData = {
   user: {
-    name: 'LogiTrack Admin',
-    email: 'admin@logitrack.com',
+    name: 'Ava Merchant',
+    email: 'ava@hedgetech.market',
     avatar: '/avatars/logistics-admin.jpg',
   },
   teams: [
     {
-      name: 'FleetOps Ltd',
-      logo: Command,
-      plan: 'Fleet Management SaaS',
+      name: 'Hedgetech HQ',
+      logo: Store,
+      plan: 'Marketplace operator',
     },
     {
-      name: 'Global Couriers',
-      logo: GalleryVerticalEnd,
-      plan: 'Enterprise Logistics',
-    },
-    {
-      name: 'Swift Movers',
-      logo: AudioWaveform,
-      plan: 'Last-Mile Startup',
+      name: 'My Storefront',
+      logo: ShoppingBag,
+      plan: 'Seller workspace',
     },
   ],
   navGroups: [
     {
-      title: 'Operations',
+      title: 'Command center',
       items: [
         {
-          title: 'Dashboard',
-          url: '/',
-          icon: IconLayoutDashboard,
+          title: 'Team dashboard',
+          url: '/_authenticated/',
+          icon: LayoutDashboard,
         },
         {
-          title: 'Fleet Status',
-          url: '/fleet',
-          icon: IconTruckDelivery,
+          title: 'Seller cockpit',
+          url: '/marketplace/dashboard',
+          icon: Store,
         },
         {
-          title: 'Delivery Routes',
-          url: '/delivery',
-          icon: IconRoad,
+          title: 'Marketplace home',
+          url: '/marketplace',
+          icon: ShoppingBag,
         },
         {
-          title: 'Warehouses',
-          url: '/warehouse',
-          icon: IconBuildingWarehouse,
-        },
-        {
-          title: 'Live Map',
-          url: '/map',
-          icon: IconMapPin,
-        },
-        {
-          title: 'Seller Orders',
-          url: '/marketplace/dashboard/orders',
-          icon: IconChecklist,
+          title: 'Point of sale',
+          url: '/marketplace/dashboard/pos',
+          icon: CreditCard,
         },
       ],
     },
     {
-      title: 'Reports & Tools',
+      title: 'Sell & merchandise',
       items: [
         {
-          title: 'Analytics Reports',
-          url: '/analytics',
-          icon: IconReportAnalytics,
-        },
-        {
-          title: 'Blog',
-          url: '/blog',
-          icon: IconPackages,
-        },
-        {
-          title: 'Task Scheduler',
-          url: '/tasks',
-          icon: IconChecklist,
-        },
-        {
-          title: 'Partner Integration',
-          url: '/partners',
-          icon: IconPackages,
-        },
-        {
-          title: 'Messages',
-          url: '/chats',
-          badge: '3',
-          icon: IconMessages,
-        },
-        {
-          title: 'Team Members',
-          url: '/users',
-          icon: IconUsers,
-        },
-      ],
-    },
-    {
-      title: 'Amazing Freight',
-      items: [
-        {
-          title: 'My Dockets',
-          url: '/driver/dockets',
-          icon: IconChecklist,
-        },
-        {
-          title: 'My Hours',
-          url: '/driver/hours',
-          icon: IconBrowserCheck,
-        },
-        {
-          title: 'Maintenance',
-          url: '/driver/maintenance',
-          icon: IconTool,
-        },
-        {
-          title: 'Accidents',
-          url: '/driver/accidents',
-          icon: IconReportAnalytics,
-        },
-        {
-          title: 'Fuel Receipts',
-          url: '/driver/receipts',
-          icon: IconPackages,
-        },
-        {
-          title: 'Payments',
-          url: '/driver/payments',
-          icon: IconBrowserCheck,
-        },
-        {
-          title: 'Admin: Drivers',
-          url: '/admin/drivers',
-          icon: IconUsers,
-        },
-        {
-          title: 'Admin: Dockets',
-          url: '/admin/dockets',
-          icon: IconChecklist,
-        },
-        {
-          title: 'Admin: Hours',
-          url: '/admin/hours',
-          icon: IconBrowserCheck,
-        },
-        {
-          title: 'Admin: Trucks',
-          url: '/admin/trucks',
-          icon: IconTruckDelivery,
-        },
-      ],
-    },
-    {
-      title: 'System',
-      items: [
-        {
-          title: 'Settings',
-          icon: IconSettings,
+          title: 'Listings & content',
+          icon: Boxes,
           items: [
             {
-              title: 'Profile',
-              url: '/settings',
-              icon: IconUserCog,
+              title: 'All listings',
+              url: '/marketplace/dashboard/listings',
             },
             {
-              title: 'Account',
-              url: '/settings/account',
-              icon: IconTool,
+              title: 'Bulk import',
+              url: '/marketplace/dashboard/import',
             },
             {
-              title: 'Appearance',
-              url: '/settings/appearance',
-              icon: IconPalette,
-            },
-            {
-              title: 'Notifications',
-              url: '/settings/notifications',
-              icon: IconNotification,
-            },
-            {
-              title: 'Display',
-              url: '/settings/display',
-              icon: IconBrowserCheck,
+              title: 'Labels & packaging',
+              url: '/marketplace/dashboard/labels',
             },
           ],
         },
         {
-          title: 'Help Center',
-          url: '/help-center',
-          icon: IconHelp,
+          title: 'Bookings calendar',
+          url: '/marketplace/dashboard/bookings',
+          icon: CalendarClock,
+        },
+        {
+          title: 'Apps & promotions',
+          url: '/_authenticated/apps/',
+          icon: Sparkles,
+        },
+      ],
+    },
+    {
+      title: 'Orders & support',
+      items: [
+        {
+          title: 'Order board',
+          url: '/marketplace/dashboard/orders',
+          icon: ClipboardList,
+        },
+        {
+          title: 'My buyers',
+          url: '/marketplace/my-orders',
+          icon: PackageCheck,
+        },
+        {
+          title: 'Support desk',
+          url: '/_authenticated/chats/',
+          icon: MessageCircle,
+        },
+        {
+          title: 'Knowledge base',
+          url: '/_authenticated/help-center/',
+          icon: LifeBuoy,
+        },
+      ],
+    },
+    {
+      title: 'Organization',
+      items: [
+        {
+          title: 'Team members',
+          url: '/_authenticated/users/',
+          icon: Users,
+        },
+        {
+          title: 'Account settings',
+          icon: Settings,
+          items: [
+            {
+              title: 'Profile overview',
+              url: '/_authenticated/settings',
+            },
+            {
+              title: 'Account',
+              url: '/_authenticated/settings/account',
+            },
+            {
+              title: 'Notifications',
+              url: '/_authenticated/settings/notifications',
+            },
+            {
+              title: 'Appearance',
+              url: '/_authenticated/settings/appearance',
+            },
+          ],
         },
       ],
     },

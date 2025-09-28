@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser'
 import jwt from 'jsonwebtoken'
 import { OAuth2Client } from 'google-auth-library'
 import express from 'express'
+import { Prisma } from '@prisma/client'
 import { getPrisma } from './prisma.js'
 import { authenticator } from 'otplib'
 
@@ -55,12 +56,28 @@ export function createAuthRouter() {
       // Assign role: admin if email in ADMIN_EMAILS else driver by default
       const role = ADMIN_EMAILS.includes(String(email).toLowerCase()) ? 'admin' : 'driver'
       // Upsert by email to avoid races and ensure creation
-      const user = await prisma.user.upsert({
-        where: { email },
-        update: { googleSub, name: name || null, image: image || null, role },
-        // Provide defaults for legacy NOT NULL columns (phoneNo/ABN) in existing DB
-        create: { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null, role },
-      })
+      const baseUpdate = { googleSub, name: name || null, image: image || null }
+      const baseCreate = { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null }
+
+      let user
+      try {
+        user = await prisma.user.upsert({
+          where: { email },
+          update: { ...baseUpdate, role },
+          create: { ...baseCreate, role },
+        })
+      } catch (err) {
+        // Some legacy databases may not yet have the `role` column; fall back gracefully
+        if (err instanceof Prisma.PrismaClientValidationError && err.message.includes('Unknown argument `role`')) {
+          user = await prisma.user.upsert({
+            where: { email },
+            update: baseUpdate,
+            create: baseCreate,
+          })
+        } else {
+          throw err
+        }
+      }
 
       // If MFA is enabled, set a temporary cookie and require OTP verification
       if (user.mfaEnabled && user.mfaSecret) {
@@ -176,7 +193,7 @@ export function createAuthRouter() {
       const labelEmail = user?.email || 'user@example.com'
       // Use crypto to generate seed, then Base32 via otplib
       const secret = authenticator.generateSecret()
-      const serviceName = process.env.MFA_ISSUER || 'FleetOps'
+      const serviceName = process.env.MFA_ISSUER || 'Hedgetech Marketplace'
       const otpauth = authenticator.keyuri(labelEmail, serviceName, secret)
       await prisma.user.update({ where, data: { mfaTempSecret: secret } })
       res.json({ secret, otpauth })

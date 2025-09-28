@@ -1,9 +1,12 @@
-/* FleetOps basic service worker for offline POS + PWA install */
-const CACHE_NAME = 'fleetops-pwa-v1'
+/* Hedgetech Marketplace service worker for offline POS + PWA install */
+const CACHE_VERSION = 'hedgetech-v2'
+const CACHE_NAME = `hedgetech-pwa-${CACHE_VERSION}`
 const APP_SHELL = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
+  '/marketplace',
+  '/marketplace/listings',
   '/marketplace/dashboard/pos',
 ]
 
@@ -60,4 +63,3 @@ self.addEventListener('fetch', (event) => {
     )
   }
 })
-

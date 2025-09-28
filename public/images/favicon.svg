@@ -1,5 +1,12 @@
-<svg width="180" height="60" viewBox="0 0 180 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="5" y="10" width="30" height="30" rx="6" fill="#2563EB"/>
-  <path d="M15 20L25 30M25 20L15 30" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="45" y="35" font-family="Segoe UI, sans-serif" font-size="20" fill="#0F172A" font-weight="bold">LogiTrack</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="hedgetech-favicon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f766e" />
+      <stop offset="1" stop-color="#34d399" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#0f1f2b" />
+  <path d="M32 12c11 0 20 3.1 20 8.9v19.1c0 11-9 20.6-20 23.2-11-2.6-20-12.2-20-23.2V20.9C12 15.1 21 12 32 12Z" fill="url(#hedgetech-favicon)" />
+  <path d="M42 22.5c0-2.3-1.2-3.4-4.2-4.1-2.1-.5-4.6-.7-7.8-.7s-5.7.2-7.8.7c-3 .7-4.2 1.8-4.2 4.1v13.5c0 6.9 5.4 13.2 12 14.9 6.6-1.7 12-8 12-14.9V22.5Z" fill="rgba(255,255,255,0.28)" />
+  <path d="M38.5 28.8c0-1.7-1.1-2.5-3.5-3-1.6-.3-3.4-.5-5-.5s-3.4.2-5 .5c-2.4.5-3.5 1.3-3.5 3v7.1c0 4.6 3.3 8.9 7.7 10 4.4-1.1 7.7-5.4 7.7-10v-7.1Z" fill="rgba(255,255,255,0.55)" />
 </svg>

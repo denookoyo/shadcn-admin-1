@@ -1,13 +1,18 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
+import { ShieldCheck, Truck, Clock3, MessageCircle } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { SafeImg } from '@/components/safe-img'
 
-function Pill({ children }: { children: React.ReactNode }) {
-  return <span className="rounded-full bg-gray-100 px-3 py-1 text-xs">{children}</span>
+function Badge({ children }: { children: React.ReactNode }) {
+  return <span className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>{children}</span>
 }
+
+export const Route = createFileRoute('/marketplace/_layout/listing/$slug/')({
+  component: ListingDetail,
+})
 
 function ListingDetail() {
   const { user } = useAuthStore((s) => s.auth)
@@ -17,12 +22,8 @@ function ListingDetail() {
   const [loaded, setLoaded] = useState(false)
   const [ownerName, setOwnerName] = useState<string | null>(null)
   const [ownerImage, setOwnerImage] = useState<string | null>(null)
-  const [ownerRating, setOwnerRating] = useState<number>(5)
+  const [ownerRating, setOwnerRating] = useState<number>(4.9)
   const [qty, setQty] = useState(1)
-  // Reviews modal (unused now that we link to merchant page)
-  // const [showReviews, setShowReviews] = useState(false)
-  // const [reviewsLoading, setReviewsLoading] = useState(false)
-  // const [reviewsData, setReviewsData] = useState<{ avg: number; count: number; histogram: Record<number, number>; reviews: { orderId: string; rating: number; feedback: string; createdAt: string; buyer?: { id: number; name?: string | null; email: string; image?: string | null } }[] } | null>(null)
 
   const images = useMemo(() => {
     if (!product) return [] as string[]
@@ -34,163 +35,245 @@ function ListingDetail() {
     return [...base, ...pads]
   }, [product])
 
-  const bullets = useMemo(
-    () => [
-      'High quality and reliable performance',
-      'Fast shipping and easy returns',
-      'Secure checkout with buyer protection',
-    ],
-    []
-  )
-
   useEffect(() => {
     let mounted = true
     ;(async () => {
       const prod = await db.getProductBySlug(slug)
-      if (mounted) { setProduct(prod ?? null); setLoaded(true) }
+      if (mounted) {
+        setProduct(prod ?? null)
+        setLoaded(true)
+      }
     })()
     return () => {
       mounted = false
     }
   }, [slug])
 
-  // Resolve owner name using ownerId when available
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
         const raw = (product as any)?.ownerId
         const id = Number(raw)
-        if (!Number.isFinite(id)) { if (mounted) setOwnerName(null); return }
-        const user = await db.getUserById?.(id)
+        if (!Number.isFinite(id)) {
+          if (mounted) setOwnerName((product as any)?.seller ?? null)
+          return
+        }
+        const owner = await db.getUserById?.(id)
         if (!mounted) return
-        if (user) {
-          setOwnerName(user.name || (user.email?.split('@')[0] ?? null))
-          setOwnerImage(user.image || null)
-          if ((user as any).rating != null) setOwnerRating((user as any).rating)
+        if (owner) {
+          setOwnerName(owner.name || owner.email?.split('@')[0] || 'Seller')
+          setOwnerImage(owner.image || null)
+          if ((owner as any).rating != null) setOwnerRating((owner as any).rating)
         }
       } catch {
         if (mounted) setOwnerName(null)
       }
     })()
-    return () => { mounted = false }
+    return () => {
+      mounted = false
+    }
   }, [product])
 
-  // Display ownerId (seller's id)
   const ownerIdLabel = product?.ownerId ?? 'N/A'
 
-  // async function openReviews() { /* no-op */ }
+  const bullets = useMemo(
+    () => [
+      'Genuine item verified by Hedgetech operations.',
+      'Flexible fulfilment windows and buyer-side support.',
+      'Secure payments with instant refund if seller cancels.',
+    ],
+    []
+  )
+
+  if (!loaded) {
+    return <div className='mx-auto max-w-6xl px-4 py-20 text-center text-sm text-slate-500'>Loading product…</div>
+  }
+
+  if (!product) {
+    return <div className='mx-auto max-w-6xl px-4 py-20 text-center text-sm text-slate-500'>This listing is no longer available.</div>
+  }
+
+  const isService = product.type === 'service'
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      {!loaded ? (
-        <div className="p-6 text-sm text-gray-500">Loading product…</div>
-      ) : !product ? (
-        <div className="p-6 text-sm text-gray-500">Product not found.</div>
-      ) : (
-        <div className="grid gap-8 md:grid-cols-2">
-        <div>
-          <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100">
-            <SafeImg src={images[0]} alt={product.title} className="h-full w-full object-cover" loading="lazy" />
-          </div>
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {images.slice(1).map((src, i) => (
-              <div key={i} className="aspect-square overflow-hidden rounded-xl bg-gray-100">
-                <SafeImg src={src} alt={`${product.title} ${i + 1}`} className="h-full w-full object-cover" loading="lazy" />
+    <div className='mx-auto max-w-6xl px-4 py-10'>
+      <div className='flex flex-wrap items-center gap-2 text-xs text-slate-500'>
+        <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>Marketplace</Link>
+        <span>/</span>
+        <span>{product.title}</span>
+      </div>
+
+      <div className='mt-6 grid gap-10 lg:grid-cols-[1.1fr_0.9fr]'>
+        <div className='space-y-4'>
+          <div className='grid gap-4 md:grid-cols-2'>
+            <div className='md:col-span-2 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm'>
+              <SafeImg src={images[0]} alt={product.title} className='h-full w-full object-cover' loading='lazy' />
+            </div>
+            {images.slice(1).map((img, idx) => (
+              <div key={idx} className='overflow-hidden rounded-3xl border border-slate-200'>
+                <SafeImg src={img} alt={`${product.title} ${idx + 2}`} className='h-full w-full object-cover' loading='lazy' />
               </div>
             ))}
           </div>
-        </div>
 
-        <div className="space-y-4">
-          <h1 className="text-2xl font-bold">{product.title}</h1>
-          <div className="text-sm text-gray-500 flex items-center gap-2">
-            <span className="inline-flex items-center gap-2">
-              {ownerImage ? (
-                <Link to="/marketplace/merchant/$id" params={{ id: String((product as any)?.ownerId ?? '') }}>
-                  <img src={ownerImage} alt={ownerName || 'Seller'} className="h-4 w-4 rounded-full object-cover" />
-                </Link>
-              ) : null}
-              <span>
-                by <Link to="/marketplace/merchant/$id" params={{ id: String((product as any)?.ownerId ?? '') }} className="font-medium underline">{ownerName || ownerIdLabel}</Link>
-              </span>
-            </span>
-            <Link to="/marketplace/merchant/$id" params={{ id: String((product as any)?.ownerId ?? '') }} className="underline underline-offset-2 hover:text-gray-900">
-              ★ {Number(ownerRating ?? 5).toFixed(1)} • See reviews
-            </Link>
-            <span>• <span className="text-green-700">Verified</span></span>
-          </div>
-          <div className="text-3xl font-extrabold">A${product.price}</div>
-
-          <div className="flex flex-wrap gap-2">
-            <Pill>Free shipping</Pill>
-            <Pill>30-day returns</Pill>
-            <Pill>2-year warranty</Pill>
-          </div>
-
-          {product.type === 'service' ? (
-            <div>
-              <label className="text-sm font-medium">Preferred time</label>
-              <div className="mt-2 flex items-center gap-2">
-                <input id="appt" type="datetime-local" className="rounded-xl border px-3 py-2 text-sm" onChange={(e) => (window as any).__appt = e.target.value} />
-                <span className="text-xs text-gray-500">Seller will confirm</span>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label className="text-sm font-medium">Color</label>
-              <div className="mt-2 flex gap-2">
-                {['Black','Silver','Blue'].map((c) => (
-                  <button key={c} className="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-50">{c}</button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="text-sm font-medium">Quantity</label>
-            <div className="mt-2 inline-flex overflow-hidden rounded-xl border">
-              <button className="px-3 py-1" onClick={() => setQty((q) => Math.max(1, q - 1))}>-</button>
-              <input value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))} className="w-12 border-l border-r text-center" />
-              <button className="px-3 py-1" onClick={() => setQty((q) => q + 1)}>+</button>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-xl bg-black px-4 py-3 text-white"
-              onClick={async () => {
-                const meta = product.type === 'service' ? (window as any).__appt || '' : undefined
-                await db.addToCart(product.id, qty, ns as any, meta)
-                window.dispatchEvent(new CustomEvent('cart:changed'))
-              }}
-            >
-              Add to cart
-            </button>
-            <Link to="/marketplace/checkout" className="flex-1 rounded-xl border px-4 py-3 text-center">Buy now</Link>
-          </div>
-
-          <div>
-            <h3 className="mb-2 font-semibold">About this item</h3>
+          <section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <h2 className='text-lg font-semibold text-slate-900'>Overview</h2>
             {((product as any).description) ? (
-              <div className='prose prose-sm max-w-none text-gray-700'>
-                {String((product as any).description).split(/\n\n+/).map((p: string, i: number) => (<p key={i}>{p}</p>))}
+              <div className='prose prose-sm mt-3 max-w-none text-slate-600'>
+                {String((product as any).description)
+                  .split(/\n\n+/)
+                  .map((paragraph: string, index: number) => (
+                    <p key={index}>{paragraph}</p>
+                  ))}
               </div>
             ) : (
-              <ul className="list-inside list-disc text-sm text-gray-700">
-                {bullets.map((b, i) => <li key={i}>{b}</li>)}
+              <ul className='mt-3 grid list-inside list-disc gap-2 text-sm text-slate-600 md:grid-cols-2'>
+                {bullets.map((bullet, idx) => (
+                  <li key={idx}>{bullet}</li>
+                ))}
               </ul>
             )}
-          </div>
-        </div>
-      </div>
-      )}
+          </section>
 
-      {/* Reviews modal removed in favor of dedicated merchant page */}
+          <section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <h2 className='text-lg font-semibold text-slate-900'>Fulfilment & support</h2>
+            <div className='mt-4 grid gap-4 md:grid-cols-3'>
+              <div className='rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-800'>
+                <ShieldCheck className='mb-2 h-5 w-5' />
+                Hedgetech buyer protection covers every order with automatic refunds for cancellations or no-shows.
+              </div>
+              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700'>
+                <Truck className='mb-2 h-5 w-5 text-emerald-600' />
+                Preferred shipping & service partners confirm handover or appointment windows with live updates.
+              </div>
+              <div className='rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700'>
+                <Clock3 className='mb-2 h-5 w-5 text-emerald-600' />
+                Typical fulfilment within 48h for goods, 24h confirmation for services.
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside className='space-y-6'>
+          <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <div className='flex items-center justify-between gap-2'>
+              <Badge>{isService ? 'Service' : 'Product'}</Badge>
+              <span className='text-xs font-medium text-slate-500'>ID {product.id.slice(0, 6)}</span>
+            </div>
+            <h1 className='mt-4 text-2xl font-semibold text-slate-900'>{product.title}</h1>
+            <div className='mt-3 flex items-center gap-2 text-sm text-slate-500'>
+              <span className='inline-flex items-center gap-2'>
+                {ownerImage ? (
+                  <Link to='/marketplace/merchant/$id' params={{ id: String((product as any)?.ownerId ?? '') }}>
+                    <img src={ownerImage} alt={ownerName || 'Seller'} className='h-6 w-6 rounded-full object-cover' />
+                  </Link>
+                ) : null}
+                <span>
+                  Sold by{' '}
+                  <Link
+                    to='/marketplace/merchant/$id'
+                    params={{ id: String((product as any)?.ownerId ?? '') }}
+                    className='font-semibold text-emerald-700 hover:underline'
+                  >
+                    {ownerName || ownerIdLabel}
+                  </Link>
+                </span>
+              </span>
+              <span>•</span>
+              <span className='text-emerald-700'>★ {Number(ownerRating ?? 4.9).toFixed(1)}</span>
+            </div>
+            <div className='mt-4 text-3xl font-bold text-emerald-700'>A${product.price}</div>
+
+            <div className='mt-5 space-y-4 text-sm text-slate-600'>
+              {isService ? (
+                <div>
+                  <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Preferred appointment</label>
+                  <input
+                    type='datetime-local'
+                    className='mt-2 w-full rounded-full border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:border-emerald-400 focus:ring-emerald-200'
+                    onChange={(e) => ((window as any).__appt = e.target.value)}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Select quantity</label>
+                  <div className='mt-2 inline-flex items-center rounded-full border border-slate-200 bg-slate-50'>
+                    <button className='px-4 py-2 text-lg font-semibold' onClick={() => setQty((q) => Math.max(1, q - 1))}>
+                      −
+                    </button>
+                    <input
+                      value={qty}
+                      onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+                      className='w-14 border-x border-slate-200 bg-white text-center text-sm outline-none'
+                    />
+                    <button className='px-4 py-2 text-lg font-semibold' onClick={() => setQty((q) => q + 1)}>
+                      +
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className='flex flex-col gap-3'>
+                <button
+                  className='inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500'
+                  onClick={async () => {
+                    const meta = isService ? (window as any).__appt || '' : undefined
+                    await db.addToCart(product.id, qty, ns as any, meta)
+                    window.dispatchEvent(new CustomEvent('cart:changed'))
+                  }}
+                >
+                  Add to cart • A${(product.price * qty).toFixed(2)}
+                </button>
+                <Link
+                  to='/marketplace/checkout'
+                  className='inline-flex items-center justify-center gap-2 rounded-full border border-emerald-200 px-5 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50'
+                >
+                  Buy now
+                </Link>
+                <Link
+                  to='/marketplace/merchant/$id'
+                  params={{ id: String((product as any)?.ownerId ?? '') }}
+                  className='inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700'
+                >
+                  <MessageCircle className='h-4 w-4' /> Message seller
+                </Link>
+              </div>
+            </div>
+
+            <div className='mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
+              <div className='flex items-center justify-between'>
+                <span>Buyer coverage</span>
+                <span className='font-semibold text-emerald-700'>Protected</span>
+              </div>
+              <p>
+                Every Hedgetech transaction is protected by identity verification, escrow-backed payments, and responsive dispute resolution.
+              </p>
+            </div>
+          </div>
+
+          <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <h2 className='text-lg font-semibold text-slate-900'>Seller signals</h2>
+            <div className='mt-4 space-y-3 text-sm text-slate-600'>
+              <div className='flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800'>
+                <span>Verified identity</span>
+                <span className='font-semibold'>Yes</span>
+              </div>
+              <div className='flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
+                <span>Average response time</span>
+                <span>{(product as any).responseTime ?? 'Under 2h'}</span>
+              </div>
+              <div className='flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3'>
+                <span>Repeat buyers</span>
+                <span className='font-semibold text-emerald-700'>{(product as any).repeatBuyerRate ?? '62%'}</span>
+              </div>
+              <div className='rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-500'>
+                Seller dashboard metrics sync automatically when connected to Hedgetech APIs.
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   )
 }
-
-export const Route = createFileRoute('/marketplace/_layout/listing/$slug/')({
-  component: ListingDetail,
-})

@@ -1,6 +1,6 @@
 {
-  "name": "fleetops",
-  "description": "A modern admin dashboard template built with React, Tailwind CSS, and Radix UI.",
+  "name": "hedgetech-marketplace",
+  "description": "Hedgetech Marketplace – an interactive commerce platform for buyers and sellers with dashboards, POS, and trust tooling.",
   "author": "Denis Kipkorir",
   "license": "MIT",
   "repository": {

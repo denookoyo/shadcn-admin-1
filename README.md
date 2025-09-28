@@ -1,26 +1,27 @@
-# Shadcn Admin + API (FleetOps)
+# Hedgetech Marketplace
 
-Modern admin dashboard built with React, Vite, TailwindCSS, and Radix UI — paired with an Express API (Prisma + Postgres) and serverless adapters for Vercel/Netlify.
+Interactive marketplace and commerce cockpit where Hedgetech buyers and sellers trade with confidence. Built with React, Vite, TailwindCSS, and Radix UI on top of an Express + Prisma API that ships with adapters for Vercel and Netlify.
 
-![Dashboard](public/images/shadcn-admin.png)
+![Hedgetech Marketplace](public/images/hedgetech-social.svg)
 
 This repo includes:
-- A responsive, accessible UI based on shadcn/ui
-- An Express API with authentication, products, orders, cart, categories, blog, and AI helper endpoints
+- Hedgetech-themed marketplace UI with discovery, dashboards, and trust signals powered by shadcn/ui primitives
+- Express API with authentication, products, services, orders, cart, categories, blog, and AI helper endpoints
 - Prisma schema and Postgres integration (Neon/Vercel Postgres compatible)
 - Serverless adapters for Vercel API routes and Netlify Functions
 
 Quick links:
 - docs/API.md — Complete API reference with routes and payloads
+- docs/hedgetech-marketplace-redesign.md — Brand, IA, and UX redesign plan
 
 ## Features
 
 - Light/dark mode, responsive layout, accessible components
-- Sidebar navigation, global command menu, 10+ pages
+- Marketplace discovery experience with hero, category rail, and spotlight listings
+- Buyer toolkit: cart, trust badges, structured checkout, order tracking, guest access
+- Seller cockpit: KPI overview, product manager, POS, fulfilment pipelines, CSV import
 - Auth with JWT cookie and Google Sign-In helper
-- Products, Categories, Cart, Checkout, Orders workflows
-- Blog CRUD and user reputation/reviews
-- AI product description generation via OpenAI
+- Blog CRUD, reputation/reviews, AI product description generation via OpenAI
 
 ## Tech Stack
 
