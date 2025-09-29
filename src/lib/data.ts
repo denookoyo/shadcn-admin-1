@@ -1,4 +1,5 @@
 import { db as localdb, seedProducts, categories as localCategories, type Product, type Order, type CartItem, type Category } from './localdb'
+import { useStageStore } from '@/stores/stageStore'
 import { fetchJson } from './http'
 
 const useApi = typeof window !== 'undefined' && (import.meta as any).env?.VITE_USE_API === 'true'
@@ -78,9 +79,19 @@ export type DataAPI = {
 }
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const stage = useStageStore.getState().stage
+  const stageHeader = stage ? { 'X-Hedgetech-Stage': stage } : undefined
+  const baseHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...stageHeader,
+  }
+  const mergedHeaders = init?.headers
+    ? { ...baseHeaders, ...(init.headers as Record<string, string>) }
+    : baseHeaders
+
   return fetchJson<T>(input, {
-    headers: { 'Content-Type': 'application/json' },
     ...init,
+    headers: mergedHeaders,
   })
 }
 

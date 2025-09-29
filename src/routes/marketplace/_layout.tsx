@@ -5,6 +5,7 @@ import { useUiStore } from '@/stores/uiStore'
 import { useAuthStore } from '@/stores/authStore'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { HedgetechLogo } from '@/components/hedgetech-logo'
+import { StageBadge } from '@/components/stage-badge'
 
 function Nav() {
   const { user } = useAuthStore((s) => s.auth)
@@ -60,7 +61,9 @@ function Nav() {
   ] as const
   const sellerLinks = [
     { href: '/marketplace/dashboard', label: 'Seller cockpit' },
-    { href: '/marketplace/dashboard/orders', label: 'Orders' },
+    { href: '/marketplace/dashboard/analytics', label: 'Analytics' },
+    { href: '/marketplace/dashboard/reports', label: 'Reports' },
+    { href: '/marketplace/dashboard/support', label: 'Support' },
     { href: '/marketplace/dashboard/pos', label: 'POS' },
   ] as const
   const supportLinks = [
@@ -98,6 +101,7 @@ function Nav() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <StageBadge className="hidden md:inline-flex" />
             <Link
               to="/marketplace/cart"
               className="group relative flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-500"
