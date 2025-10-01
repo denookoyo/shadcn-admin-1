@@ -22,6 +22,12 @@ model Product {
   barcode   String?
   description String?
   images     String[]
+  stockCount Int      @default(0)
+  serviceDurationMinutes Int?
+  serviceOpenTime  String?
+  serviceCloseTime String?
+  serviceOpenDays  String[] @default([])
+  serviceDailyCapacity Int?
   ownerId   Int?
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])

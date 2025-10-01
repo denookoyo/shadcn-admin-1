@@ -4,6 +4,56 @@ import { fetchJson } from './http'
 
 const useApi = typeof window !== 'undefined' && (import.meta as any).env?.VITE_USE_API === 'true'
 
+const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+function startOfDay(date: Date | string | number) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function addDays(date: Date, days: number) {
+  const copy = new Date(date)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+function combineDateAndTime(base: Date, time?: string | null) {
+  const d = new Date(base)
+  const fallback = '09:00'
+  const source = time && /^\d{2}:\d{2}$/.test(time) ? time : fallback
+  const [hours, minutes] = source.split(':').map((value) => Number(value) || 0)
+  d.setHours(hours, minutes, 0, 0)
+  return d
+}
+
+export type ServiceAvailabilitySlot = {
+  start: string
+  end: string
+  available: boolean
+  booked: number
+}
+
+export type ServiceAvailabilityDay = {
+  date: string
+  weekday: string
+  isOpen: boolean
+  remaining: number
+  capacity: number
+  slots: ServiceAvailabilitySlot[]
+}
+
+export type ProductAvailability = {
+  productId: string
+  start: string
+  end: string
+  durationMinutes: number
+  openTime: string
+  closeTime: string
+  openDays: string[]
+  days: ServiceAvailabilityDay[]
+}
+
 // Unify API surface so callers can use categories regardless of backend
 export type DataAPI = {
   // Products
@@ -11,6 +61,10 @@ export type DataAPI = {
   getProductBySlug: (slug: string) => Promise<Product | undefined>
   getProductById: (id: string) => Promise<Product | undefined>
   getProductByBarcode?: (code: string) => Promise<Product | null>
+  getProductAvailability?: (
+    id: string,
+    options?: { start?: string | Date; days?: number }
+  ) => Promise<ProductAvailability>
   createProduct: (input: Omit<Product, 'id'>) => Promise<Product>
   updateProduct: (id: string, patch: Partial<Product>) => Promise<Product | undefined>
   deleteProduct: (id: string) => Promise<boolean>
@@ -109,6 +163,14 @@ const api: DataAPI = {
   async getProductById(id: string): Promise<Product | undefined> {
     const products = await api.listProducts()
     return products.find((p) => p.id === id)
+  },
+  async getProductAvailability(id: string, options) {
+    const params = new URLSearchParams()
+    if (options?.start) params.set('start', new Date(options.start).toISOString())
+    if (options?.days) params.set('days', String(options.days))
+    const query = params.toString()
+    const path = `/api/products/${encodeURIComponent(id)}/availability${query ? `?${query}` : ''}`
+    return http<ProductAvailability>(path)
   },
   async getProductByBarcode(code: string) {
     try {
@@ -280,6 +342,67 @@ const localWrapper: DataAPI = {
   async listProducts() { return localdb.listProducts() },
   async getProductBySlug(slug: string) { return localdb.getProductBySlug(slug) },
   async getProductById(id: string) { return localdb.getProductById(id) },
+  async getProductAvailability(id: string, options) {
+    const product = await localdb.getProductById(id)
+    if (!product) throw new Error('Product not found')
+    if (product.type !== 'service') throw new Error('Availability only applies to services')
+    const startDate = options?.start ? new Date(options.start) : new Date()
+    if (Number.isNaN(startDate.getTime())) throw new Error('Invalid start date')
+    const start = startOfDay(startDate)
+    const span = Math.min(Math.max(1, options?.days ?? 14), 90)
+    const openDays = (product.serviceOpenDays && product.serviceOpenDays.length ? product.serviceOpenDays : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']).map((d) => d.toLowerCase())
+    const openTime = product.serviceOpenTime || '09:00'
+    const closeTime = product.serviceCloseTime || '17:00'
+    const durationMinutes = Math.max(15, product.serviceDurationMinutes || 60)
+    const durationMs = durationMinutes * 60 * 1000
+
+    const days: ServiceAvailabilityDay[] = []
+    for (let offset = 0; offset < span; offset += 1) {
+      const dayDate = addDays(start, offset)
+      const weekday = DAY_NAMES[dayDate.getDay()] || 'monday'
+      const isOpen = openDays.includes(weekday)
+      let slots: ServiceAvailabilitySlot[] = []
+      let capacity = product.serviceDailyCapacity ?? 0
+      if (isOpen) {
+        const dayOpen = combineDateAndTime(dayDate, openTime)
+        let dayClose = combineDateAndTime(dayDate, closeTime)
+        if (dayClose <= dayOpen) {
+          dayClose = new Date(dayOpen.getTime() + durationMs)
+        }
+        const maxSlots = Math.max(1, Math.floor((dayClose.getTime() - dayOpen.getTime()) / durationMs))
+        capacity = product.serviceDailyCapacity ?? maxSlots
+        const effectiveSlots = Math.min(maxSlots, capacity)
+        slots = Array.from({ length: effectiveSlots }).map((_, idx) => {
+          const slotStart = dayOpen.getTime() + idx * durationMs
+          return {
+            start: new Date(slotStart).toISOString(),
+            end: new Date(slotStart + durationMs).toISOString(),
+            available: true,
+            booked: 0,
+          }
+        })
+      }
+      days.push({
+        date: dayDate.toISOString().slice(0, 10),
+        weekday,
+        isOpen,
+        remaining: capacity,
+        capacity,
+        slots,
+      })
+    }
+
+    return {
+      productId: id,
+      start: start.toISOString(),
+      end: addDays(start, span).toISOString(),
+      durationMinutes,
+      openTime,
+      closeTime,
+      openDays,
+      days,
+    }
+  },
   async getProductByBarcode(code: string) {
     const list = await localdb.listProducts()
     const p = list.find((x: any) => String(x.barcode || '').trim() === String(code).trim())

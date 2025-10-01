@@ -35,9 +35,14 @@ import { Route as ClerkauthRouteImport } from './routes/clerk/(auth)/route'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings/route'
 import { Route as MarketplaceLayoutIndexImport } from './routes/marketplace/_layout/index'
 import { Route as BlogSlugIndexImport } from './routes/blog/$slug/index'
+import { Route as AuthenticatedWarehouseIndexImport } from './routes/_authenticated/warehouse/index'
 import { Route as AuthenticatedUsersIndexImport } from './routes/_authenticated/users/index'
+import { Route as AuthenticatedTasksIndexImport } from './routes/_authenticated/tasks/index'
 import { Route as AuthenticatedSettingsIndexImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedHelpCenterIndexImport } from './routes/_authenticated/help-center/index'
+import { Route as AuthenticatedFleetIndexImport } from './routes/_authenticated/fleet/index'
+import { Route as AuthenticatedDriversIndexImport } from './routes/_authenticated/drivers/index'
+import { Route as AuthenticatedDeliveryIndexImport } from './routes/_authenticated/delivery/index'
 import { Route as AuthenticatedChatsIndexImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexImport } from './routes/_authenticated/apps/index'
 import { Route as MarketplaceLayoutMyOrdersImport } from './routes/marketplace/_layout/my-orders'
@@ -49,6 +54,16 @@ import { Route as AuthenticatedSettingsNotificationsImport } from './routes/_aut
 import { Route as AuthenticatedSettingsDisplayImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountImport } from './routes/_authenticated/settings/account'
+import { Route as AuthenticatedDriverReceiptsImport } from './routes/_authenticated/driver/receipts'
+import { Route as AuthenticatedDriverPaymentsImport } from './routes/_authenticated/driver/payments'
+import { Route as AuthenticatedDriverMaintenanceImport } from './routes/_authenticated/driver/maintenance'
+import { Route as AuthenticatedDriverHoursImport } from './routes/_authenticated/driver/hours'
+import { Route as AuthenticatedDriverDocketsImport } from './routes/_authenticated/driver/dockets'
+import { Route as AuthenticatedDriverAccidentsImport } from './routes/_authenticated/driver/accidents'
+import { Route as AuthenticatedAdminTrucksImport } from './routes/_authenticated/admin/trucks'
+import { Route as AuthenticatedAdminHoursImport } from './routes/_authenticated/admin/hours'
+import { Route as AuthenticatedAdminDriversImport } from './routes/_authenticated/admin/drivers'
+import { Route as AuthenticatedAdminDocketsImport } from './routes/_authenticated/admin/dockets'
 import { Route as MarketplaceLayoutListingsIndexImport } from './routes/marketplace/_layout/listings/index'
 import { Route as MarketplaceLayoutDashboardIndexImport } from './routes/marketplace/_layout/dashboard/index'
 import { Route as MarketplaceLayoutCheckoutIndexImport } from './routes/marketplace/_layout/checkout/index'
@@ -215,9 +230,22 @@ const BlogSlugIndexRoute = BlogSlugIndexImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const AuthenticatedWarehouseIndexRoute =
+  AuthenticatedWarehouseIndexImport.update({
+    id: '/warehouse/',
+    path: '/warehouse/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexImport.update({
   id: '/users/',
   path: '/users/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
@@ -235,6 +263,26 @@ const AuthenticatedHelpCenterIndexRoute =
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+
+const AuthenticatedFleetIndexRoute = AuthenticatedFleetIndexImport.update({
+  id: '/fleet/',
+  path: '/fleet/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedDriversIndexRoute = AuthenticatedDriversIndexImport.update({
+  id: '/drivers/',
+  path: '/drivers/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedDeliveryIndexRoute = AuthenticatedDeliveryIndexImport.update(
+  {
+    id: '/delivery/',
+    path: '/delivery/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any,
+)
 
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexImport.update({
   id: '/chats/',
@@ -306,6 +354,72 @@ const AuthenticatedSettingsAccountRoute =
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+
+const AuthenticatedDriverReceiptsRoute =
+  AuthenticatedDriverReceiptsImport.update({
+    id: '/driver/receipts',
+    path: '/driver/receipts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
+const AuthenticatedDriverPaymentsRoute =
+  AuthenticatedDriverPaymentsImport.update({
+    id: '/driver/payments',
+    path: '/driver/payments',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
+const AuthenticatedDriverMaintenanceRoute =
+  AuthenticatedDriverMaintenanceImport.update({
+    id: '/driver/maintenance',
+    path: '/driver/maintenance',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
+const AuthenticatedDriverHoursRoute = AuthenticatedDriverHoursImport.update({
+  id: '/driver/hours',
+  path: '/driver/hours',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedDriverDocketsRoute = AuthenticatedDriverDocketsImport.update(
+  {
+    id: '/driver/dockets',
+    path: '/driver/dockets',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any,
+)
+
+const AuthenticatedDriverAccidentsRoute =
+  AuthenticatedDriverAccidentsImport.update({
+    id: '/driver/accidents',
+    path: '/driver/accidents',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
+const AuthenticatedAdminTrucksRoute = AuthenticatedAdminTrucksImport.update({
+  id: '/admin/trucks',
+  path: '/admin/trucks',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedAdminHoursRoute = AuthenticatedAdminHoursImport.update({
+  id: '/admin/hours',
+  path: '/admin/hours',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedAdminDriversRoute = AuthenticatedAdminDriversImport.update({
+  id: '/admin/drivers',
+  path: '/admin/drivers',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedAdminDocketsRoute = AuthenticatedAdminDocketsImport.update({
+  id: '/admin/dockets',
+  path: '/admin/dockets',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 const MarketplaceLayoutListingsIndexRoute =
   MarketplaceLayoutListingsIndexImport.update({
@@ -619,6 +733,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogIndexImport
       parentRoute: typeof rootRoute
     }
+    '/_authenticated/admin/dockets': {
+      id: '/_authenticated/admin/dockets'
+      path: '/admin/dockets'
+      fullPath: '/admin/dockets'
+      preLoaderRoute: typeof AuthenticatedAdminDocketsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/admin/drivers': {
+      id: '/_authenticated/admin/drivers'
+      path: '/admin/drivers'
+      fullPath: '/admin/drivers'
+      preLoaderRoute: typeof AuthenticatedAdminDriversImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/admin/hours': {
+      id: '/_authenticated/admin/hours'
+      path: '/admin/hours'
+      fullPath: '/admin/hours'
+      preLoaderRoute: typeof AuthenticatedAdminHoursImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/admin/trucks': {
+      id: '/_authenticated/admin/trucks'
+      path: '/admin/trucks'
+      fullPath: '/admin/trucks'
+      preLoaderRoute: typeof AuthenticatedAdminTrucksImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/accidents': {
+      id: '/_authenticated/driver/accidents'
+      path: '/driver/accidents'
+      fullPath: '/driver/accidents'
+      preLoaderRoute: typeof AuthenticatedDriverAccidentsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/dockets': {
+      id: '/_authenticated/driver/dockets'
+      path: '/driver/dockets'
+      fullPath: '/driver/dockets'
+      preLoaderRoute: typeof AuthenticatedDriverDocketsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/hours': {
+      id: '/_authenticated/driver/hours'
+      path: '/driver/hours'
+      fullPath: '/driver/hours'
+      preLoaderRoute: typeof AuthenticatedDriverHoursImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/maintenance': {
+      id: '/_authenticated/driver/maintenance'
+      path: '/driver/maintenance'
+      fullPath: '/driver/maintenance'
+      preLoaderRoute: typeof AuthenticatedDriverMaintenanceImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/payments': {
+      id: '/_authenticated/driver/payments'
+      path: '/driver/payments'
+      fullPath: '/driver/payments'
+      preLoaderRoute: typeof AuthenticatedDriverPaymentsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/driver/receipts': {
+      id: '/_authenticated/driver/receipts'
+      path: '/driver/receipts'
+      fullPath: '/driver/receipts'
+      preLoaderRoute: typeof AuthenticatedDriverReceiptsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/settings/account': {
       id: '/_authenticated/settings/account'
       path: '/account'
@@ -696,6 +880,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedChatsIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/delivery/': {
+      id: '/_authenticated/delivery/'
+      path: '/delivery'
+      fullPath: '/delivery'
+      preLoaderRoute: typeof AuthenticatedDeliveryIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/drivers/': {
+      id: '/_authenticated/drivers/'
+      path: '/drivers'
+      fullPath: '/drivers'
+      preLoaderRoute: typeof AuthenticatedDriversIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/fleet/': {
+      id: '/_authenticated/fleet/'
+      path: '/fleet'
+      fullPath: '/fleet'
+      preLoaderRoute: typeof AuthenticatedFleetIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/help-center/': {
       id: '/_authenticated/help-center/'
       path: '/help-center'
@@ -710,11 +915,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexImport
       parentRoute: typeof AuthenticatedSettingsRouteImport
     }
+    '/_authenticated/tasks/': {
+      id: '/_authenticated/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof AuthenticatedTasksIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/users/': {
       id: '/_authenticated/users/'
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AuthenticatedUsersIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/warehouse/': {
+      id: '/_authenticated/warehouse/'
+      path: '/warehouse'
+      fullPath: '/warehouse'
+      preLoaderRoute: typeof AuthenticatedWarehouseIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
     '/blog/$slug/': {
@@ -923,19 +1142,49 @@ const AuthenticatedSettingsRouteRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteRoute: typeof AuthenticatedSettingsRouteRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAdminDocketsRoute: typeof AuthenticatedAdminDocketsRoute
+  AuthenticatedAdminDriversRoute: typeof AuthenticatedAdminDriversRoute
+  AuthenticatedAdminHoursRoute: typeof AuthenticatedAdminHoursRoute
+  AuthenticatedAdminTrucksRoute: typeof AuthenticatedAdminTrucksRoute
+  AuthenticatedDriverAccidentsRoute: typeof AuthenticatedDriverAccidentsRoute
+  AuthenticatedDriverDocketsRoute: typeof AuthenticatedDriverDocketsRoute
+  AuthenticatedDriverHoursRoute: typeof AuthenticatedDriverHoursRoute
+  AuthenticatedDriverMaintenanceRoute: typeof AuthenticatedDriverMaintenanceRoute
+  AuthenticatedDriverPaymentsRoute: typeof AuthenticatedDriverPaymentsRoute
+  AuthenticatedDriverReceiptsRoute: typeof AuthenticatedDriverReceiptsRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedDeliveryIndexRoute: typeof AuthenticatedDeliveryIndexRoute
+  AuthenticatedDriversIndexRoute: typeof AuthenticatedDriversIndexRoute
+  AuthenticatedFleetIndexRoute: typeof AuthenticatedFleetIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
+  AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
+  AuthenticatedWarehouseIndexRoute: typeof AuthenticatedWarehouseIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteRoute: AuthenticatedSettingsRouteRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAdminDocketsRoute: AuthenticatedAdminDocketsRoute,
+  AuthenticatedAdminDriversRoute: AuthenticatedAdminDriversRoute,
+  AuthenticatedAdminHoursRoute: AuthenticatedAdminHoursRoute,
+  AuthenticatedAdminTrucksRoute: AuthenticatedAdminTrucksRoute,
+  AuthenticatedDriverAccidentsRoute: AuthenticatedDriverAccidentsRoute,
+  AuthenticatedDriverDocketsRoute: AuthenticatedDriverDocketsRoute,
+  AuthenticatedDriverHoursRoute: AuthenticatedDriverHoursRoute,
+  AuthenticatedDriverMaintenanceRoute: AuthenticatedDriverMaintenanceRoute,
+  AuthenticatedDriverPaymentsRoute: AuthenticatedDriverPaymentsRoute,
+  AuthenticatedDriverReceiptsRoute: AuthenticatedDriverReceiptsRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedDeliveryIndexRoute: AuthenticatedDeliveryIndexRoute,
+  AuthenticatedDriversIndexRoute: AuthenticatedDriversIndexRoute,
+  AuthenticatedFleetIndexRoute: AuthenticatedFleetIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
+  AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
+  AuthenticatedWarehouseIndexRoute: AuthenticatedWarehouseIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -1089,6 +1338,16 @@ export interface FileRoutesByFullPath {
   '/marketplace': typeof MarketplaceLayoutRouteWithChildren
   '/': typeof AuthenticatedIndexRoute
   '/blog': typeof BlogIndexRoute
+  '/admin/dockets': typeof AuthenticatedAdminDocketsRoute
+  '/admin/drivers': typeof AuthenticatedAdminDriversRoute
+  '/admin/hours': typeof AuthenticatedAdminHoursRoute
+  '/admin/trucks': typeof AuthenticatedAdminTrucksRoute
+  '/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
+  '/driver/dockets': typeof AuthenticatedDriverDocketsRoute
+  '/driver/hours': typeof AuthenticatedDriverHoursRoute
+  '/driver/maintenance': typeof AuthenticatedDriverMaintenanceRoute
+  '/driver/payments': typeof AuthenticatedDriverPaymentsRoute
+  '/driver/receipts': typeof AuthenticatedDriverReceiptsRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -1100,9 +1359,14 @@ export interface FileRoutesByFullPath {
   '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
   '/blog/$slug': typeof BlogSlugIndexRoute
   '/marketplace/': typeof MarketplaceLayoutIndexRoute
   '/marketplace/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
@@ -1147,6 +1411,16 @@ export interface FileRoutesByTo {
   '/marketplace': typeof MarketplaceLayoutIndexRoute
   '/': typeof AuthenticatedIndexRoute
   '/blog': typeof BlogIndexRoute
+  '/admin/dockets': typeof AuthenticatedAdminDocketsRoute
+  '/admin/drivers': typeof AuthenticatedAdminDriversRoute
+  '/admin/hours': typeof AuthenticatedAdminHoursRoute
+  '/admin/trucks': typeof AuthenticatedAdminTrucksRoute
+  '/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
+  '/driver/dockets': typeof AuthenticatedDriverDocketsRoute
+  '/driver/hours': typeof AuthenticatedDriverHoursRoute
+  '/driver/maintenance': typeof AuthenticatedDriverMaintenanceRoute
+  '/driver/payments': typeof AuthenticatedDriverPaymentsRoute
+  '/driver/receipts': typeof AuthenticatedDriverReceiptsRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -1158,9 +1432,14 @@ export interface FileRoutesByTo {
   '/marketplace/my-orders': typeof MarketplaceLayoutMyOrdersRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/delivery': typeof AuthenticatedDeliveryIndexRoute
+  '/drivers': typeof AuthenticatedDriversIndexRoute
+  '/fleet': typeof AuthenticatedFleetIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/tasks': typeof AuthenticatedTasksIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
+  '/warehouse': typeof AuthenticatedWarehouseIndexRoute
   '/blog/$slug': typeof BlogSlugIndexRoute
   '/marketplace/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
   '/marketplace/dashboard/approvals': typeof MarketplaceLayoutDashboardApprovalsRoute
@@ -1210,6 +1489,16 @@ export interface FileRoutesById {
   '/marketplace/_layout': typeof MarketplaceLayoutRouteWithChildren
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/blog/': typeof BlogIndexRoute
+  '/_authenticated/admin/dockets': typeof AuthenticatedAdminDocketsRoute
+  '/_authenticated/admin/drivers': typeof AuthenticatedAdminDriversRoute
+  '/_authenticated/admin/hours': typeof AuthenticatedAdminHoursRoute
+  '/_authenticated/admin/trucks': typeof AuthenticatedAdminTrucksRoute
+  '/_authenticated/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
+  '/_authenticated/driver/dockets': typeof AuthenticatedDriverDocketsRoute
+  '/_authenticated/driver/hours': typeof AuthenticatedDriverHoursRoute
+  '/_authenticated/driver/maintenance': typeof AuthenticatedDriverMaintenanceRoute
+  '/_authenticated/driver/payments': typeof AuthenticatedDriverPaymentsRoute
+  '/_authenticated/driver/receipts': typeof AuthenticatedDriverReceiptsRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
@@ -1221,9 +1510,14 @@ export interface FileRoutesById {
   '/marketplace/_layout/my-orders': typeof MarketplaceLayoutMyOrdersRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/delivery/': typeof AuthenticatedDeliveryIndexRoute
+  '/_authenticated/drivers/': typeof AuthenticatedDriversIndexRoute
+  '/_authenticated/fleet/': typeof AuthenticatedFleetIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
+  '/_authenticated/warehouse/': typeof AuthenticatedWarehouseIndexRoute
   '/blog/$slug/': typeof BlogSlugIndexRoute
   '/marketplace/_layout/': typeof MarketplaceLayoutIndexRoute
   '/marketplace/_layout/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
@@ -1273,6 +1567,16 @@ export interface FileRouteTypes {
     | '/marketplace'
     | '/'
     | '/blog'
+    | '/admin/dockets'
+    | '/admin/drivers'
+    | '/admin/hours'
+    | '/admin/trucks'
+    | '/driver/accidents'
+    | '/driver/dockets'
+    | '/driver/hours'
+    | '/driver/maintenance'
+    | '/driver/payments'
+    | '/driver/receipts'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -1284,9 +1588,14 @@ export interface FileRouteTypes {
     | '/marketplace/my-orders'
     | '/apps'
     | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
     | '/help-center'
     | '/settings/'
+    | '/tasks'
     | '/users'
+    | '/warehouse'
     | '/blog/$slug'
     | '/marketplace/'
     | '/marketplace/dashboard/analytics'
@@ -1330,6 +1639,16 @@ export interface FileRouteTypes {
     | '/marketplace'
     | '/'
     | '/blog'
+    | '/admin/dockets'
+    | '/admin/drivers'
+    | '/admin/hours'
+    | '/admin/trucks'
+    | '/driver/accidents'
+    | '/driver/dockets'
+    | '/driver/hours'
+    | '/driver/maintenance'
+    | '/driver/payments'
+    | '/driver/receipts'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -1341,9 +1660,14 @@ export interface FileRouteTypes {
     | '/marketplace/my-orders'
     | '/apps'
     | '/chats'
+    | '/delivery'
+    | '/drivers'
+    | '/fleet'
     | '/help-center'
     | '/settings'
+    | '/tasks'
     | '/users'
+    | '/warehouse'
     | '/blog/$slug'
     | '/marketplace/dashboard/analytics'
     | '/marketplace/dashboard/approvals'
@@ -1391,6 +1715,16 @@ export interface FileRouteTypes {
     | '/marketplace/_layout'
     | '/_authenticated/'
     | '/blog/'
+    | '/_authenticated/admin/dockets'
+    | '/_authenticated/admin/drivers'
+    | '/_authenticated/admin/hours'
+    | '/_authenticated/admin/trucks'
+    | '/_authenticated/driver/accidents'
+    | '/_authenticated/driver/dockets'
+    | '/_authenticated/driver/hours'
+    | '/_authenticated/driver/maintenance'
+    | '/_authenticated/driver/payments'
+    | '/_authenticated/driver/receipts'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
@@ -1402,9 +1736,14 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/my-orders'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
+    | '/_authenticated/delivery/'
+    | '/_authenticated/drivers/'
+    | '/_authenticated/fleet/'
     | '/_authenticated/help-center/'
     | '/_authenticated/settings/'
+    | '/_authenticated/tasks/'
     | '/_authenticated/users/'
+    | '/_authenticated/warehouse/'
     | '/blog/$slug/'
     | '/marketplace/_layout/'
     | '/marketplace/_layout/dashboard/analytics'
@@ -1510,10 +1849,25 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated/settings",
         "/_authenticated/",
+        "/_authenticated/admin/dockets",
+        "/_authenticated/admin/drivers",
+        "/_authenticated/admin/hours",
+        "/_authenticated/admin/trucks",
+        "/_authenticated/driver/accidents",
+        "/_authenticated/driver/dockets",
+        "/_authenticated/driver/hours",
+        "/_authenticated/driver/maintenance",
+        "/_authenticated/driver/payments",
+        "/_authenticated/driver/receipts",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
+        "/_authenticated/delivery/",
+        "/_authenticated/drivers/",
+        "/_authenticated/fleet/",
         "/_authenticated/help-center/",
-        "/_authenticated/users/"
+        "/_authenticated/tasks/",
+        "/_authenticated/users/",
+        "/_authenticated/warehouse/"
       ]
     },
     "/clerk": {
@@ -1629,6 +1983,46 @@ export const routeTree = rootRoute
     "/blog/": {
       "filePath": "blog/index.tsx"
     },
+    "/_authenticated/admin/dockets": {
+      "filePath": "_authenticated/admin/dockets.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/admin/drivers": {
+      "filePath": "_authenticated/admin/drivers.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/admin/hours": {
+      "filePath": "_authenticated/admin/hours.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/admin/trucks": {
+      "filePath": "_authenticated/admin/trucks.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/accidents": {
+      "filePath": "_authenticated/driver/accidents.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/dockets": {
+      "filePath": "_authenticated/driver/dockets.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/hours": {
+      "filePath": "_authenticated/driver/hours.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/maintenance": {
+      "filePath": "_authenticated/driver/maintenance.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/payments": {
+      "filePath": "_authenticated/driver/payments.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/driver/receipts": {
+      "filePath": "_authenticated/driver/receipts.tsx",
+      "parent": "/_authenticated"
+    },
     "/_authenticated/settings/account": {
       "filePath": "_authenticated/settings/account.tsx",
       "parent": "/_authenticated/settings"
@@ -1672,6 +2066,18 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/chats/index.tsx",
       "parent": "/_authenticated"
     },
+    "/_authenticated/delivery/": {
+      "filePath": "_authenticated/delivery/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/drivers/": {
+      "filePath": "_authenticated/drivers/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/fleet/": {
+      "filePath": "_authenticated/fleet/index.tsx",
+      "parent": "/_authenticated"
+    },
     "/_authenticated/help-center/": {
       "filePath": "_authenticated/help-center/index.tsx",
       "parent": "/_authenticated"
@@ -1680,8 +2086,16 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/settings/index.tsx",
       "parent": "/_authenticated/settings"
     },
+    "/_authenticated/tasks/": {
+      "filePath": "_authenticated/tasks/index.tsx",
+      "parent": "/_authenticated"
+    },
     "/_authenticated/users/": {
       "filePath": "_authenticated/users/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/warehouse/": {
+      "filePath": "_authenticated/warehouse/index.tsx",
       "parent": "/_authenticated"
     },
     "/blog/$slug/": {

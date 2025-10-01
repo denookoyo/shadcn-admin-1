@@ -196,15 +196,26 @@ function CheckoutPage() {
           <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
             <div className='text-lg font-semibold text-slate-900'>Order summary</div>
             <div className='mt-3 space-y-3 text-sm text-slate-600'>
-              {detailed.map((entry, idx) => (
-                <div key={idx} className='rounded-2xl border border-slate-200 px-4 py-3'>
-                  <div className='flex items-center justify-between gap-2'>
-                    <span className='font-semibold text-slate-800'>{entry.product.title}</span>
-                    <span className='text-emerald-700'>A${(entry.product.price * entry.quantity).toFixed(2)}</span>
+              {detailed.map((entry, idx) => {
+                const isService = entry.product.type === 'service'
+                let appointmentLabel: string | null = null
+                if (isService && entry.meta) {
+                  const dt = new Date(entry.meta)
+                  appointmentLabel = Number.isNaN(dt.getTime()) ? entry.meta : dt.toLocaleString()
+                }
+                return (
+                  <div key={idx} className='rounded-2xl border border-slate-200 px-4 py-3'>
+                    <div className='flex items-center justify-between gap-2'>
+                      <span className='font-semibold text-slate-800'>{entry.product.title}</span>
+                      <span className='text-emerald-700'>A${(entry.product.price * entry.quantity).toFixed(2)}</span>
+                    </div>
+                    <div className='text-xs text-slate-500'>
+                      Qty {entry.quantity}
+                      {appointmentLabel ? ` • Scheduled ${appointmentLabel}` : ''}
+                    </div>
                   </div>
-                  <div className='text-xs text-slate-500'>Qty {entry.quantity}{entry.meta && entry.product.type === 'service' ? ` • Scheduled ${entry.meta}` : ''}</div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <div className='mt-4 flex justify-between text-sm text-slate-600'>
               <span>Shipping</span>

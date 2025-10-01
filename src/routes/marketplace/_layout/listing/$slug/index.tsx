@@ -5,6 +5,7 @@ import { imageFor } from '@/features/marketplace/helpers'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { SafeImg } from '@/components/safe-img'
+import { ServiceScheduler } from '@/features/marketplace/service-scheduler'
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>{children}</span>
@@ -24,6 +25,8 @@ function ListingDetail() {
   const [ownerImage, setOwnerImage] = useState<string | null>(null)
   const [ownerRating, setOwnerRating] = useState<number>(4.9)
   const [qty, setQty] = useState(1)
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
+  const [slotError, setSlotError] = useState<string | null>(null)
 
   const images = useMemo(() => {
     if (!product) return [] as string[]
@@ -48,6 +51,11 @@ function ListingDetail() {
       mounted = false
     }
   }, [slug])
+
+  useEffect(() => {
+    setSelectedSlot(null)
+    setSlotError(null)
+  }, [product?.id])
 
   useEffect(() => {
     let mounted = true
@@ -95,6 +103,7 @@ function ListingDetail() {
   }
 
   const isService = product.type === 'service'
+  const displayQuantity = isService ? 1 : qty
 
   return (
     <div className='mx-auto max-w-6xl px-4 py-10'>
@@ -187,13 +196,20 @@ function ListingDetail() {
 
             <div className='mt-5 space-y-4 text-sm text-slate-600'>
               {isService ? (
-                <div>
-                  <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Preferred appointment</label>
-                  <input
-                    type='datetime-local'
-                    className='mt-2 w-full rounded-full border border-slate-200 px-4 py-3 text-sm shadow-sm outline-none focus:border-emerald-400 focus:ring-emerald-200'
-                    onChange={(e) => ((window as any).__appt = e.target.value)}
+                <div className='space-y-3'>
+                  <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Book an appointment</div>
+                  <ServiceScheduler
+                    productId={product.id}
+                    value={selectedSlot}
+                    onChange={(slot) => {
+                      setSelectedSlot(slot)
+                      setSlotError(null)
+                    }}
                   />
+                  <p className='text-xs text-slate-500'>Providers confirm bookings within 24 hours. You can reschedule later if needed.</p>
+                  {slotError ? (
+                    <div className='rounded-full border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600'>{slotError}</div>
+                  ) : null}
                 </div>
               ) : (
                 <div>
@@ -218,12 +234,17 @@ function ListingDetail() {
                 <button
                   className='inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500'
                   onClick={async () => {
-                    const meta = isService ? (window as any).__appt || '' : undefined
-                    await db.addToCart(product.id, qty, ns as any, meta)
+                    const quantity = displayQuantity
+                    const meta = isService ? selectedSlot : undefined
+                    if (isService && !meta) {
+                      setSlotError('Select an appointment time before adding to cart.')
+                      return
+                    }
+                    await db.addToCart(product.id, quantity, ns as any, meta ?? undefined)
                     window.dispatchEvent(new CustomEvent('cart:changed'))
                   }}
                 >
-                  Add to cart • A${(product.price * qty).toFixed(2)}
+                  Add to cart • A${(product.price * displayQuantity).toFixed(2)}
                 </button>
                 <Link
                   to='/marketplace/checkout'

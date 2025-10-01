@@ -17,6 +17,12 @@ export type Product = {
   images?: string[]
   ownerId?: string
   categoryId?: string
+  stockCount?: number
+  serviceDurationMinutes?: number
+  serviceOpenTime?: string
+  serviceCloseTime?: string
+  serviceOpenDays?: string[]
+  serviceDailyCapacity?: number
 }
 
 export type CartItem = {
@@ -80,7 +86,12 @@ export const db = {
   },
   async createProduct(input: Omit<Product, 'id'>, namespace?: string): Promise<Product> {
     const products = await this.listProducts(namespace)
-    const product: Product = { id: uid('prod'), ...input }
+    const product: Product = {
+      id: uid('prod'),
+      stockCount: input.stockCount ?? 0,
+      serviceOpenDays: input.serviceOpenDays ?? [],
+      ...input,
+    }
     write(nsKey('db_products', namespace), [product, ...products])
     return product
   },

@@ -1,6 +1,7 @@
 import express from 'express'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
+import { sendMarketplaceEmail } from './email.js'
 
 function imageForServer(query, w = 640, h = 640) {
   const provider = process.env.VITE_IMAGE_PROVIDER || 'picsum'
@@ -20,6 +21,77 @@ export function createApiRouter() {
     const negatives = Number.isFinite(negCount) && negCount > 0 ? negCount : 0
     const penalty = Math.min(2.5, negatives * 0.8)
     return Math.max(1, Math.min(5, avg - penalty))
+  }
+
+  const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  const WEEKDAY_FROM_INDEX = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+  function normalizeDayToken(token) {
+    if (!token) return null
+    const lower = String(token).trim().toLowerCase()
+    if (!lower) return null
+    const match = DAY_NAMES.find((day) => day.startsWith(lower))
+    return match || null
+  }
+
+  function normalizeOpenDays(value) {
+    if (!value) return []
+    const parts = Array.isArray(value) ? value : String(value).split(/[,\s]+/)
+    const seen = new Set()
+    for (const part of parts) {
+      const day = normalizeDayToken(part)
+      if (day) seen.add(day)
+    }
+    return Array.from(seen)
+  }
+
+  function parseIntOrNull(value, { min = Number.NEGATIVE_INFINITY } = {}) {
+    if (value === undefined || value === null || value === '') return null
+    const num = Number(value)
+    if (!Number.isFinite(num)) return null
+    const rounded = Math.round(num)
+    if (rounded < min) return null
+    return rounded
+  }
+
+  function parseIntOrDefault(value, defaultValue = 0, options = {}) {
+    const parsed = parseIntOrNull(value, options)
+    if (parsed === null || parsed === undefined) return defaultValue
+    return parsed
+  }
+
+  function normalizeTimeString(value) {
+    if (!value && value !== 0) return null
+    const str = String(value).trim()
+    if (!str) return null
+    const match = str.match(/^(\d{1,2}):(\d{2})/)
+    if (!match) return null
+    const hours = String(Math.min(23, Math.max(0, Number(match[1])))).padStart(2, '0')
+    const minutes = String(Math.min(59, Math.max(0, Number(match[2])))).padStart(2, '0')
+    return `${hours}:${minutes}`
+  }
+
+  function startOfDay(date) {
+    const d = new Date(date)
+    d.setHours(0, 0, 0, 0)
+    return d
+  }
+
+  function addDays(date, days) {
+    const d = new Date(date)
+    d.setDate(d.getDate() + days)
+    return d
+  }
+
+  function combineDateAndTime(baseDate, timeString) {
+    const date = new Date(baseDate)
+    if (!timeString) {
+      date.setHours(9, 0, 0, 0)
+      return date
+    }
+    const [hours, minutes] = timeString.split(':').map((value) => Number(value) || 0)
+    date.setHours(hours, minutes, 0, 0)
+    return date
   }
 
   router.get('/health', (_req, res) => res.json({ ok: true }))
@@ -376,9 +448,129 @@ export function createApiRouter() {
     }
   })
 
+  async function fetchServiceAvailability(product, startDate, rangeDays) {
+    const start = startOfDay(startDate)
+    const span = Number.isFinite(rangeDays) && rangeDays > 0 ? Math.min(rangeDays, 90) : 14
+    const end = addDays(start, span)
+    const openDays = product.serviceOpenDays?.length ? product.serviceOpenDays : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    const openTime = product.serviceOpenTime || '09:00'
+    const closeTime = product.serviceCloseTime || '17:00'
+    const durationMinutes = Math.max(15, product.serviceDurationMinutes || 60)
+    const durationMs = durationMinutes * 60 * 1000
+    let exampleOpen = combineDateAndTime(start, openTime)
+    let exampleClose = combineDateAndTime(start, closeTime)
+    if (exampleClose <= exampleOpen) exampleClose = new Date(exampleOpen.getTime() + durationMs)
+    const slotsPerDay = Math.max(1, Math.floor((exampleClose.getTime() - exampleOpen.getTime()) / durationMs))
+    const existingBookings = await prisma.orderItem.findMany({
+      where: {
+        productId: product.id,
+        appointmentAt: { not: null, gte: start, lt: end },
+        appointmentStatus: { notIn: ['cancelled', 'rejected'] },
+      },
+      select: { id: true, appointmentAt: true },
+    })
+    const bookingsByDay = new Map()
+    for (const booking of existingBookings) {
+      if (!booking.appointmentAt) continue
+      const at = new Date(booking.appointmentAt)
+      const dayKey = at.toISOString().slice(0, 10)
+      const slotKeyDate = new Date(at)
+      slotKeyDate.setSeconds(0, 0)
+      const slotKey = slotKeyDate.getTime()
+      if (!bookingsByDay.has(dayKey)) bookingsByDay.set(dayKey, { total: 0, slots: new Map() })
+      const entry = bookingsByDay.get(dayKey)
+      entry.total += 1
+      entry.slots.set(slotKey, (entry.slots.get(slotKey) || 0) + 1)
+    }
+
+    const days = []
+    for (let offset = 0; offset < span; offset += 1) {
+      const dayDate = addDays(start, offset)
+      const dayKey = dayDate.toISOString().slice(0, 10)
+      const weekday = WEEKDAY_FROM_INDEX[dayDate.getDay()]
+      const isOpen = openDays.includes(weekday)
+      const booked = bookingsByDay.get(dayKey) || { total: 0, slots: new Map() }
+      let dayOpen = combineDateAndTime(dayDate, openTime)
+      let dayClose = combineDateAndTime(dayDate, closeTime)
+      if (dayClose <= dayOpen) dayClose = new Date(dayOpen.getTime() + durationMs)
+      const maxSlots = Math.max(1, Math.floor((dayClose.getTime() - dayOpen.getTime()) / durationMs))
+      const dailyCapacity = product.serviceDailyCapacity ?? maxSlots
+      const effectiveSlots = Math.min(maxSlots, dailyCapacity)
+      const slots = []
+      if (isOpen) {
+        let slotIndex = 0
+        let cursor = new Date(dayOpen)
+        while (cursor < dayClose && slotIndex < effectiveSlots) {
+          const slotStart = new Date(cursor)
+          const slotEnd = new Date(cursor.getTime() + durationMs)
+          const slotKey = slotStart.getTime()
+          const slotBookings = booked.slots.get(slotKey) || 0
+          const available = slotBookings === 0 && booked.total < dailyCapacity
+          slots.push({
+            start: slotStart.toISOString(),
+            end: slotEnd.toISOString(),
+            available,
+            booked: slotBookings,
+          })
+          cursor = new Date(cursor.getTime() + durationMs)
+          slotIndex += 1
+        }
+      }
+      const remaining = Math.max(0, dailyCapacity - (booked.total || 0))
+      days.push({
+        date: dayKey,
+        weekday,
+        isOpen,
+        remaining,
+        capacity: dailyCapacity,
+        slots,
+      })
+    }
+
+    return {
+      productId: product.id,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      durationMinutes,
+      openTime,
+      closeTime,
+      openDays,
+      days,
+    }
+  }
+
+  router.get('/products/:id/availability', async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing product id' })
+      const product = await prisma.product.findUnique({ where: { id } })
+      if (!product) return res.status(404).json({ error: 'Product not found' })
+      if (product.type !== 'service') return res.status(400).json({ error: 'Availability only applies to services' })
+      const startParam = req.query.start ? new Date(String(req.query.start)) : new Date()
+      if (Number.isNaN(startParam.getTime())) return res.status(400).json({ error: 'Invalid start date' })
+      const windowParam = req.query.days ? Number(req.query.days) : undefined
+      const availability = await fetchServiceAvailability(product, startParam, windowParam)
+      res.json(availability)
+    } catch (e) {
+      console.error('GET /api/products/:id/availability error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
   router.post('/products', ensureAuth, async (req, res) => {
     try {
-      let { images, description, barcode, ...rest } = req.body || {}
+      let {
+        images,
+        description,
+        barcode,
+        stockCount,
+        serviceOpenDays,
+        serviceDurationMinutes,
+        serviceOpenTime,
+        serviceCloseTime,
+        serviceDailyCapacity,
+        ...rest
+      } = req.body || {}
       if (typeof images === 'string') {
         images = images
           .split(/\n|,/) // split on newlines or commas
@@ -386,7 +578,21 @@ export function createApiRouter() {
           .filter(Boolean)
       }
       if (!Array.isArray(images)) images = undefined
-      const data = { ...rest, description: description ?? null, images, barcode: barcode ? String(barcode).trim() : undefined, ownerId: req.user.uid }
+      const normalizedDescription = typeof description === 'string' ? description.trim() || null : description ?? null
+      const normalizedBarcode = typeof barcode === 'string' ? barcode.trim() || null : undefined
+      const data = {
+        ...rest,
+        stockCount: parseIntOrDefault(stockCount, 0, { min: 0 }),
+        serviceOpenDays: normalizeOpenDays(serviceOpenDays),
+        serviceDurationMinutes: parseIntOrNull(serviceDurationMinutes, { min: 0 }),
+        serviceDailyCapacity: parseIntOrNull(serviceDailyCapacity, { min: 0 }),
+        serviceOpenTime: normalizeTimeString(serviceOpenTime),
+        serviceCloseTime: normalizeTimeString(serviceCloseTime),
+        description: normalizedDescription,
+        images,
+        barcode: normalizedBarcode === undefined ? undefined : normalizedBarcode,
+        ownerId: req.user.uid,
+      }
       const created = await prisma.product.create({ data })
       res.status(201).json(created)
     } catch (e) {
@@ -401,7 +607,19 @@ export function createApiRouter() {
 
   router.put('/products', ensureAuth, async (req, res) => {
     try {
-      const { id, images, description, barcode, ...rest } = req.body || {}
+      const {
+        id,
+        images,
+        description,
+        barcode,
+        stockCount,
+        serviceOpenDays,
+        serviceDurationMinutes,
+        serviceOpenTime,
+        serviceCloseTime,
+        serviceDailyCapacity,
+        ...rest
+      } = req.body || {}
       if (!id) return res.status(400).send('Missing id')
       let imagesArr = images
       if (typeof images === 'string') {
@@ -410,11 +628,28 @@ export function createApiRouter() {
           .map((s) => String(s).trim())
           .filter(Boolean)
       }
+      const normalizedDescription =
+        description === undefined ? undefined : typeof description === 'string' ? description.trim() || null : description
+      const normalizedBarcode =
+        barcode === undefined ? undefined : typeof barcode === 'string' ? barcode.trim() || null : barcode
       const data = {
         ...rest,
-        description: description ?? undefined,
-        barcode: typeof barcode === 'string' ? barcode.trim() : undefined,
+        description: normalizedDescription,
+        barcode: normalizedBarcode,
         images: Array.isArray(imagesArr) ? imagesArr : undefined,
+        stockCount: stockCount === undefined ? undefined : parseIntOrDefault(stockCount, 0, { min: 0 }),
+        serviceOpenDays:
+          serviceOpenDays === undefined ? undefined : normalizeOpenDays(serviceOpenDays),
+        serviceDurationMinutes:
+          serviceDurationMinutes === undefined
+            ? undefined
+            : parseIntOrNull(serviceDurationMinutes, { min: 0 }),
+        serviceDailyCapacity:
+          serviceDailyCapacity === undefined ? undefined : parseIntOrNull(serviceDailyCapacity, { min: 0 }),
+        serviceOpenTime:
+          serviceOpenTime === undefined ? undefined : normalizeTimeString(serviceOpenTime),
+        serviceCloseTime:
+          serviceCloseTime === undefined ? undefined : normalizeTimeString(serviceCloseTime),
       }
       let updated
       try {
@@ -547,21 +782,158 @@ export function createApiRouter() {
   router.post('/checkout', async (req, res) => {
     try {
       const { items = [], customerName, customerEmail, address, customerPhone } = req.body || {}
+      if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'No items to checkout' })
       const uid = req.user?.uid ? Number(req.user.uid) : null
-      // Lookup products to determine owners and types
-      const productIds = (items || []).map((i) => i.productId)
-      const products = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, ownerId: true, type: true } })
+      const productIds = items.map((i) => i.productId).filter(Boolean)
+      if (!productIds.length) return res.status(400).json({ error: 'Invalid cart items' })
+
+      const products = await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: {
+          id: true,
+          ownerId: true,
+          type: true,
+          title: true,
+          stockCount: true,
+          serviceOpenDays: true,
+          serviceOpenTime: true,
+          serviceCloseTime: true,
+          serviceDurationMinutes: true,
+          serviceDailyCapacity: true,
+        },
+      })
       const productById = new Map(products.map((p) => [p.id, p]))
-      // Group items by ownerId
-      const groups = new Map()
-      for (const i of items) {
-        const ownerId = productById.get(i.productId)?.ownerId ?? null
-        if (!groups.has(ownerId)) groups.set(ownerId, [])
-        groups.get(ownerId).push(i)
+      for (const productId of productIds) {
+        if (!productById.has(productId)) {
+          return res.status(400).json({ error: 'One or more items are no longer available.' })
+        }
       }
+
+      const goodsAdjustments = new Map()
+      const serviceRequests = new Map()
+      const serviceRanges = new Map()
+
+      for (const item of items) {
+        const product = productById.get(item.productId)
+        if (!product) return res.status(400).json({ error: 'Product not found' })
+        const quantity = Math.max(1, Number(item.quantity || 1))
+
+        if (product.type === 'goods') {
+          const stock = Number(product.stockCount ?? 0)
+          if (quantity > stock) {
+            return res.status(409).json({ error: `"${product.title}" only has ${stock} in stock.` })
+          }
+          goodsAdjustments.set(product.id, (goodsAdjustments.get(product.id) || 0) + quantity)
+        } else if (product.type === 'service') {
+          if (quantity !== 1) {
+            return res.status(400).json({ error: `"${product.title}" appointments must be booked one at a time.` })
+          }
+          const slotString = item.meta || item.appointmentAt
+          if (!slotString) {
+            return res.status(400).json({ error: `Select an appointment time for "${product.title}".` })
+          }
+          const slot = new Date(slotString)
+          if (Number.isNaN(slot.getTime())) {
+            return res.status(400).json({ error: `Invalid appointment time for "${product.title}".` })
+          }
+          slot.setSeconds(0, 0)
+          const weekday = WEEKDAY_FROM_INDEX[slot.getDay()] || ''
+          const openDays = product.serviceOpenDays?.length ? product.serviceOpenDays : ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+          if (!openDays.includes(weekday)) {
+            return res.status(400).json({ error: `"${product.title}" does not accept bookings on ${weekday}.` })
+          }
+          const durationMinutes = Math.max(15, product.serviceDurationMinutes || 60)
+          const durationMs = durationMinutes * 60 * 1000
+          const dayStart = startOfDay(slot)
+          let dayOpen = combineDateAndTime(dayStart, product.serviceOpenTime || '09:00')
+          let dayClose = combineDateAndTime(dayStart, product.serviceCloseTime || '17:00')
+          if (dayClose <= dayOpen) dayClose = new Date(dayOpen.getTime() + durationMs)
+          if (slot < dayOpen || slot >= dayClose) {
+            return res.status(400).json({ error: `"${product.title}" offers appointments between ${product.serviceOpenTime || '09:00'} and ${product.serviceCloseTime || '17:00'}.` })
+          }
+          const offset = slot.getTime() - dayOpen.getTime()
+          if (offset % durationMs !== 0) {
+            return res.status(400).json({ error: `"${product.title}" uses ${durationMinutes}-minute slots. Please choose a valid time.` })
+          }
+          const maxSlots = Math.max(1, Math.floor((dayClose.getTime() - dayOpen.getTime()) / durationMs))
+          const dailyCapacity = product.serviceDailyCapacity ?? maxSlots
+          const dayKey = dayStart.toISOString().slice(0, 10)
+          const normalizedSlot = new Date(slot)
+          normalizedSlot.setSeconds(0, 0)
+          if (!serviceRequests.has(product.id)) serviceRequests.set(product.id, [])
+          serviceRequests.get(product.id).push({ slot: normalizedSlot, dayKey, dailyCapacity, title: product.title })
+          const existingRange = serviceRanges.get(product.id)
+          if (existingRange) {
+            if (normalizedSlot < existingRange.min) existingRange.min = normalizedSlot
+            if (normalizedSlot > existingRange.max) existingRange.max = normalizedSlot
+          } else {
+            serviceRanges.set(product.id, { min: normalizedSlot, max: normalizedSlot })
+          }
+          Object.assign(item, { __normalizedSlot: normalizedSlot })
+        }
+      }
+
+      const pendingDayCounts = new Map()
+      const pendingSlotCounts = new Map()
+      for (const [productId, requests] of serviceRequests) {
+        const product = productById.get(productId)
+        if (!product) continue
+        const range = serviceRanges.get(productId)
+        const windowStart = startOfDay(range?.min || new Date())
+        const windowEnd = addDays(startOfDay(range?.max || new Date()), 1)
+        const existingItems = await prisma.orderItem.findMany({
+          where: {
+            productId,
+            appointmentAt: { not: null, gte: windowStart, lt: windowEnd },
+            appointmentStatus: { notIn: ['cancelled', 'rejected'] },
+          },
+          select: { appointmentAt: true },
+        })
+        const bookedByDay = new Map()
+        for (const entry of existingItems) {
+          if (!entry.appointmentAt) continue
+          const at = new Date(entry.appointmentAt)
+          at.setSeconds(0, 0)
+          const dayKey = at.toISOString().slice(0, 10)
+          const slotKey = at.getTime()
+          if (!bookedByDay.has(dayKey)) bookedByDay.set(dayKey, { total: 0, slots: new Map() })
+          const bucket = bookedByDay.get(dayKey)
+          bucket.total += 1
+          bucket.slots.set(slotKey, (bucket.slots.get(slotKey) || 0) + 1)
+        }
+
+        for (const request of requests) {
+          const slotKey = `${productId}:${request.slot.getTime()}`
+          if ((pendingSlotCounts.get(slotKey) || 0) > 0) {
+            return res.status(400).json({ error: `Duplicate time selected for "${request.title}".` })
+          }
+          pendingSlotCounts.set(slotKey, 1)
+          const dayKey = request.dayKey
+          const dayEntry = bookedByDay.get(dayKey) || { total: 0, slots: new Map() }
+          const slotBooked = dayEntry.slots.get(request.slot.getTime()) || 0
+          if (slotBooked > 0) {
+            return res.status(409).json({ error: `That time for "${request.title}" was just taken. Please pick another slot.` })
+          }
+          const pendingKey = `${productId}:${dayKey}`
+          const pendingTotal = pendingDayCounts.get(pendingKey) || 0
+          if (dayEntry.total + pendingTotal >= request.dailyCapacity) {
+            return res.status(409).json({ error: `Daily capacity reached for "${request.title}" on ${dayKey}.` })
+          }
+          pendingDayCounts.set(pendingKey, pendingTotal + 1)
+        }
+      }
+
+      const groups = new Map()
+      for (const item of items) {
+        const ownerId = productById.get(item.productId)?.ownerId ?? null
+        if (!groups.has(ownerId)) groups.set(ownerId, [])
+        groups.get(ownerId).push(item)
+      }
+
       const createdOrders = []
+      const serviceOrders = []
       for (const [ownerId, groupItems] of groups) {
-        const groupTotal = groupItems.reduce((a, c) => a + (c.price || 0) * (c.quantity || 0), 0)
+        const groupTotal = groupItems.reduce((sum, current) => sum + (Number(current.price) || 0) * (Number(current.quantity) || 0), 0)
         const hasService = groupItems.some((gi) => productById.get(gi.productId)?.type === 'service')
         const order = await prisma.order.create({
           data: {
@@ -574,28 +946,92 @@ export function createApiRouter() {
             address,
             customerPhone,
             accessCode: uid == null ? (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)) : null,
-            items: { create: groupItems.map((i) => ({
-              productId: i.productId,
-              title: i.title,
-              price: i.price,
-              quantity: i.quantity,
-              appointmentAt: productById.get(i.productId)?.type === 'service' && i.meta ? new Date(i.meta) : null,
-              appointmentStatus: productById.get(i.productId)?.type === 'service' ? 'requested' : null,
-            })) },
+            items: {
+              create: groupItems.map((i) => ({
+                productId: i.productId,
+                title: i.title,
+                price: Number(i.price) || 0,
+                quantity: Number(i.quantity) || 1,
+                appointmentAt:
+                  productById.get(i.productId)?.type === 'service' && (i.__normalizedSlot || i.meta)
+                    ? new Date(i.__normalizedSlot || i.meta)
+                    : null,
+                appointmentStatus: productById.get(i.productId)?.type === 'service' ? 'requested' : null,
+              })),
+            },
           },
           include: { items: true },
         })
         createdOrders.push(order)
+        if (hasService) serviceOrders.push(order)
       }
-      // Clear buyer's cart
+
+      for (const [productId, qty] of goodsAdjustments) {
+        await prisma.product.update({ where: { id: productId }, data: { stockCount: { decrement: qty } } })
+      }
+
       if (uid != null) {
         const cart = await prisma.cart.findFirst({ where: { userId: uid }, include: { items: true } })
         if (cart?.items.length) await prisma.cartItem.deleteMany({ where: { cartId: cart.id } })
       }
-      // Return the first order for backward-compatibility
+
+      const sellerCache = new Map()
+      let buyerUser = null
+      if (uid != null) {
+        buyerUser = await prisma.user.findUnique({ where: { id: uid }, select: { email: true, name: true } })
+      }
+
+      for (const order of serviceOrders) {
+        try {
+          const serviceItems = order.items.filter((it) => productById.get(it.productId)?.type === 'service')
+          if (!serviceItems.length) continue
+          let sellerContact = null
+          if (order.sellerId) {
+            sellerContact = sellerCache.get(order.sellerId)
+            if (!sellerContact) {
+              sellerContact = await prisma.user.findUnique({ where: { id: order.sellerId }, select: { email: true, name: true } })
+              sellerCache.set(order.sellerId, sellerContact)
+            }
+          }
+          const appointmentList = serviceItems
+            .map((item) => {
+              const at = item.appointmentAt ? new Date(item.appointmentAt) : null
+              return `<li><strong>${item.title}</strong> — ${at ? at.toLocaleString() : 'Pending time'}</li>`
+            })
+            .join('')
+          const sellerEmail = sellerContact?.email
+          if (sellerEmail) {
+            await sendMarketplaceEmail({
+              to: sellerEmail,
+              subject: 'New service booking request on Hedgetech',
+              html: `
+                <h2>New booking request</h2>
+                <p>You have a new service booking request from ${customerName || customerEmail || buyerUser?.name || buyerUser?.email || 'a Hedgetech buyer'}.</p>
+                <ul>${appointmentList}</ul>
+                <p>Buyer contact: ${customerEmail || buyerUser?.email || 'Not provided'}${customerPhone ? ` | Phone: ${customerPhone}` : ''}</p>
+              `,
+            })
+          }
+          const buyerEmail = customerEmail || buyerUser?.email
+          if (buyerEmail) {
+            await sendMarketplaceEmail({
+              to: buyerEmail,
+              subject: 'Your service booking request is pending confirmation',
+              html: `
+                <h2>We received your service request</h2>
+                <p>Thanks for booking with Hedgetech. The provider will confirm the appointment shortly.</p>
+                <ul>${appointmentList}</ul>
+                <p>We will email you once the provider confirms.</p>
+              `,
+            })
+          }
+        } catch (err) {
+          console.error('Failed to send service booking email:', err)
+        }
+      }
+
       res.status(201).json(createdOrders[0] || null)
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('POST /api/checkout error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
@@ -752,12 +1188,42 @@ export function createApiRouter() {
       const sellerId = req.user?.uid ? Number(req.user.uid) : NaN
       if (!Number.isFinite(sellerId)) return res.status(401).send('Unauthorized')
       const id = String(req.params.id)
-      const order = await prisma.order.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: { include: { product: true } },
+          buyer: { select: { email: true, name: true } },
+        },
+      })
       if (!order || order.sellerId !== sellerId) return res.status(404).json({ error: 'Order not found' })
       const serviceItemIds = order.items.filter((it) => it.product?.type === 'service').map((it) => it.id)
       if (serviceItemIds.length === 0) return res.status(400).json({ error: 'No service items to confirm' })
       await prisma.orderItem.updateMany({ where: { id: { in: serviceItemIds } }, data: { appointmentStatus: 'confirmed' } })
       const updated = await prisma.order.update({ where: { id }, data: { status: 'scheduled' } })
+      const buyerEmail = order.customerEmail || order.buyer?.email
+      if (buyerEmail) {
+        try {
+          const appointments = order.items
+            .filter((item) => item.product?.type === 'service')
+            .map((item) => {
+              const when = item.appointmentAt ? new Date(item.appointmentAt).toLocaleString() : 'Pending time'
+              return `<li><strong>${item.title}</strong> — ${when}</li>`
+            })
+            .join('')
+          await sendMarketplaceEmail({
+            to: buyerEmail,
+            subject: 'Your Hedgetech appointment is confirmed',
+            html: `
+              <h2>Appointment confirmed</h2>
+              <p>Your provider confirmed the following service booking:</p>
+              <ul>${appointments}</ul>
+              <p>We look forward to seeing you.</p>
+            `,
+          })
+        } catch (err) {
+          console.error('Failed to send confirmation email:', err)
+        }
+      }
       res.json(updated)
     } catch (e) {
       console.error('POST /api/orders/:id/confirm-appointment error:', e)
@@ -788,13 +1254,50 @@ export function createApiRouter() {
       if (!Number.isFinite(sellerId)) return res.status(401).send('Unauthorized')
       const id = String(req.params.id)
       const { proposals } = req.body || {}
-      const order = await prisma.order.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: { include: { product: true } },
+          buyer: { select: { email: true, name: true } },
+        },
+      })
       if (!order || order.sellerId !== sellerId) return res.status(404).json({ error: 'Order not found' })
       const serviceItemIds = order.items.filter((it) => it.product?.type === 'service').map((it) => it.id)
       if (serviceItemIds.length === 0) return res.status(400).json({ error: 'No service items to update' })
       const alternatesJson = Array.isArray(proposals) ? JSON.stringify(proposals) : JSON.stringify([])
       await prisma.orderItem.updateMany({ where: { id: { in: serviceItemIds } }, data: { appointmentStatus: proposals && proposals.length ? 'proposed' : 'rejected', appointmentAlternates: alternatesJson } })
       const updated = await prisma.order.update({ where: { id }, data: { status: 'pending' } })
+      const buyerEmail = order.customerEmail || order.buyer?.email
+      if (buyerEmail) {
+        try {
+          const proposalList = Array.isArray(proposals) && proposals.length
+            ? proposals
+                .map((p) => {
+                  const dt = new Date(p)
+                  return Number.isNaN(dt.getTime()) ? null : `<li>${dt.toLocaleString()}</li>`
+                })
+                .filter(Boolean)
+                .join('')
+            : ''
+          await sendMarketplaceEmail({
+            to: buyerEmail,
+            subject: proposals && proposals.length ? 'New appointment times proposed' : 'Appointment request declined',
+            html: proposals && proposals.length
+              ? `
+                <h2>New appointment options</h2>
+                <p>Your provider proposed new times for your service booking:</p>
+                <ul>${proposalList}</ul>
+                <p>Sign in to Hedgetech to choose one of the proposed slots.</p>
+              `
+              : `
+                <h2>Appointment update</h2>
+                <p>Your provider was unable to accept the requested time. Please sign in to propose a new slot.</p>
+              `,
+          })
+        } catch (err) {
+          console.error('Failed to send appointment proposal email:', err)
+        }
+      }
       res.json(updated)
     } catch (e) {
       console.error('POST /api/orders/:id/appointment/reject-propose error:', e)
@@ -810,11 +1313,49 @@ export function createApiRouter() {
       const id = String(req.params.id)
       const { date } = req.body || {}
       if (!date) return res.status(400).json({ error: 'Missing date' })
-      const order = await prisma.order.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          items: { include: { product: true } },
+          seller: { select: { email: true, name: true } },
+          buyer: { select: { email: true, name: true } },
+        },
+      })
       if (!order || order.buyerId !== buyerId) return res.status(404).json({ error: 'Order not found' })
       const serviceItemIds = order.items.filter((it) => it.product?.type === 'service').map((it) => it.id)
       await prisma.orderItem.updateMany({ where: { id: { in: serviceItemIds } }, data: { appointmentAt: new Date(date), appointmentStatus: 'scheduled', appointmentAlternates: null } })
       const updated = await prisma.order.update({ where: { id }, data: { status: 'scheduled' } })
+      try {
+        const appointmentTime = new Date(date)
+        const formatted = Number.isNaN(appointmentTime.getTime()) ? null : appointmentTime.toLocaleString()
+        const serviceTitles = order.items.filter((it) => it.product?.type === 'service').map((it) => it.title).join(', ')
+        const sellerEmail = order.seller?.email
+        if (sellerEmail) {
+          await sendMarketplaceEmail({
+            to: sellerEmail,
+            subject: 'A buyer accepted your proposed appointment',
+            html: `
+              <h2>Appointment scheduled</h2>
+              <p>Your buyer confirmed ${serviceTitles || 'the service booking'} for ${formatted || 'the selected time'}.</p>
+              <p>Get ready to deliver the service.</p>
+            `,
+          })
+        }
+        const buyerEmail = order.customerEmail || order.buyer?.email
+        if (buyerEmail) {
+          await sendMarketplaceEmail({
+            to: buyerEmail,
+            subject: 'Appointment scheduled with your provider',
+            html: `
+              <h2>Appointment locked in</h2>
+              <p>You scheduled ${serviceTitles || 'your service'} for ${formatted || 'the selected time'}.</p>
+              <p>If you need to make any changes, contact your provider.</p>
+            `,
+          })
+        }
+      } catch (err) {
+        console.error('Failed to send appointment acceptance emails:', err)
+      }
       res.json(updated)
     } catch (e) {
       console.error('POST /api/orders/:id/appointment/accept error:', e)

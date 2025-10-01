@@ -78,35 +78,46 @@ function CartPage() {
               </div>
             </div>
           ) : (
-            detailed.map((entry) => (
-              <div key={entry.cartId} className='flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center'>
-                <SafeImg
-                  src={entry.product.img || imageFor(entry.product.title, 200, 200)}
-                  alt={entry.product.title}
-                  className='h-24 w-24 rounded-2xl object-cover'
-                  loading='lazy'
-                />
-                <div className='flex-1 space-y-1'>
-                  <div className='text-sm font-semibold text-slate-900'>{entry.product.title}</div>
-                  <div className='text-xs text-slate-500'>Qty: {entry.quantity}{entry.meta ? ` • ${entry.meta}` : ''}</div>
-                  <div className='text-xs text-slate-500'>Seller: {(entry.product as any).ownerName || entry.product.seller}</div>
-                  <div className='text-xs text-emerald-700'>★ {Number((entry.product as any).ownerRating ?? entry.product.rating ?? 4.7).toFixed(1)}</div>
+            detailed.map((entry) => {
+              const isService = entry.product.type === 'service'
+              let appointmentLabel: string | null = null
+              if (isService && entry.meta) {
+                const dt = new Date(entry.meta)
+                appointmentLabel = Number.isNaN(dt.getTime()) ? entry.meta : dt.toLocaleString()
+              }
+              return (
+                <div key={entry.cartId} className='flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center'>
+                  <SafeImg
+                    src={entry.product.img || imageFor(entry.product.title, 200, 200)}
+                    alt={entry.product.title}
+                    className='h-24 w-24 rounded-2xl object-cover'
+                    loading='lazy'
+                  />
+                  <div className='flex-1 space-y-1'>
+                    <div className='text-sm font-semibold text-slate-900'>{entry.product.title}</div>
+                    <div className='text-xs text-slate-500'>
+                      Qty: {entry.quantity}
+                      {appointmentLabel ? ` • ${appointmentLabel}` : ''}
+                    </div>
+                    <div className='text-xs text-slate-500'>Seller: {(entry.product as any).ownerName || entry.product.seller}</div>
+                    <div className='text-xs text-emerald-700'>★ {Number((entry.product as any).ownerRating ?? entry.product.rating ?? 4.7).toFixed(1)}</div>
+                  </div>
+                  <div className='flex flex-col items-end gap-3 text-sm'>
+                    <div className='text-right text-lg font-semibold text-emerald-700'>A${(entry.product.price * entry.quantity).toFixed(2)}</div>
+                    <button
+                      className='rounded-full border border-slate-200 px-4 py-1 text-xs font-semibold text-slate-500 transition hover:border-emerald-200 hover:text-emerald-700'
+                      onClick={async () => {
+                        await db.removeFromCart(entry.cartId, ns)
+                        setCart((items) => items.filter((c) => c.id !== entry.cartId))
+                        window.dispatchEvent(new CustomEvent('cart:changed'))
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div className='flex flex-col items-end gap-3 text-sm'>
-                  <div className='text-right text-lg font-semibold text-emerald-700'>A${(entry.product.price * entry.quantity).toFixed(2)}</div>
-                  <button
-                    className='rounded-full border border-slate-200 px-4 py-1 text-xs font-semibold text-slate-500 transition hover:border-emerald-200 hover:text-emerald-700'
-                    onClick={async () => {
-                      await db.removeFromCart(entry.cartId, ns)
-                      setCart((items) => items.filter((c) => c.id !== entry.cartId))
-                      window.dispatchEvent(new CustomEvent('cart:changed'))
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))
+              )
+            })
           )}
         </section>
 

@@ -195,6 +195,11 @@ function Listings() {
               {items.map((it) => {
                 const sellerName = (it as any).ownerName || it.seller
                 const rating = Number((it as any).ownerRating ?? it.rating ?? 4.7).toFixed(1)
+                const availabilityLabel = it.type === 'service'
+                  ? ((it as any).serviceDailyCapacity ? `${(it as any).serviceDailyCapacity} slots/day` : 'Accepting bookings')
+                  : Number.isFinite(Number((it as any).stockCount))
+                    ? `${(it as any).stockCount} in stock`
+                    : 'Available now'
                 return (
                   <div key={it.slug} className='group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg'>
                     <div className='relative aspect-[4/3] w-full overflow-hidden'>
@@ -218,7 +223,7 @@ function Listings() {
                       </div>
                       <div className='flex items-center justify-between text-xs text-emerald-700'>
                         <span>★ {rating}</span>
-                        <span className='rounded-full bg-slate-100 px-2 py-1 text-slate-500'>{(it as any).stock ?? 'Available now'}</span>
+                        <span className='rounded-full bg-slate-100 px-2 py-1 text-slate-500'>{availabilityLabel}</span>
                       </div>
                       <div className='mt-auto flex gap-2 text-sm'>
                         <button

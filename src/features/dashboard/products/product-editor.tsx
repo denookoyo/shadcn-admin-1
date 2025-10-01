@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export type ProductEditorMode = 'create' | 'edit'
 
@@ -26,7 +27,12 @@ type FormState = {
   img: string
   gallery: string[]
   barcode?: string
-  inventory: number
+  stockCount: number
+  serviceOpenDays: string[]
+  serviceOpenTime: string
+  serviceCloseTime: string
+  serviceDurationMinutes: number
+  serviceDailyCapacity: number
 }
 
 const emptyState: FormState = {
@@ -39,7 +45,12 @@ const emptyState: FormState = {
   img: '',
   gallery: [],
   barcode: '',
-  inventory: 1,
+  stockCount: 0,
+  serviceOpenDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+  serviceOpenTime: '09:00',
+  serviceCloseTime: '17:00',
+  serviceDurationMinutes: 60,
+  serviceDailyCapacity: 8,
 }
 
 function slugify(input: string) {
@@ -51,6 +62,16 @@ function ensureAbsoluteUrl(url: string) {
   if (/^https?:\/\//.test(url)) return url
   return `https://${url}`
 }
+
+const WEEKDAY_OPTIONS = [
+  { label: 'Mon', value: 'monday' },
+  { label: 'Tue', value: 'tuesday' },
+  { label: 'Wed', value: 'wednesday' },
+  { label: 'Thu', value: 'thursday' },
+  { label: 'Fri', value: 'friday' },
+  { label: 'Sat', value: 'saturday' },
+  { label: 'Sun', value: 'sunday' },
+]
 
 export function ProductEditor({ mode, product }: ProductEditorProps) {
   const { user } = useAuthStore((state) => state.auth)
@@ -67,7 +88,14 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         img: product.img,
         gallery: product.images ?? [],
         barcode: product.barcode,
-        inventory: (product as any)?.inventory ?? 1,
+        stockCount: Number((product as any)?.stockCount ?? (product as any)?.inventory ?? 0),
+        serviceOpenDays: Array.isArray((product as any)?.serviceOpenDays) && (product as any)?.serviceOpenDays.length
+          ? ((product as any)?.serviceOpenDays as string[])
+          : emptyState.serviceOpenDays,
+        serviceOpenTime: (product as any)?.serviceOpenTime || emptyState.serviceOpenTime,
+        serviceCloseTime: (product as any)?.serviceCloseTime || emptyState.serviceCloseTime,
+        serviceDurationMinutes: Number((product as any)?.serviceDurationMinutes ?? emptyState.serviceDurationMinutes),
+        serviceDailyCapacity: Number((product as any)?.serviceDailyCapacity ?? emptyState.serviceDailyCapacity),
       }
     }
     return emptyState
@@ -89,7 +117,14 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         img: product.img,
         gallery: product.images ?? [],
         barcode: product.barcode,
-        inventory: (product as any)?.inventory ?? 1,
+        stockCount: Number((product as any)?.stockCount ?? (product as any)?.inventory ?? 0),
+        serviceOpenDays: Array.isArray((product as any)?.serviceOpenDays) && (product as any)?.serviceOpenDays.length
+          ? ((product as any)?.serviceOpenDays as string[])
+          : emptyState.serviceOpenDays,
+        serviceOpenTime: (product as any)?.serviceOpenTime || emptyState.serviceOpenTime,
+        serviceCloseTime: (product as any)?.serviceCloseTime || emptyState.serviceCloseTime,
+        serviceDurationMinutes: Number((product as any)?.serviceDurationMinutes ?? emptyState.serviceDurationMinutes),
+        serviceDailyCapacity: Number((product as any)?.serviceDailyCapacity ?? emptyState.serviceDailyCapacity),
       })
     }
   }, [mode, product])
@@ -99,11 +134,39 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
     return form.gallery
   }, [form.gallery, form.img])
 
+  const isService = form.type === 'service'
+  const openTimeLabel = form.serviceOpenTime || '09:00'
+  const closeTimeLabel = form.serviceCloseTime || '17:00'
+  const serviceWindow = `${openTimeLabel} – ${closeTimeLabel}`
+  const openDaySummary = form.serviceOpenDays.length
+    ? form.serviceOpenDays
+        .map((day) => day.slice(0, 3).toUpperCase())
+        .join(' · ')
+    : 'Set availability'
+
+  function updateServiceDay(day: string, enabled: boolean) {
+    setForm((state) => {
+      const nextSet = new Set(state.serviceOpenDays.map((item) => item.toLowerCase()))
+      if (enabled) {
+        nextSet.add(day)
+      } else {
+        nextSet.delete(day)
+      }
+      const ordered = WEEKDAY_OPTIONS.filter((opt) => nextSet.has(opt.value)).map((opt) => opt.value)
+      return { ...state, serviceOpenDays: ordered }
+    })
+  }
+
   async function handleSubmit(publish: boolean) {
     setSaving(true)
     setError(null)
     try {
       const ownerId = user?.email || (user as any)?.accountNo || 'guest'
+      const stockCount = Math.max(0, Number(form.stockCount) || 0)
+      const serviceDurationMinutes = Math.max(15, Number(form.serviceDurationMinutes) || 60)
+      const serviceDailyCapacity = Math.max(1, Number(form.serviceDailyCapacity) || 1)
+      const serviceOpenTime = (form.serviceOpenTime || '09:00').slice(0, 5)
+      const serviceCloseTime = (form.serviceCloseTime || '17:00').slice(0, 5)
       const payload: Omit<Product, 'id'> = {
         title: form.title.trim(),
         slug: form.slug || slugify(form.title),
@@ -117,6 +180,12 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         images: form.gallery.length ? form.gallery.map(ensureAbsoluteUrl) : undefined,
         ownerId,
         categoryId: product?.categoryId,
+        stockCount,
+        serviceOpenDays: isService ? form.serviceOpenDays : [],
+        serviceOpenTime: isService ? serviceOpenTime : undefined,
+        serviceCloseTime: isService ? serviceCloseTime : undefined,
+        serviceDurationMinutes: isService ? serviceDurationMinutes : undefined,
+        serviceDailyCapacity: isService ? serviceDailyCapacity : undefined,
       }
 
       if (!payload.title) throw new Error('Title is required')
@@ -132,8 +201,9 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         setPublished(publish)
         await navigate({ to: '/marketplace/dashboard/listings' })
       }
-    } catch (err: any) {
-      setError(err?.message || 'Unable to save product')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unable to save product'
+      setError(message)
     } finally {
       setSaving(false)
     }
@@ -221,13 +291,13 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
               />
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='inventory'>Inventory</Label>
+              <Label htmlFor='stockCount'>Stock count</Label>
               <Input
-                id='inventory'
+                id='stockCount'
                 type='number'
                 min={0}
-                value={form.inventory}
-                onChange={(event) => setForm((state) => ({ ...state, inventory: Number(event.target.value) }))}
+                value={form.stockCount}
+                onChange={(event) => setForm((state) => ({ ...state, stockCount: Number(event.target.value) }))}
               />
             </div>
           </div>
@@ -303,6 +373,85 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
               ) : null}
             </div>
           </div>
+
+          {isService ? (
+            <div className='space-y-4 rounded-3xl border border-emerald-100 bg-emerald-50/40 p-4'>
+              <div>
+                <h3 className='text-sm font-semibold text-emerald-900'>Service availability</h3>
+                <p className='text-xs text-emerald-800'>Define the days, hours, and capacity so buyers can book real-time slots.</p>
+              </div>
+              <div>
+                <Label className='text-xs uppercase tracking-wide text-emerald-800'>Service days</Label>
+                <div className='mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4'>
+                  {WEEKDAY_OPTIONS.map((day) => {
+                    const checked = form.serviceOpenDays.includes(day.value)
+                    return (
+                      <label
+                        key={day.value}
+                        className={cn(
+                          'flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium shadow-sm transition',
+                          checked ? 'border-emerald-400 bg-white text-emerald-900' : 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => updateServiceDay(day.value, value === true)}
+                        />
+                        <span>{day.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='space-y-2'>
+                  <Label htmlFor='service-open-time'>Opens</Label>
+                  <Input
+                    id='service-open-time'
+                    type='time'
+                    value={form.serviceOpenTime}
+                    onChange={(event) => setForm((state) => ({ ...state, serviceOpenTime: event.target.value }))}
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='service-close-time'>Closes</Label>
+                  <Input
+                    id='service-close-time'
+                    type='time'
+                    value={form.serviceCloseTime}
+                    onChange={(event) => setForm((state) => ({ ...state, serviceCloseTime: event.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className='grid gap-4 md:grid-cols-2'>
+                <div className='space-y-2'>
+                  <Label htmlFor='service-duration'>Appointment length (minutes)</Label>
+                  <Input
+                    id='service-duration'
+                    type='number'
+                    min={15}
+                    step={15}
+                    value={form.serviceDurationMinutes}
+                    onChange={(event) =>
+                      setForm((state) => ({ ...state, serviceDurationMinutes: Number(event.target.value) }))
+                    }
+                  />
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='service-capacity'>Daily capacity</Label>
+                  <Input
+                    id='service-capacity'
+                    type='number'
+                    min={1}
+                    value={form.serviceDailyCapacity}
+                    onChange={(event) =>
+                      setForm((state) => ({ ...state, serviceDailyCapacity: Number(event.target.value) }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -339,10 +488,27 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
             </div>
           </div>
           <div className='mt-4 grid gap-3 rounded-3xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500'>
-            <div className='flex items-center justify-between'>
-              <span>Inventory</span>
-              <span className='font-semibold text-slate-900'>{form.inventory}</span>
-            </div>
+            {isService ? (
+              <>
+                <div className='flex items-center justify-between'>
+                  <span>Service window</span>
+                  <span className='font-semibold text-slate-900'>{serviceWindow}</span>
+                </div>
+                <div className='flex items-center justify-between'>
+                  <span>Open days</span>
+                  <span className='font-semibold text-slate-900'>{openDaySummary}</span>
+                </div>
+                <div className='flex items-center justify-between'>
+                  <span>Daily capacity</span>
+                  <span className='font-semibold text-slate-900'>{form.serviceDailyCapacity} slots</span>
+                </div>
+              </>
+            ) : (
+              <div className='flex items-center justify-between'>
+                <span>Stock on hand</span>
+                <span className='font-semibold text-slate-900'>{form.stockCount}</span>
+              </div>
+            )}
             <div className='flex items-center justify-between'>
               <span>Barcode</span>
               <span className='font-semibold text-slate-900'>{form.barcode || '—'}</span>

@@ -44,14 +44,21 @@ function ImportCsvPage() {
     let failed = 0
     for (const r of rows) {
       try {
+        const isService = (r.type as any) === 'service'
         await db.createProduct({
           title: r.title!,
           slug: r.slug || r.title!.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           price: Number(r.price || 0),
-          type: (r.type as any) === 'service' ? 'service' : 'goods',
+          type: isService ? 'service' : 'goods',
           seller: r.seller || 'You',
           img: r.img || '',
           barcode: (r as any).barcode || undefined,
+          stockCount: isService ? 0 : Number((r as any).stockCount ?? 10),
+          serviceOpenDays: isService ? ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] : [],
+          serviceOpenTime: isService ? '09:00' : undefined,
+          serviceCloseTime: isService ? '17:00' : undefined,
+          serviceDurationMinutes: isService ? 60 : undefined,
+          serviceDailyCapacity: isService ? 8 : undefined,
         } as any)
         created++
       } catch {
@@ -91,4 +98,3 @@ function ImportCsvPage() {
 export const Route = createFileRoute('/marketplace/_layout/dashboard/import')({
   component: ImportCsvPage,
 })
-
