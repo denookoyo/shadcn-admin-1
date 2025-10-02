@@ -1,5 +1,5 @@
 import express from 'express'
-import { authMiddleware, createApiRouter } from './_bridge.ts'
+import { authMiddleware, createApiRouter } from './_bridge'
 
 const app = express()
 app.use(express.json())
