@@ -133,7 +133,8 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
   const mutation = useMutation({
     mutationFn: async ({ text, userMessage }: { text: string; userMessage: AssistantMessage }) => {
       if (!db.salesAssistantChat) throw new Error('AI assistant is not available in local mode.')
-      const baseConversation = messagesRef.current.map((item) => ({
+      const history = messagesRef.current.slice(-29)
+      const baseConversation = history.map((item) => ({
         role: item.role,
         content: item.content,
         createdAt: item.createdAt,
