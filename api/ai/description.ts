@@ -1,6 +1,15 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+type ApiRequest = {
+  method?: string
+  body?: unknown
+}
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+type ApiResponse = {
+  setHeader(name: string, value: string): void
+  status(code: number): ApiResponse
+  json(body: unknown): ApiResponse
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method Not Allowed' })
