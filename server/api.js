@@ -1206,26 +1206,105 @@ export function createApiRouter() {
     if (!Array.isArray(nextState.appointments)) nextState.appointments = []
     if (!Array.isArray(nextState.pendingInfoRequests)) nextState.pendingInfoRequests = []
 
+    const catalogEntries = Array.from(catalogMap.values())
+    const catalogSlugMap = new Map()
+    const catalogIdLowerMap = new Map()
+    for (const item of catalogEntries) {
+      if (item?.slug) catalogSlugMap.set(String(item.slug).toLowerCase(), item)
+      if (item?.id) catalogIdLowerMap.set(String(item.id).toLowerCase(), item)
+    }
+
+    const productCache = new Map()
+
+    function registerCatalogProduct(item) {
+      if (!item || !item.id) return item
+      if (!catalogMap.has(item.id)) catalogMap.set(item.id, item)
+      catalogIdLowerMap.set(String(item.id).toLowerCase(), item)
+      if (item.slug) catalogSlugMap.set(String(item.slug).toLowerCase(), item)
+      return item
+    }
+
+    async function resolveCatalogProduct(identifier) {
+      if (identifier == null) return null
+      const raw = String(identifier).trim()
+      if (!raw) return null
+      const direct = catalogMap.get(raw)
+      if (direct) return direct
+      const lower = raw.toLowerCase()
+      if (catalogSlugMap.has(lower)) return catalogSlugMap.get(lower)
+      if (catalogIdLowerMap.has(lower)) return catalogIdLowerMap.get(lower)
+      if (productCache.has(lower)) return productCache.get(lower)
+
+      const product = await prisma.product.findFirst({
+        where: {
+          OR: [
+            { id: raw },
+            { slug: raw },
+            { id: lower },
+            { slug: lower },
+          ],
+        },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          price: true,
+          type: true,
+          img: true,
+          description: true,
+          stockCount: true,
+          seller: true,
+          ownerId: true,
+          rating: true,
+        },
+      })
+
+      if (!product) {
+        productCache.set(lower, null)
+        return null
+      }
+
+      const normalized = {
+        id: product.id,
+        slug: product.slug,
+        title: product.title,
+        price: product.price,
+        type: product.type,
+        sellerId: product.ownerId ?? null,
+        seller: product.seller || 'Marketplace seller',
+        rating: product.rating ?? null,
+        image: product.img || imageForServer(product.title, 640, 640),
+        description: product.description || '',
+        stockCount: product.stockCount,
+      }
+
+      registerCatalogProduct(normalized)
+      productCache.set(lower, normalized)
+      productCache.set(product.id.toLowerCase(), normalized)
+      if (product.slug) productCache.set(product.slug.toLowerCase(), normalized)
+      return normalized
+    }
+
     const results = []
     const createdOrders = []
 
     for (const action of actions) {
       try {
         if (action.type === 'recommend_products') {
-          const resolved = action.products
-            .map((item) => {
-              const product = catalogMap.get(item.productId)
-              if (!product) return null
-              return {
-                ...item,
-                title: product.title,
-                price: product.price,
-                type: product.type,
-                image: product.image,
-                slug: product.slug,
-              }
+          const resolved = []
+          for (const item of action.products) {
+            const product = await resolveCatalogProduct(item.productId)
+            if (!product) continue
+            resolved.push({
+              ...item,
+              productId: product.id,
+              title: product.title,
+              price: product.price,
+              type: product.type,
+              image: product.image,
+              slug: product.slug,
             })
-            .filter(Boolean)
+          }
           if (resolved.length) {
             const existingIds = new Set(nextState.recommendations.map((r) => r.productId))
             for (const rec of resolved) {
@@ -1242,11 +1321,12 @@ export function createApiRouter() {
           }
           const payload = []
           for (const entry of action.items) {
-            const product = catalogMap.get(entry.productId)
+            const product = await resolveCatalogProduct(entry.productId)
             if (!product) throw new Error(`Product ${entry.productId} could not be found`)
+            const quantity = Math.max(1, Number(entry.quantity || 1))
             payload.push({
-              productId: entry.productId,
-              quantity: Math.max(1, Number(entry.quantity || 1)),
+              productId: product.id,
+              quantity,
               appointmentSlot: entry.appointmentSlot,
               note: entry.note,
               title: product.title,
@@ -1303,11 +1383,11 @@ export function createApiRouter() {
           }
           results.push({ ...action, status: 'applied', items: payload })
         } else if (action.type === 'book_service') {
-          const product = catalogMap.get(action.productId)
+          const product = await resolveCatalogProduct(action.productId)
           if (!product) throw new Error(`Service ${action.productId} not found`)
           const slot = new Date(action.slot)
           if (Number.isNaN(slot.getTime())) throw new Error('Invalid appointment time provided')
-          const dbProduct = await prisma.product.findUnique({ where: { id: action.productId } })
+          const dbProduct = await prisma.product.findUnique({ where: { id: product.id } })
           if (!dbProduct) throw new Error('Selected service is not available in the live catalogue')
           const availability = await fetchServiceAvailability(dbProduct, slot, 1)
           const slotAvailable = (availability?.days || []).some((day) =>
@@ -1315,22 +1395,27 @@ export function createApiRouter() {
           )
           if (!slotAvailable) throw new Error('Selected appointment is no longer available')
           nextState.appointments.push({
-            productId: action.productId,
+            productId: product.id,
             slot: slot.toISOString(),
             status: 'requested',
             note: action.note,
           })
-          nextState.cart.push({ productId: action.productId, quantity: 1, appointmentSlot: slot.toISOString() })
-          results.push({ ...action, status: 'applied', slot: slot.toISOString() })
+          nextState.cart.push({ productId: product.id, quantity: 1, appointmentSlot: slot.toISOString() })
+          results.push({ ...action, productId: product.id, status: 'applied', slot: slot.toISOString(), title: product.title })
         } else if (action.type === 'create_order') {
           const sourceItems = action.useCart || !action.items?.length ? nextState.cart : action.items
           if (!sourceItems || !sourceItems.length) throw new Error('No items available to create an order')
-          const normalized = sourceItems.map((item) => ({
-            productId: item.productId,
-            quantity: Math.max(1, Number(item.quantity || 1)),
-            appointmentSlot: item.appointmentSlot,
-            note: item.note,
-          }))
+          const normalized = []
+          for (const item of sourceItems) {
+            const product = await resolveCatalogProduct(item.productId)
+            if (!product) throw new Error(`Product ${item.productId} is no longer available`)
+            normalized.push({
+              productId: product.id,
+              quantity: Math.max(1, Number(item.quantity || 1)),
+              appointmentSlot: item.appointmentSlot,
+              note: item.note,
+            })
+          }
           const orders = await createAssistantOrders({
             items: normalized,
             buyerId,
