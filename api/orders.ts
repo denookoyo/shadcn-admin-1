@@ -1,6 +1,5 @@
 import express from 'express'
-import { authMiddleware } from '../server/auth.js'
-import { createApiRouter } from '../server/api.js'
+import { authMiddleware, createApiRouter } from './_bridge.ts'
 
 const app = express()
 app.use(express.json())
@@ -15,4 +14,3 @@ export default function handler(req: any, res: any) {
   } catch {}
   return (app as any)(req, res)
 }
-
