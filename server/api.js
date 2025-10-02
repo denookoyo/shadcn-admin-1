@@ -659,6 +659,221 @@ export function createApiRouter() {
     sentiment: z.string().optional(),
   })
 
+  function normalizeAssistantResponse(raw) {
+    if (!raw || typeof raw !== 'object') return raw
+    const normalized = { ...raw }
+    normalized.actions = normalizeAssistantActions(raw.actions)
+    normalized.suggestions = Array.isArray(raw.suggestions)
+      ? raw.suggestions.filter((item) => typeof item === 'string')
+      : []
+    normalized.reply = typeof raw.reply === 'string' ? raw.reply : String(raw.reply ?? '')
+    return normalized
+  }
+
+  function normalizeAssistantActions(actions) {
+    if (!Array.isArray(actions)) return []
+    return actions
+      .map((action) => {
+        if (!action || typeof action !== 'object') return action
+        if (typeof action.action === 'string' && !action.type) {
+          const rawType = String(action.action)
+          const value = Object.prototype.hasOwnProperty.call(action, rawType) ? action[rawType] : action
+          switch (rawType) {
+            case 'recommend_products': {
+              const products = Array.isArray(value)
+                ? value
+                : value && typeof value === 'object'
+                  ? Array.isArray(value.products)
+                    ? value.products
+                    : value.productId
+                      ? [{ productId: value.productId, reason: value.reason }]
+                      : []
+                  : []
+              return { type: 'recommend_products', products }
+            }
+            case 'add_to_cart': {
+              let itemsArray = []
+              if (Array.isArray(value)) {
+                itemsArray = value
+              } else if (value && typeof value === 'object') {
+                const entry = normalizeCartItem(value)
+                if (entry) itemsArray = [entry]
+              }
+              if (!itemsArray.length) return null
+              return { type: 'add_to_cart', items: itemsArray, replace: Boolean(value?.replace) }
+            }
+            case 'book_service': {
+              if (value && typeof value === 'object') {
+                return {
+                  type: 'book_service',
+                  productId: value.productId,
+                  slot: value.slot ?? value.appointmentSlot,
+                  note: value.note,
+                }
+              }
+              return null
+            }
+            case 'create_order': {
+              if (value && typeof value === 'object') {
+                return {
+                  type: 'create_order',
+                  items: Array.isArray(value.items) ? value.items : undefined,
+                  useCart: value.useCart,
+                  customerName: value.customerName,
+                  customerEmail: value.customerEmail,
+                  customerPhone: value.customerPhone,
+                  address: value.address,
+                  note: value.note,
+                }
+              }
+              return null
+            }
+            case 'generate_payment_link':
+              return { type: 'generate_payment_link', orderId: value?.orderId || value }
+            case 'ask_information': {
+              if (value && typeof value === 'object') {
+                return { type: 'ask_information', fields: Array.isArray(value.fields) ? value.fields : [], reason: value.reason }
+              }
+              if (Array.isArray(value)) {
+                return { type: 'ask_information', fields: value, reason: undefined }
+              }
+              return null
+            }
+            case 'clear_cart':
+              return { type: 'clear_cart', note: value?.note }
+            case 'update_metadata': {
+              if (value && typeof value === 'object') {
+                return { type: 'update_metadata', patch: value.patch || value, scope: value.scope }
+              }
+              return null
+            }
+            default:
+              return null
+          }
+        }
+        if ('type' in action) return action
+        const keys = Object.keys(action).filter((key) => typeof key === 'string')
+        if (keys.length !== 1) return action
+        const key = keys[0]
+        const value = action[key]
+        switch (key) {
+          case 'recommend_products':
+            return {
+              type: 'recommend_products',
+              products: Array.isArray(value) ? value : [],
+            }
+          case 'add_to_cart': {
+            const payload = Array.isArray(value)
+              ? { items: value, replace: false }
+              : typeof value === 'object' && value !== null
+                ? {
+                    items: Array.isArray(value.items) ? value.items : [],
+                    replace: Boolean(value.replace),
+                  }
+                : { items: [] }
+            return { type: 'add_to_cart', ...payload }
+          }
+          case 'book_service': {
+            if (Array.isArray(value) && value.length > 0) {
+              const entry = value[0]
+              return {
+                type: 'book_service',
+                productId: entry?.productId,
+                slot: entry?.slot,
+                note: entry?.note,
+              }
+            }
+            if (value && typeof value === 'object') {
+              return {
+                type: 'book_service',
+                productId: value.productId,
+                slot: value.slot,
+                note: value.note,
+              }
+            }
+            break
+          }
+          case 'create_order': {
+            if (Array.isArray(value) && value.length > 0) {
+              return { type: 'create_order', items: value }
+            }
+            if (value && typeof value === 'object') {
+              return {
+                type: 'create_order',
+                items: Array.isArray(value.items) ? value.items : undefined,
+                useCart: value.useCart,
+                customerName: value.customerName,
+                customerEmail: value.customerEmail,
+                customerPhone: value.customerPhone,
+                address: value.address,
+                note: value.note,
+              }
+            }
+            break
+          }
+          case 'generate_payment_link': {
+            if (value && typeof value === 'object') {
+              return { type: 'generate_payment_link', orderId: value.orderId }
+            }
+            return { type: 'generate_payment_link', orderId: typeof value === 'string' ? value : undefined }
+          }
+          case 'ask_information': {
+            if (Array.isArray(value)) {
+              return { type: 'ask_information', fields: value, reason: undefined }
+            }
+            if (value && typeof value === 'object') {
+              return { type: 'ask_information', fields: Array.isArray(value.fields) ? value.fields : [], reason: value.reason }
+            }
+            break
+          }
+          case 'clear_cart': {
+            if (value && typeof value === 'object') {
+              return { type: 'clear_cart', note: value.note }
+            }
+            return { type: 'clear_cart' }
+          }
+          case 'update_metadata': {
+            if (value && typeof value === 'object') {
+              return { type: 'update_metadata', patch: value.patch || value, scope: value.scope }
+            }
+            return null
+          }
+          default:
+            return action
+        }
+        return action
+      })
+      .filter(Boolean)
+  }
+
+  function normalizeCartItem(value) {
+    if (!value || typeof value !== 'object') return null
+    const productId = value.productId ?? value.id
+    if (!productId) return null
+    const qty = Number(value.quantity)
+    const quantity = Number.isFinite(qty) ? Math.max(1, Math.trunc(qty)) : 1
+    return {
+      productId: String(productId),
+      quantity,
+      appointmentSlot: value.appointmentSlot ?? value.slot ?? undefined,
+      note: value.note ?? undefined,
+    }
+  }
+
+  function safeParseAssistant(raw) {
+    const normalized = normalizeAssistantResponse(raw)
+    const parsed = AssistantLLMResponseSchema.safeParse(normalized)
+    if (parsed.success) return { data: parsed.data, normalized, warning: null }
+    const fallback = {
+      reply: typeof normalized?.reply === 'string' ? normalized.reply : '',
+      actions: [],
+      suggestions: Array.isArray(normalized?.suggestions) ? normalized.suggestions.filter((item) => typeof item === 'string') : [],
+      summary: typeof normalized?.summary === 'string' ? normalized.summary : undefined,
+      sentiment: typeof normalized?.sentiment === 'string' ? normalized.sentiment : undefined,
+    }
+    return { data: AssistantLLMResponseSchema.parse(fallback), normalized, warning: parsed.error }
+  }
+
   const SalesAssistantRequestSchema = z.object({
     message: z.string().min(1),
     conversation: z.array(AssistantConversationMessageSchema).max(30).default([]),
@@ -1022,6 +1237,9 @@ export function createApiRouter() {
           }
           results.push({ ...action, status: 'applied', products: resolved })
         } else if (action.type === 'add_to_cart') {
+          if (!Array.isArray(action.items) || action.items.length === 0) {
+            throw new Error('No cart items supplied')
+          }
           const payload = []
           for (const entry of action.items) {
             const product = catalogMap.get(entry.productId)
@@ -1036,6 +1254,35 @@ export function createApiRouter() {
               type: product.type,
               slug: product.slug,
             })
+          }
+          if (Number.isFinite(buyerId)) {
+            let cart = await prisma.cart.findFirst({ where: { userId: Number(buyerId) } })
+            if (!cart) {
+              cart = await prisma.cart.create({ data: { userId: Number(buyerId) } })
+            }
+            for (const entry of payload) {
+              const metaObject = entry.appointmentSlot || entry.note ? { appointmentSlot: entry.appointmentSlot, note: entry.note } : null
+              const metaString = metaObject ? JSON.stringify(metaObject) : null
+              const existing = await prisma.cartItem.findFirst({ where: { cartId: cart.id, productId: entry.productId } })
+              if (existing) {
+                await prisma.cartItem.update({
+                  where: { id: existing.id },
+                  data: {
+                    quantity: Math.min(99, (existing.quantity || 0) + entry.quantity),
+                    meta: metaString ?? existing.meta,
+                  },
+                })
+              } else {
+                await prisma.cartItem.create({
+                  data: {
+                    cartId: cart.id,
+                    productId: entry.productId,
+                    quantity: entry.quantity,
+                    meta: metaString,
+                  },
+                })
+              }
+            }
           }
           if (action.replace) {
             nextState.cart = payload.map((item) => ({ productId: item.productId, quantity: item.quantity, appointmentSlot: item.appointmentSlot, note: item.note }))
@@ -1256,13 +1503,11 @@ Rules:
         return res.status(502).json({ error: 'Assistant produced invalid JSON', detail: e?.message || 'parse error', raw: content })
       }
 
-      const parsedAssistant = AssistantLLMResponseSchema.safeParse(raw)
-      if (!parsedAssistant.success) {
-        return res.status(502).json({ error: 'Assistant response failed validation', detail: parsedAssistant.error.flatten(), raw })
-      }
+      const { data: assistantData, warning } = safeParseAssistant(raw)
+      if (warning) console.warn('Assistant response normalized with warnings')
 
       const { state: nextState, results, createdOrders } = await applyAssistantActions({
-        actions: parsedAssistant.data.actions || [],
+        actions: assistantData.actions || [],
         state: sanitizedState,
         catalogMap,
         customer,
@@ -1272,9 +1517,9 @@ Rules:
       const assistantMessage = {
         id: `assistant-${randomAssistantAccessCode().slice(0, 8)}`,
         role: 'assistant',
-        content: parsedAssistant.data.reply,
+        content: assistantData.reply,
         actions: results,
-        suggestions: parsedAssistant.data.suggestions || [],
+        suggestions: assistantData.suggestions || [],
         createdAt: new Date().toISOString(),
       }
 
@@ -1282,7 +1527,7 @@ Rules:
         message: assistantMessage,
         state: nextState,
         usage: data?.usage || null,
-        raw: parsedAssistant.data,
+        raw: assistantData,
         createdOrders: (createdOrders || []).map((order) => ({
           id: order.id,
           total: order.total,

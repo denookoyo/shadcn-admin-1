@@ -70,6 +70,7 @@ export type AssistantMessage = {
   createdAt?: string
   actions?: AssistantActionResult[]
   suggestions?: string[]
+  fresh?: boolean
 }
 
 export type AssistantChatRequest = {

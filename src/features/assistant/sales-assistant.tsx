@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
-import { Sparkles, ShoppingBag, Clock, CreditCard, AlertCircle } from 'lucide-react'
+import { Sparkles, ShoppingBag, Clock, CreditCard, AlertCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { db } from '@/lib/data'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import type {
   AssistantActionResult,
   AssistantChatRequest,
@@ -17,6 +18,8 @@ import type {
   AssistantState,
   AssistantInfoField,
 } from './types'
+
+const STORAGE_KEY = 'hedgetech_assistant_chat_v1'
 
 type UsageStats = {
   prompt_tokens?: number
@@ -40,6 +43,7 @@ const welcomeMessage: AssistantMessage = {
     "Hi there! I'm Hedgetech's AI sales assistant. Tell me what you're shopping for or which service you need and I'll line up the best options, schedule bookings, and organise checkout for you.",
   createdAt: new Date().toISOString(),
   suggestions: ['Show me popular items', 'I want to book a service appointment'],
+  fresh: false,
 }
 
 function generateId(prefix: string) {
@@ -47,26 +51,79 @@ function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2)}`
 }
 
-export function SalesAssistant() {
-  const [messages, setMessages] = useState<AssistantMessage[]>([welcomeMessage])
+type SalesAssistantProps = {
+  variant?: 'page' | 'modal'
+  onClose?: () => void
+}
+
+export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProps) {
+  const isModal = variant === 'modal'
+  const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [state, setState] = useState<AssistantState>(defaultState)
   const [customer, setCustomer] = useState<{ name?: string; email?: string; phone?: string }>({})
   const [input, setInput] = useState('')
   const [usage, setUsage] = useState<UsageStats>(null)
+  const [hydrated, setHydrated] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-  const messagesRef = useRef(messages)
+  const messagesRef = useRef<AssistantMessage[]>([])
   const stateRef = useRef(state)
+  const timersRef = useRef<number[]>([])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setMessages([welcomeMessage])
+      setHydrated(true)
+      return
+    }
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+          setMessages(parsed.messages.map((msg: AssistantMessage) => ({ ...msg, fresh: false })))
+        } else {
+          setMessages([welcomeMessage])
+        }
+        if (parsed.state) setState({ ...defaultState, ...parsed.state })
+        if (parsed.customer) setCustomer(parsed.customer)
+      } else {
+        setMessages([welcomeMessage])
+      }
+    } catch (error) {
+      console.warn('Failed to hydrate assistant history:', error)
+      setMessages([welcomeMessage])
+    }
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated || typeof window === 'undefined') return
+    try {
+      const serialisableMessages = messages.map(({ fresh, ...rest }) => rest)
+      const payload = { messages: serialisableMessages, state, customer }
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    } catch (error) {
+      console.warn('Failed to persist assistant history:', error)
+    }
+  }, [messages, state, customer, hydrated])
 
   useEffect(() => {
     messagesRef.current = messages
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
     }
   }, [messages])
 
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((id) => window.clearTimeout(id))
+      timersRef.current = []
+    }
+  }, [])
 
   const pendingInfoFields = useMemo(() => {
     const latest = state.pendingInfoRequests.at(-1)
@@ -99,8 +156,14 @@ export function SalesAssistant() {
         createdAt: response.message.createdAt,
         actions: response.message.actions,
         suggestions: response.message.suggestions,
+        fresh: true,
       }
       setMessages((prev) => [...prev, assistantMessage])
+      const timer = window.setTimeout(() => {
+        setMessages((prev) => prev.map((msg) => (msg.id === assistantMessage.id ? { ...msg, fresh: false } : msg)))
+        timersRef.current = timersRef.current.filter((id) => id !== timer)
+      }, 1600)
+      timersRef.current.push(timer)
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Something went wrong'
@@ -108,7 +171,7 @@ export function SalesAssistant() {
     },
   })
 
-  const handleSend = async (value?: string) => {
+  const handleSend = useCallback(async (value?: string) => {
     const text = (value ?? input).trim()
     if (!text) return
     const userMessage: AssistantMessage = {
@@ -116,15 +179,16 @@ export function SalesAssistant() {
       role: 'user',
       content: text,
       createdAt: new Date().toISOString(),
+      fresh: false,
     }
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     try {
       await mutation.mutateAsync({ text, userMessage })
     } catch (e) {
-      // error handled in onError
+      // handled in onError
     }
-  }
+  }, [input, mutation])
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -155,16 +219,28 @@ export function SalesAssistant() {
   }
 
   return (
-    <div className='grid gap-6 lg:grid-cols-[2fr_1fr]'>
-      <Card className='flex h-[calc(100vh-9rem)] flex-col'>
-        <CardHeader className='space-y-2 border-b'>
-          <div className='flex items-center gap-2 text-base font-semibold'>
+    <div className={cn(isModal ? 'flex h-full flex-col gap-4' : 'grid gap-6 lg:grid-cols-[2fr_1fr]')}>
+      <div className={cn(
+        'flex flex-col rounded-3xl border border-slate-200 bg-white shadow-sm',
+        isModal ? 'h-full overflow-hidden' : 'h-[calc(100vh-9rem)]'
+      )}>
+        <div className='flex items-center justify-between border-b border-slate-100 px-6 py-4'>
+          <div className='flex items-center gap-2 text-base font-semibold text-slate-900'>
             <Sparkles className='h-5 w-5 text-emerald-500' />
             Hedgetech AI Concierge
           </div>
-          <p className='text-sm text-muted-foreground'>Conversational selling powered by your live catalogue and OpenAI.</p>
-        </CardHeader>
-        <CardContent className='flex flex-1 flex-col gap-4 p-0'>
+          {isModal ? (
+            <button
+              type='button'
+              className='rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700'
+              onClick={onClose}
+              aria-label='Close assistant'
+            >
+              <X className='h-4 w-4' />
+            </button>
+          ) : null}
+        </div>
+        <div className='flex flex-1 flex-col overflow-hidden'>
           <div ref={scrollRef} className='flex-1 space-y-6 overflow-y-auto px-6 py-6'>
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
@@ -175,10 +251,10 @@ export function SalesAssistant() {
               </div>
             ) : null}
           </div>
-          <Separator />
-          <div className='space-y-3 px-6 pb-6'>
+
+          <div className='border-t border-slate-100 px-6 py-4'>
             {pendingInfoFields.length ? (
-              <div className='flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700'>
+              <div className='mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700'>
                 <AlertCircle className='mt-0.5 h-4 w-4 flex-none' />
                 <div>
                   <span className='font-medium'>Required to proceed:</span>{' '}
@@ -223,67 +299,115 @@ export function SalesAssistant() {
               </div>
             </form>
             {usage ? (
-              <div className='text-[11px] text-muted-foreground'>Model tokens • Prompt {usage.prompt_tokens ?? 0} · Completion {usage.completion_tokens ?? 0}</div>
+              <div className='mt-2 text-[11px] text-muted-foreground'>Model tokens • Prompt {usage.prompt_tokens ?? 0} · Completion {usage.completion_tokens ?? 0}</div>
             ) : null}
           </div>
-        </CardContent>
-      </Card>
-
-      <div className='flex flex-col gap-6'>
-        <Card>
-          <CardHeader>
-            <CardTitle className='text-base'>Customer details</CardTitle>
-          </CardHeader>
-          <CardContent className='space-y-3 text-sm'>
-            <label className='block space-y-1'>
-              <span className='text-xs font-medium text-muted-foreground'>Name</span>
-              <input
-                value={customer.name ?? ''}
-                onChange={(event) => setCustomer((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder='e.g. Olivia Nguyen'
-                className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
-              />
-            </label>
-            <label className='block space-y-1'>
-              <span className='text-xs font-medium text-muted-foreground'>Email</span>
-              <input
-                value={customer.email ?? ''}
-                onChange={(event) => setCustomer((prev) => ({ ...prev, email: event.target.value }))}
-                placeholder='name@example.com'
-                className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
-                type='email'
-              />
-            </label>
-            <label className='block space-y-1'>
-              <span className='text-xs font-medium text-muted-foreground'>Phone</span>
-              <input
-                value={customer.phone ?? ''}
-                onChange={(event) => setCustomer((prev) => ({ ...prev, phone: event.target.value }))}
-                placeholder='+61 400 000 000'
-                className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
-              />
-            </label>
-            <p className='text-[11px] text-muted-foreground'>Shared with the assistant so it can complete bookings and invoices without asking twice.</p>
-          </CardContent>
-        </Card>
-
-        <StateSummary state={state} />
+        </div>
       </div>
+
+      {!isModal ? (
+        <StateSummary state={state} variant='panel' />
+      ) : null}
+
+      {!isModal ? (
+        <div className='flex flex-col gap-6'>
+          <Card>
+            <CardHeader>
+              <CardTitle className='text-base'>Customer details</CardTitle>
+            </CardHeader>
+            <CardContent className='space-y-3 text-sm'>
+              <label className='block space-y-1'>
+                <span className='text-xs font-medium text-muted-foreground'>Name</span>
+                <input
+                  value={customer.name ?? ''}
+                  onChange={(event) => setCustomer((prev) => ({ ...prev, name: event.target.value }))}
+                  placeholder='e.g. Olivia Nguyen'
+                  className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
+                />
+              </label>
+              <label className='block space-y-1'>
+                <span className='text-xs font-medium text-muted-foreground'>Email</span>
+                <input
+                  value={customer.email ?? ''}
+                  onChange={(event) => setCustomer((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder='name@example.com'
+                  className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
+                  type='email'
+                />
+              </label>
+              <label className='block space-y-1'>
+                <span className='text-xs font-medium text-muted-foreground'>Phone</span>
+                <input
+                  value={customer.phone ?? ''}
+                  onChange={(event) => setCustomer((prev) => ({ ...prev, phone: event.target.value }))}
+                  placeholder='+61 400 000 000'
+                  className='w-full rounded-md border border-slate-200 px-2 py-2 text-sm focus:border-emerald-400 focus:outline-none focus:ring-emerald-200'
+                />
+              </label>
+              <p className='text-[11px] text-muted-foreground'>Shared with the assistant so it can complete bookings and invoices without asking twice.</p>
+            </CardContent>
+          </Card>
+      </div>
+      ) : null}
     </div>
   )
 }
 
 function MessageBubble({ message }: { message: AssistantMessage }) {
   const isAssistant = message.role === 'assistant'
+  const [displayText, setDisplayText] = useState(message.content)
+
+  useEffect(() => {
+    if (!isAssistant || message.fresh !== true) {
+      setDisplayText(message.content)
+      return
+    }
+    const text = message.content
+    let index = 0
+    const step = Math.max(1, Math.floor(text.length / 120))
+    setDisplayText('')
+    const timer = window.setInterval(() => {
+      index = Math.min(text.length, index + step)
+      setDisplayText(text.slice(0, index))
+      if (index >= text.length) {
+        window.clearInterval(timer)
+      }
+    }, 16)
+    return () => {
+      window.clearInterval(timer)
+    }
+  }, [isAssistant, message.content, message.fresh, message.id])
+
   return (
-    <div className={cn('flex w-full flex-col gap-2 text-sm', isAssistant ? 'items-start' : 'items-end')}> 
+    <div className={cn('flex w-full flex-col gap-2 text-sm', isAssistant ? 'items-start' : 'items-end')}>
       <div
         className={cn(
           'max-w-[80%] rounded-2xl px-4 py-3 shadow-sm',
           isAssistant ? 'rounded-tl-none border border-slate-200 bg-white text-slate-700' : 'rounded-tr-none bg-emerald-600 text-white'
         )}
       >
-        <div className='whitespace-pre-wrap leading-relaxed'>{message.content}</div>
+        <div className='prose prose-sm max-w-none whitespace-pre-wrap break-words text-slate-700 prose-headings:text-slate-800 prose-strong:text-slate-900 prose-ul:ml-4 prose-a:text-emerald-600 hover:prose-a:text-emerald-500'>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              img: ({ src, alt }) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={src ?? ''}
+                  alt={alt ?? ''}
+                  className='mt-2 w-full rounded-lg border border-slate-100 object-cover shadow-sm'
+                />
+              ),
+              a: ({ href, children }) => (
+                <a href={href} target='_blank' rel='noreferrer'>
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {displayText}
+          </ReactMarkdown>
+        </div>
         {isAssistant && message.actions?.length ? (
           <div className='mt-3 space-y-3'>
             {message.actions.map((action, index) => (
@@ -322,15 +446,20 @@ function ActionSummary({ action }: { action: AssistantActionResult }) {
           </div>
           <div className='grid gap-3 md:grid-cols-2'>
             {products.map((product: any) => (
-              <div key={product.productId} className='rounded-lg border border-slate-200 bg-white p-3 shadow-sm'>
-                <div className='flex items-start justify-between gap-3'>
-                  <div>
+              <div key={product.productId} className='rounded-lg border border-slate-200 bg-white p-3 shadow-xs'>
+                <div className='flex items-start gap-3'>
+                  {product.image ? (
+                    <img src={product.image} alt={product.title || 'Recommended item'} className='h-12 w-12 flex-none rounded-md object-cover' />
+                  ) : null}
+                  <div className='flex-1'>
                     <div className='text-sm font-semibold text-slate-800'>{product.title || 'Recommended item'}</div>
-                    <div className='text-xs text-muted-foreground'>{product.reason}</div>
+                    {product.reason ? <div className='text-xs text-muted-foreground'>{product.reason}</div> : null}
                   </div>
-                  <Badge variant='secondary'>{product.type === 'service' ? 'Service' : 'Goods'}</Badge>
                 </div>
-                <div className='mt-2 text-sm font-medium text-slate-900'>A${product.price ?? '—'}</div>
+                <div className='mt-2 flex items-center justify-between text-xs text-slate-500'>
+                  <Badge variant='secondary'>{product.type === 'service' ? 'Service' : 'Goods'}</Badge>
+                  {product.price != null ? <span className='font-medium text-slate-900'>A${product.price}</span> : null}
+                </div>
               </div>
             ))}
           </div>
@@ -357,7 +486,7 @@ function ActionSummary({ action }: { action: AssistantActionResult }) {
       const orders = Array.isArray(action.orders) ? action.orders : []
       if (!orders.length) return null
       return (
-        <div className='space-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-sm'>
+        <div className='space-y-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-xs'>
           <div className='flex items-center gap-2 text-xs font-semibold text-slate-800'>
             <ShoppingBag className='h-3.5 w-3.5 text-emerald-600' />
             Order created
@@ -398,7 +527,59 @@ function ActionSummary({ action }: { action: AssistantActionResult }) {
   }
 }
 
-function StateSummary({ state }: { state: AssistantState }) {
+type StateSummaryVariant = 'panel' | 'compact'
+
+function StateSummary({ state, variant = 'panel' }: { state: AssistantState; variant?: StateSummaryVariant }) {
+  if (variant === 'compact') {
+    return (
+      <div className='space-y-4 text-sm text-slate-600'>
+        <section>
+          <div className='text-xs font-semibold uppercase text-muted-foreground'>Cart</div>
+          {state.cart.length ? (
+            <ul className='mt-1 space-y-1 text-xs'>
+              {state.cart.map((item) => (
+                <li key={item.productId}>
+                  {item.productId} × {item.quantity}
+                  {item.appointmentSlot ? ` · ${new Date(item.appointmentSlot).toLocaleString()}` : ''}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className='mt-1 text-xs text-muted-foreground'>No items staged yet.</p>
+          )}
+        </section>
+        <section>
+          <div className='text-xs font-semibold uppercase text-muted-foreground'>Appointments</div>
+          {state.appointments.length ? (
+            <ul className='mt-1 space-y-1 text-xs'>
+              {state.appointments.map((appointment) => (
+                <li key={`${appointment.productId}-${appointment.slot}`}>
+                  {appointment.productId} — {new Date(appointment.slot).toLocaleString()} ({appointment.status || 'requested'})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className='mt-1 text-xs text-muted-foreground'>No bookings yet.</p>
+          )}
+        </section>
+        <section>
+          <div className='text-xs font-semibold uppercase text-muted-foreground'>Orders</div>
+          {state.orders.length ? (
+            <ul className='mt-1 space-y-1 text-xs'>
+              {state.orders.map((order) => (
+                <li key={order.id}>
+                  #{String(order.id).slice(0, 8)} — A${order.total} ({order.status})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className='mt-1 text-xs text-muted-foreground'>No orders created yet.</p>
+          )}
+        </section>
+      </div>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
