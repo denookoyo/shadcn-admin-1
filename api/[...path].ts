@@ -1,6 +1,6 @@
 // Catch-all serverless function to serve all /api/* routes on Vercel
 import express from 'express'
-import { authMiddleware, createAuthRouter, createApiRouter } from './_bridge'
+import { authMiddleware, createAuthRouter, createApiRouter } from './_bridge.js'
 
 const app = express()
 

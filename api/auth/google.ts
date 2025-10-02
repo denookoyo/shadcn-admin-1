@@ -1,6 +1,6 @@
 // Vercel Node function for POST /api/auth/google
 import express from 'express'
-import { createAuthRouter } from '../_bridge'
+import { createAuthRouter } from '../_bridge.js'
 
 const app = express()
 app.use(express.json())

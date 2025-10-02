@@ -1,5 +1,5 @@
 import express from 'express'
-import { authMiddleware, createAuthRouter } from '../_bridge'
+import { authMiddleware, createAuthRouter } from '../_bridge.js'
 
 const app = express()
 app.use(express.json())
