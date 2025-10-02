@@ -6,6 +6,7 @@ import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { SafeImg } from '@/components/safe-img'
 import { ServiceScheduler } from '@/features/marketplace/service-scheduler'
+import { ChatLauncher } from '@/features/assistant/chat-launcher'
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>{children}</span>
@@ -295,6 +296,7 @@ function ListingDetail() {
           </div>
         </aside>
       </div>
+      <ChatLauncher className='bottom-6 right-6 sm:bottom-8 sm:right-8' />
     </div>
   )
 }

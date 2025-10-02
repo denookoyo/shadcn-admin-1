@@ -1,4 +1,5 @@
 import { db as localdb, seedProducts, categories as localCategories, type Product, type Order, type CartItem, type Category } from './localdb'
+import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
 import { useStageStore } from '@/stores/stageStore'
 import { fetchJson } from './http'
 
@@ -54,6 +55,72 @@ export type ProductAvailability = {
   days: ServiceAvailabilityDay[]
 }
 
+export type AnnouncementAudience = 'all' | 'buyers' | 'sellers' | 'drivers' | 'admins'
+
+export type Announcement = {
+  id: string
+  title: string
+  body: string
+  audience: AnnouncementAudience
+  pinned: boolean
+  startAt?: string | null
+  endAt?: string | null
+  publishedAt: string
+  author?: { id: number; name?: string | null; email: string }
+}
+
+export type SupportMessage = {
+  id: string
+  ticketId: string
+  authorId?: number | null
+  body: string
+  attachments?: string[]
+  createdAt: string
+  author?: { id: number; name?: string | null; email: string; image?: string | null }
+}
+
+export type SupportTicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+export type SupportTicketType = 'general' | 'order' | 'service' | 'billing'
+
+export type SupportTicket = {
+  id: string
+  subject: string
+  type: SupportTicketType
+  status: SupportTicketStatus
+  priority?: string
+  orderId?: string | null
+  orderItemId?: string | null
+  requesterId: number
+  sellerId?: number | null
+  createdAt: string
+  updatedAt: string
+  requester?: { id: number; name?: string | null; email: string; image?: string | null }
+  seller?: { id: number; name?: string | null; email: string; image?: string | null }
+  order?: { id: string; status: string }
+  orderItem?: { id: string; title: string }
+  messages?: SupportMessage[]
+}
+
+export type RefundStatus = 'requested' | 'reviewing' | 'accepted' | 'rejected' | 'refunded'
+
+export type RefundRequest = {
+  id: string
+  orderId: string
+  orderItemId?: string | null
+  buyerId: number
+  sellerId?: number | null
+  amount?: number | null
+  reason: string
+  status: RefundStatus
+  resolution?: string | null
+  createdAt: string
+  updatedAt: string
+  order?: { id: string; status: string; customerName?: string | null }
+  orderItem?: { id: string; title: string }
+  buyer?: { id: number; name?: string | null; email: string }
+  seller?: { id: number; name?: string | null; email: string }
+}
+
 // Unify API surface so callers can use categories regardless of backend
 export type DataAPI = {
   // Products
@@ -65,6 +132,8 @@ export type DataAPI = {
     id: string,
     options?: { start?: string | Date; days?: number }
   ) => Promise<ProductAvailability>
+  // Announcements
+  listAnnouncements?: (audience?: AnnouncementAudience) => Promise<Announcement[]>
   createProduct: (input: Omit<Product, 'id'>) => Promise<Product>
   updateProduct: (id: string, patch: Partial<Product>) => Promise<Product | undefined>
   deleteProduct: (id: string) => Promise<boolean>
@@ -86,6 +155,18 @@ export type DataAPI = {
   adminDeleteOrder?: (id: string) => Promise<void>
   submitOrderReview?: (orderId: string, rating: number, feedback: string) => Promise<{ rating: number; feedback: string }>
   getOrderReview?: (orderId: string) => Promise<{ rating: number; feedback: string } | null>
+  // Support
+  listSupportTickets?: () => Promise<SupportTicket[]>
+  getSupportTicket?: (id: string) => Promise<SupportTicket | null>
+  createSupportTicket?: (input: { subject: string; body: string; type?: SupportTicketType; orderId?: string; orderItemId?: string; priority?: string }) => Promise<SupportTicket>
+  replySupportTicket?: (id: string, body: string, attachments?: string[]) => Promise<SupportMessage>
+  updateSupportTicketStatus?: (id: string, status: SupportTicketStatus) => Promise<SupportTicket>
+  // AI assistant
+  salesAssistantChat?: (payload: AssistantChatRequest) => Promise<AssistantChatResponse>
+  // Refunds
+  listRefundRequests?: (scope?: 'buyer' | 'seller' | 'all') => Promise<RefundRequest[]>
+  createRefundRequest?: (input: { orderId: string; orderItemId?: string; amount?: number; reason: string }) => Promise<RefundRequest>
+  reviewRefundRequest?: (id: string, action: 'accept' | 'reject' | 'refund', notes?: string, amount?: number) => Promise<RefundRequest>
   // Categories (optional when using pure local db before categories existed)
   listCategories?: () => Promise<Category[]>
   createCategory?: (input: Omit<Category, 'id'>) => Promise<Category>
@@ -149,6 +230,27 @@ async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   })
 }
 
+function localRead<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw ? (JSON.parse(raw) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function localWrite<T>(key: string, value: T) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {}
+}
+
+function localId(prefix: string) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
+}
+
 const api: DataAPI = {
   async listProducts(): Promise<Product[]> {
     return http<Product[]>('/api/products')
@@ -178,6 +280,12 @@ const api: DataAPI = {
     } catch {
       return null
     }
+  },
+  async listAnnouncements(audience) {
+    const params = new URLSearchParams()
+    if (audience && audience !== 'all') params.set('audience', audience)
+    const query = params.toString()
+    return http<Announcement[]>(`/api/announcements${query ? `?${query}` : ''}`)
   },
   async createProduct(input: Omit<Product, 'id'>): Promise<Product> {
     return http<Product>('/api/products', { method: 'POST', body: JSON.stringify(input) })
@@ -252,6 +360,59 @@ const api: DataAPI = {
     } catch {
       return null
     }
+  },
+  async listSupportTickets() {
+    return http<SupportTicket[]>('/api/support/tickets')
+  },
+  async getSupportTicket(id: string) {
+    try {
+      return await http<SupportTicket>(`/api/support/tickets/${encodeURIComponent(id)}`)
+    } catch {
+      return null
+    }
+  },
+  async createSupportTicket(input: { subject: string; body: string; type?: SupportTicketType; orderId?: string; orderItemId?: string; priority?: string }) {
+    return http<SupportTicket>('/api/support/tickets', { method: 'POST', body: JSON.stringify(input) })
+  },
+  async replySupportTicket(id: string, body: string, attachments: string[] = []) {
+    return http<SupportMessage>(`/api/support/tickets/${encodeURIComponent(id)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, attachments }),
+    })
+  },
+  async updateSupportTicketStatus(id: string, status: SupportTicketStatus) {
+    return http<SupportTicket>(`/api/support/tickets/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    })
+  },
+  async salesAssistantChat(payload: AssistantChatRequest) {
+    return http<AssistantChatResponse>('/api/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+  async listRefundRequests(scope?: 'buyer' | 'seller' | 'all') {
+    const params = new URLSearchParams()
+    if (scope) params.set('scope', scope)
+    const query = params.toString()
+    return http<RefundRequest[]>(`/api/refunds${query ? `?${query}` : ''}`)
+  },
+  async createRefundRequest(input: { orderId: string; orderItemId?: string; amount?: number; reason: string }) {
+    const { orderId, ...rest } = input
+    return http<RefundRequest>(`/api/orders/${encodeURIComponent(orderId)}/refund`, {
+      method: 'POST',
+      body: JSON.stringify(rest),
+    })
+  },
+  async reviewRefundRequest(id: string, action: 'accept' | 'reject' | 'refund', notes?: string, amount?: number) {
+    const payload: Record<string, unknown> = { action }
+    if (notes !== undefined) payload.notes = notes
+    if (amount !== undefined) payload.amount = amount
+    return http<RefundRequest>(`/api/refunds/${encodeURIComponent(id)}/review`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
   },
 
   // Categories
@@ -339,6 +500,25 @@ const api: DataAPI = {
 
 const localWrapper: DataAPI = {
   // Products
+  async listAnnouncements(audience) {
+    const announcements = localRead<Announcement[]>('local_announcements', [
+      {
+        id: localId('ann'),
+        title: 'Welcome to Hedgetech demo mode',
+        body: 'Switch to API-backed mode to see real marketplace announcements.',
+        audience: 'all',
+        pinned: true,
+        publishedAt: new Date().toISOString(),
+      },
+    ])
+    const now = Date.now()
+    const filtered = announcements.filter((item) => {
+      const inWindow = (!item.startAt || Date.parse(item.startAt) <= now) && (!item.endAt || Date.parse(item.endAt) >= now)
+      if (!audience || audience === 'all') return inWindow
+      return inWindow && (item.audience === 'all' || item.audience === audience)
+    })
+    return filtered
+  },
   async listProducts() { return localdb.listProducts() },
   async getProductBySlug(slug: string) { return localdb.getProductBySlug(slug) },
   async getProductById(id: string) { return localdb.getProductById(id) },
@@ -439,6 +619,115 @@ const localWrapper: DataAPI = {
   async adminDeleteOrder(_id: string) { return },
   async submitOrderReview(_orderId: string, rating: number, feedback: string) { return { rating, feedback } },
   async getOrderReview(_orderId: string) { return null },
+  async listSupportTickets() {
+    return localRead<SupportTicket[]>('local_supportTickets', [])
+  },
+  async getSupportTicket(id: string) {
+    const tickets = localRead<SupportTicket[]>('local_supportTickets', [])
+    return tickets.find((ticket) => ticket.id === id) || null
+  },
+  async createSupportTicket(input) {
+    const tickets = localRead<SupportTicket[]>('local_supportTickets', [])
+    const message: SupportMessage = {
+      id: localId('msg'),
+      ticketId: '',
+      authorId: 0,
+      body: input.body,
+      attachments: [],
+      createdAt: new Date().toISOString(),
+    }
+    const ticket: SupportTicket = {
+      id: localId('ticket'),
+      subject: input.subject,
+      type: (input.type as SupportTicketType) || 'general',
+      status: 'open',
+      priority: input.priority || 'normal',
+      orderId: input.orderId,
+      orderItemId: input.orderItemId,
+      requesterId: 0,
+      sellerId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [],
+    }
+    message.ticketId = ticket.id
+    ticket.messages = [message]
+    localWrite('local_supportTickets', [ticket, ...tickets])
+    return ticket
+  },
+  async replySupportTicket(id: string, body: string, attachments: string[] = []) {
+    const tickets = localRead<SupportTicket[]>('local_supportTickets', [])
+    const idx = tickets.findIndex((ticket) => ticket.id === id)
+    const message: SupportMessage = {
+      id: localId('msg'),
+      ticketId: id,
+      authorId: 0,
+      body,
+      attachments,
+      createdAt: new Date().toISOString(),
+    }
+    if (idx >= 0) {
+      const next = { ...tickets[idx] }
+      next.messages = [...(next.messages ?? []), message]
+      next.updatedAt = new Date().toISOString()
+      tickets[idx] = next
+      localWrite('local_supportTickets', tickets)
+    }
+    return message
+  },
+  async updateSupportTicketStatus(id: string, status: SupportTicketStatus) {
+    const tickets = localRead<SupportTicket[]>('local_supportTickets', [])
+    const idx = tickets.findIndex((ticket) => ticket.id === id)
+    if (idx === -1) throw new Error('Ticket not found')
+    const next = { ...tickets[idx], status, updatedAt: new Date().toISOString() }
+    tickets[idx] = next
+    localWrite('local_supportTickets', tickets)
+    return next
+  },
+  async salesAssistantChat() {
+    throw new Error('AI assistant requires API mode. Enable VITE_USE_API=true with a configured backend.')
+  },
+  async listRefundRequests(scope?: 'buyer' | 'seller' | 'all') {
+    const refunds = localRead<RefundRequest[]>('local_refunds', [])
+    if (!scope || scope === 'all') return refunds
+    if (scope === 'buyer') return refunds.filter((item) => item.buyerId === 0)
+    if (scope === 'seller') return refunds.filter((item) => item.sellerId === 0)
+    return refunds
+  },
+  async createRefundRequest(input) {
+    const refunds = localRead<RefundRequest[]>('local_refunds', [])
+    const refund: RefundRequest = {
+      id: localId('refund'),
+      orderId: input.orderId,
+      orderItemId: input.orderItemId ?? null,
+      buyerId: 0,
+      sellerId: null,
+      amount: input.amount ?? null,
+      reason: input.reason,
+      status: 'requested',
+      resolution: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    localWrite('local_refunds', [refund, ...refunds])
+    return refund
+  },
+  async reviewRefundRequest(id: string, action: 'accept' | 'reject' | 'refund', notes?: string, amount?: number) {
+    const refunds = localRead<RefundRequest[]>('local_refunds', [])
+    const idx = refunds.findIndex((item) => item.id === id)
+    if (idx === -1) throw new Error('Refund not found')
+    const map: Record<string, RefundStatus> = { accept: 'accepted', reject: 'rejected', refund: 'refunded' }
+    const next: RefundRequest = {
+      ...refunds[idx],
+      status: map[action] ?? refunds[idx].status,
+      resolution: notes ?? refunds[idx].resolution ?? null,
+      amount: amount ?? refunds[idx].amount ?? null,
+      updatedAt: new Date().toISOString(),
+    }
+    refunds[idx] = next
+    localWrite('local_refunds', refunds)
+    return next
+  },
   // Categories (map to local storage categories helper)
   async listCategories() { return localCategories.list() },
   async createCategory(input: Omit<Category, 'id'>) { return localCategories.create(input) },

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Calendar } from '@/components/ui/calendar'
 import { useAuthStore } from '@/stores/authStore'
-import { db } from '@/lib/data'
+import { db, type RefundRequest } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 
 export const Route = createFileRoute('/marketplace/_layout/order/$id')({
@@ -55,6 +55,11 @@ function OrderDetail() {
   const [localProposals, setLocalProposals] = useState<string[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedTime, setSelectedTime] = useState<string>('')
+  const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
+  const [refundReason, setRefundReason] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
+  const [selectedRefundItem, setSelectedRefundItem] = useState<string>('order')
+  const [submittingRefund, setSubmittingRefund] = useState(false)
   useEffect(() => {
     // Preload proposals from current order once data arrives
     try {
@@ -65,6 +70,22 @@ function OrderDetail() {
       setLocalProposals([])
     }
   }, [data])
+
+  useEffect(() => {
+    if (!isBuyer || typeof db.listRefundRequests !== 'function') return
+    let mounted = true
+    ;(async () => {
+      try {
+        const list = (await db.listRefundRequests?.('buyer')) ?? []
+        if (mounted) setRefundRequests(list.filter((item) => item.orderId === id))
+      } catch {
+        if (mounted) setRefundRequests([])
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [id, isBuyer])
 
   if (error) {
     if (status === 401 || status === 403) {
@@ -97,6 +118,67 @@ function OrderDetail() {
     const t = selectedTime.padStart(5, '0')
     const isoLike = `${y}-${m}-${d}T${t}`
     setLocalProposals((cur) => Array.from(new Set([isoLike, ...cur])))
+  }
+
+  const refundableItems = useMemo(() => data?.items ?? [], [data])
+  const hasPendingRefund = useMemo(
+    () => refundRequests.some((item) => item.status === 'requested' || item.status === 'reviewing'),
+    [refundRequests]
+  )
+
+  function refundStatusLabel(status: RefundRequest['status']) {
+    return status.replace('_', ' ')
+  }
+
+  function refundBadgeClasses(status: RefundRequest['status']) {
+    switch (status) {
+      case 'requested':
+        return 'bg-amber-50 text-amber-700 border-amber-200'
+      case 'reviewing':
+        return 'bg-sky-50 text-sky-700 border-sky-200'
+      case 'accepted':
+      case 'refunded':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      case 'rejected':
+        return 'bg-red-50 text-red-700 border-red-200'
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-200'
+    }
+  }
+
+  async function submitRefundRequest() {
+    if (!isBuyer || typeof db.createRefundRequest !== 'function') return
+    if (hasPendingRefund) {
+      window.alert('You already have a refund request awaiting review.')
+      return
+    }
+    if (!refundReason.trim()) {
+      window.alert('Please describe the issue before submitting a refund request.')
+      return
+    }
+    setSubmittingRefund(true)
+    try {
+      const payload: { orderId: string; orderItemId?: string; amount?: number; reason: string } = {
+        orderId: id,
+        reason: refundReason.trim(),
+      }
+      if (selectedRefundItem !== 'order') payload.orderItemId = selectedRefundItem
+      if (refundAmount) {
+        const amountValue = Number(refundAmount)
+        if (Number.isFinite(amountValue) && amountValue > 0) payload.amount = Math.round(amountValue)
+      }
+      const created = await db.createRefundRequest?.(payload)
+      if (created) {
+        setRefundRequests((prev) => [created, ...prev])
+        setRefundReason('')
+        setRefundAmount('')
+        setSelectedRefundItem('order')
+      }
+    } catch (err) {
+      window.alert((err as Error)?.message ?? 'Unable to submit refund request right now.')
+    } finally {
+      setSubmittingRefund(false)
+    }
   }
 
   return (
@@ -152,31 +234,111 @@ function OrderDetail() {
       </div>
 
       {/* Buyer: Accept seller's proposed alternates */}
-      {isBuyer && hasService && proposals.length > 0 && data.status === 'pending' && (
-        <div className='mt-4 rounded-2xl border p-4'>
-          <div className='mb-2 text-lg font-semibold'>Seller Proposed Alternate Times</div>
-          <div className='mb-2 text-sm text-gray-600'>Choose one of the proposed slots to schedule your appointment.</div>
-          <div className='flex flex-wrap gap-2'>
-            {proposals.map((p) => (
-              <button
-                key={p}
-                className='rounded-md border px-3 py-1.5 text-sm'
-                onClick={async () => {
-                  setWorking(true)
-                  try {
-                    await fetchJson(`/api/orders/${data.id}/appointment/accept`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: p }) })
-                    location.reload()
-                  } finally {
-                    setWorking(false)
-                  }
-                }}
-              >
-                {new Date(p).toLocaleString()}
-              </button>
-            ))}
+  {isBuyer && hasService && proposals.length > 0 && data.status === 'pending' && (
+    <div className='mt-4 rounded-2xl border p-4'>
+      <div className='mb-2 text-lg font-semibold'>Seller Proposed Alternate Times</div>
+      <div className='mb-2 text-sm text-gray-600'>Choose one of the proposed slots to schedule your appointment.</div>
+      <div className='flex flex-wrap gap-2'>
+        {proposals.map((p) => (
+          <button
+            key={p}
+            className='rounded-md border px-3 py-1.5 text-sm'
+            onClick={async () => {
+              setWorking(true)
+              try {
+                await fetchJson(`/api/orders/${data.id}/appointment/accept`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: p }) })
+                location.reload()
+              } finally {
+                setWorking(false)
+              }
+            }}
+          >
+            {new Date(p).toLocaleString()}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+
+      {isBuyer ? (
+        <section className='mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <h2 className='text-lg font-semibold text-slate-900'>Refunds & disputes</h2>
+            <span className='text-xs text-slate-500'>Requests route to the seller support console.</span>
           </div>
-        </div>
-      )}
+          {refundRequests.length ? (
+            <ul className='mt-4 space-y-3'>
+              {refundRequests.map((request) => (
+                <li key={request.id} className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+                  <div className='flex flex-wrap items-start justify-between gap-2'>
+                    <div>
+                      <div className='text-sm font-semibold text-slate-900'>{request.reason}</div>
+                      <div className='text-xs text-slate-500'>Submitted {new Date(request.createdAt).toLocaleString()}</div>
+                      {request.amount ? <div className='text-xs text-slate-500'>Requested amount: A${request.amount}</div> : null}
+                    </div>
+                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${refundBadgeClasses(request.status)}`}>
+                      {refundStatusLabel(request.status)}
+                    </span>
+                  </div>
+                  {request.resolution ? (
+                    <p className='mt-2 text-xs text-slate-500'>Resolution: {request.resolution}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className='mt-4 text-sm text-slate-500'>You haven’t raised any disputes for this order.</p>
+          )}
+          <div className='mt-6 grid gap-3 md:grid-cols-2'>
+            <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
+              Apply to
+              <select
+                value={selectedRefundItem}
+                onChange={(event) => setSelectedRefundItem(event.target.value)}
+                className='mt-1 w-full rounded-md border border-slate-200 bg-white p-2 text-sm'
+              >
+                <option value='order'>Entire order</option>
+                {refundableItems.map((item: any) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title} · A${item.price * item.quantity}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
+              Requested amount (optional)
+              <input
+                type='number'
+                min={0}
+                value={refundAmount}
+                onChange={(event) => setRefundAmount(event.target.value)}
+                className='mt-1 w-full rounded-md border border-slate-200 p-2 text-sm'
+                placeholder='Leave blank for full amount'
+              />
+            </label>
+          </div>
+          <div className='mt-4'>
+            <label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Describe the issue</label>
+            <textarea
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              rows={4}
+              className='mt-1 w-full rounded-md border border-slate-200 p-3 text-sm'
+              placeholder='Explain what went wrong so the seller can respond quickly.'
+            />
+          </div>
+          <div className='mt-3 flex items-center gap-3 text-xs'>
+            <button
+              disabled={submittingRefund || hasPendingRefund}
+              className='rounded-md bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-60'
+              onClick={submitRefundRequest}
+            >
+              {submittingRefund ? 'Submitting…' : 'Submit refund request'}
+            </button>
+            {hasPendingRefund ? <span className='text-slate-500'>An existing refund is awaiting review.</span> : null}
+          </div>
+        </section>
+      ) : null}
 
       {/* Actions (buyer + seller) */}
       <div className='mt-6 flex flex-wrap gap-2'>

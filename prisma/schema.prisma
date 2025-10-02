@@ -59,6 +59,8 @@ model Order {
   createdAt     DateTime    @default(now())
 
   items OrderItem[]
+  tickets SupportTicket[] @relation("OrderTickets")
+  refundRequests RefundRequest[]
 
   buyer  User? @relation("OrderBuyer", fields: [buyerId], references: [id])
   seller User? @relation("OrderSeller", fields: [sellerId], references: [id])
@@ -72,6 +74,37 @@ enum OrderStatus {
   shipped
   completed
   cancelled
+  refunded
+}
+
+enum RefundStatus {
+  requested
+  reviewing
+  accepted
+  rejected
+  refunded
+}
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum SupportTicketType {
+  general
+  order
+  service
+  billing
+}
+
+enum AnnouncementAudience {
+  all
+  buyers
+  sellers
+  drivers
+  admins
 }
 
 model OrderItem {
@@ -87,6 +120,8 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
+  tickets SupportTicket[] @relation("OrderItemTickets")
+  refundRequests RefundRequest[]
 }
 
 model Cart {
@@ -143,6 +178,13 @@ model User {
   orderReviewsGiven OrderReview[] @relation("OrderReviewBuyer")
   orderReviewsReceived OrderReview[] @relation("OrderReviewSeller")
   blogPosts BlogPost[]
+
+  supportTicketsCreated SupportTicket[] @relation("TicketRequester")
+  supportTicketsAssigned SupportTicket[] @relation("TicketSeller")
+  supportMessages SupportMessage[]
+  announcements Announcement[] @relation("AnnouncementAuthor")
+  refundRequestsMade RefundRequest[] @relation("RefundBuyer")
+  refundRequestsReceived RefundRequest[] @relation("RefundSeller")
 
   // Relations
   dockets        Docket[]
@@ -321,4 +363,69 @@ model OrderReview {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   buyer User  @relation("OrderReviewBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
   seller User @relation("OrderReviewSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id          String               @id @default(cuid())
+  title       String
+  body        String
+  audience    AnnouncementAudience @default(all)
+  pinned      Boolean              @default(false)
+  startAt     DateTime?
+  endAt       DateTime?
+  publishedAt DateTime             @default(now())
+  authorId    Int?
+
+  author User? @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+}
+
+model SupportTicket {
+  id           String              @id @default(cuid())
+  subject      String
+  type         SupportTicketType   @default(general)
+  status       SupportTicketStatus @default(open)
+  priority     String?             @default("normal")
+  orderId      String?
+  orderItemId  String?
+  requesterId  Int
+  sellerId     Int?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  order     Order?     @relation("OrderTickets", fields: [orderId], references: [id])
+  orderItem OrderItem? @relation("OrderItemTickets", fields: [orderItemId], references: [id])
+  requester User       @relation("TicketRequester", fields: [requesterId], references: [id])
+  seller    User?      @relation("TicketSeller", fields: [sellerId], references: [id])
+  messages  SupportMessage[]
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  Int?
+  body      String
+  attachments String[] @default([])
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?         @relation(fields: [authorId], references: [id])
+}
+
+model RefundRequest {
+  id          String        @id @default(cuid())
+  orderId     String
+  orderItemId String?
+  buyerId     Int
+  sellerId    Int?
+  amount      Int?
+  reason      String
+  status      RefundStatus  @default(requested)
+  resolution  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem? @relation(fields: [orderItemId], references: [id])
+  buyer     User       @relation("RefundBuyer", fields: [buyerId], references: [id])
+  seller    User?      @relation("RefundSeller", fields: [sellerId], references: [id])
 }

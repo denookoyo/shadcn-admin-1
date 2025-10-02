@@ -4,6 +4,7 @@ import { Sparkles, ShieldCheck, Store, ShoppingBag, BarChart3, MessagesSquare, t
 import { imageFor } from '@/features/marketplace/helpers'
 import { SafeImg } from '@/components/safe-img'
 import { db, type Category, type Product } from '@/lib/data'
+import { ChatLauncher } from '@/features/assistant/chat-launcher'
 
 type QuickAction = {
   icon: LucideIcon
@@ -154,6 +155,13 @@ function MarketplaceHome() {
   const goodsCount = products.length - serviceCount
 
   const buyerActions: QuickAction[] = [
+    {
+      icon: Sparkles,
+      title: 'Chat with AI concierge',
+      body: 'Explain what you need and the assistant will curate products, bookings, and checkout links for you.',
+      href: '/marketplace/assistant',
+      tone: 'emerald',
+    },
     {
       icon: ShoppingBag,
       title: 'Shop curated picks',
@@ -360,6 +368,7 @@ function MarketplaceHome() {
           </div>
         </div>
       </section>
+      <ChatLauncher />
     </div>
   )
 }

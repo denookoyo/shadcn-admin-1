@@ -1,4 +1,5 @@
 import express from 'express'
+import { z } from 'zod'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
@@ -525,19 +526,776 @@ export function createApiRouter() {
         capacity: dailyCapacity,
         slots,
       })
+  }
+
+  return {
+    productId: product.id,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    durationMinutes,
+    openTime,
+    closeTime,
+    openDays,
+    days,
+  }
+}
+
+  const ASSISTANT_INFO_FIELDS = [
+    'customer_name',
+    'customer_email',
+    'customer_phone',
+    'address',
+    'service_time',
+    'product_preference',
+    'budget',
+  ]
+
+  const AssistantCartItemInputSchema = z.object({
+    productId: z.string().min(1),
+    quantity: z.number().int().min(1).max(99).default(1),
+    appointmentSlot: z.string().optional(),
+    note: z.string().optional(),
+  })
+
+  const AssistantRecommendationSchema = z.object({
+    productId: z.string().min(1),
+    reason: z.string().optional(),
+    matchScore: z.number().optional(),
+  })
+
+  const AssistantPendingInfoSchema = z.object({
+    fields: z.array(z.enum(ASSISTANT_INFO_FIELDS)).min(1),
+    reason: z.string().optional(),
+  })
+
+  const AssistantAppointmentSchema = z.object({
+    productId: z.string().min(1),
+    slot: z.string().min(1),
+    status: z.string().optional(),
+    orderId: z.string().optional(),
+    note: z.string().optional(),
+  })
+
+  const AssistantOrderSummarySchema = z.object({
+    id: z.string().min(1),
+    total: z.number(),
+    status: z.string().min(1),
+    paymentLink: z.string().optional(),
+    accessCode: z.string().optional(),
+    createdAt: z.string().optional(),
+  })
+
+  const SalesAssistantStateSchema = z.object({
+    cart: z.array(AssistantCartItemInputSchema).default([]),
+    recommendations: z.array(AssistantRecommendationSchema).default([]),
+    orders: z.array(AssistantOrderSummarySchema).default([]),
+    appointments: z.array(AssistantAppointmentSchema).default([]),
+    pendingInfoRequests: z.array(AssistantPendingInfoSchema).default([]),
+    metadata: z.record(z.any()).optional(),
+  })
+
+  const AssistantConversationMessageSchema = z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+    actions: z.any().optional(),
+    createdAt: z.string().optional(),
+  })
+
+  const AssistantCartItemForOrderSchema = AssistantCartItemInputSchema.extend({
+    quantity: AssistantCartItemInputSchema.shape.quantity.default(1),
+  })
+
+  const SalesAssistantActionSchema = z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('recommend_products'),
+      products: z.array(AssistantRecommendationSchema).min(1),
+    }),
+    z.object({
+      type: z.literal('add_to_cart'),
+      items: z.array(AssistantCartItemInputSchema).min(1),
+      replace: z.boolean().optional(),
+    }),
+    z.object({
+      type: z.literal('book_service'),
+      productId: z.string().min(1),
+      slot: z.string().min(1),
+      note: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('create_order'),
+      items: z.array(AssistantCartItemForOrderSchema).min(1).optional(),
+      useCart: z.boolean().optional(),
+      customerName: z.string().optional(),
+      customerEmail: z.string().optional(),
+      customerPhone: z.string().optional(),
+      address: z.string().optional(),
+      note: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('generate_payment_link'),
+      orderId: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('ask_information'),
+      fields: z.array(z.enum(ASSISTANT_INFO_FIELDS)).min(1),
+      reason: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('clear_cart'),
+      note: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('update_metadata'),
+      patch: z.record(z.any()),
+      scope: z.string().optional(),
+    }),
+  ])
+
+  const AssistantLLMResponseSchema = z.object({
+    reply: z.string(),
+    actions: z.array(SalesAssistantActionSchema).default([]),
+    suggestions: z.array(z.string()).default([]),
+    summary: z.string().optional(),
+    sentiment: z.string().optional(),
+  })
+
+  const SalesAssistantRequestSchema = z.object({
+    message: z.string().min(1),
+    conversation: z.array(AssistantConversationMessageSchema).max(30).default([]),
+    state: SalesAssistantStateSchema.optional(),
+    customer: z
+      .object({
+        id: z.number().int().optional(),
+        name: z.string().optional(),
+        email: z.string().optional(),
+        phone: z.string().optional(),
+      })
+      .optional(),
+  })
+
+  function cloneAssistantState(state) {
+    if (!state) return { cart: [], recommendations: [], orders: [], appointments: [], pendingInfoRequests: [] }
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(state)
+      } catch (e) {
+        console.error('structuredClone failed for assistant state:', e)
+      }
+    }
+    return JSON.parse(JSON.stringify(state))
+  }
+
+  function randomAssistantAccessCode() {
+    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+  }
+
+  function buildAssistantPaymentLink(order) {
+    if (!order) return null
+    if (order.accessCode) return `/marketplace/order/pay?code=${encodeURIComponent(order.accessCode)}`
+    return `/marketplace/order/${encodeURIComponent(order.id)}`
+  }
+
+  const assistantFallbackCatalog = [
+    {
+      id: 'demo-anc-headphones',
+      slug: 'demo-anc-headphones',
+      title: 'Wireless ANC Headphones',
+      price: 229,
+      type: 'goods',
+      seller: 'Nova Audio',
+      rating: 4.8,
+      image: imageForServer('modern headphones product', 640, 640),
+      description: 'Immersive over-ear wireless headphones with adaptive noise cancelling and 28-hour battery life.',
+      stockCount: 38,
+      tags: ['audio', 'electronics'],
+    },
+    {
+      id: 'demo-smartphone-128',
+      slug: 'demo-smartphone-128',
+      title: 'Smartphone 128GB',
+      price: 699,
+      type: 'goods',
+      seller: 'Metro Gadgets',
+      rating: 4.7,
+      image: imageForServer('modern smartphone product', 640, 640),
+      description: '6.7" OLED display, triple camera system, and 128GB storage. Ships unlocked with 24-month warranty.',
+      stockCount: 22,
+      tags: ['electronics', 'mobile'],
+    },
+    {
+      id: 'demo-cleaning-2h',
+      slug: 'demo-cleaning-2h',
+      title: 'Apartment Cleaning (2h)',
+      price: 89,
+      type: 'service',
+      seller: 'Sparkle Pro',
+      rating: 4.9,
+      image: imageForServer('apartment cleaning service', 640, 640),
+      description: 'Two-hour professional clean covering kitchen, bathroom, and living spaces. Eco-friendly supplies included.',
+      service: {
+        openDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+        openTime: '09:00',
+        closeTime: '18:00',
+        durationMinutes: 120,
+        dailyCapacity: 4,
+        availability: {
+          days: ['2025-01-10T09:00:00Z', '2025-01-10T11:30:00Z', '2025-01-11T09:00:00Z'],
+        },
+      },
+      tags: ['home', 'service'],
+    },
+    {
+      id: 'demo-portrait-photo',
+      slug: 'demo-portrait-photo',
+      title: 'Portrait Photography (1h)',
+      price: 150,
+      type: 'service',
+      seller: 'LensCraft',
+      rating: 4.8,
+      image: imageForServer('portrait photography studio', 640, 640),
+      description: 'Studio portrait session with professional lighting, 10 retouched images delivered within 72 hours.',
+      service: {
+        openDays: ['wednesday', 'thursday', 'friday', 'saturday'],
+        openTime: '10:00',
+        closeTime: '17:00',
+        durationMinutes: 60,
+        dailyCapacity: 5,
+        availability: {
+          days: ['2025-01-11T10:00:00Z', '2025-01-11T12:00:00Z', '2025-01-12T14:00:00Z'],
+        },
+      },
+      tags: ['creative', 'service'],
+    },
+  ]
+
+  async function loadAssistantCatalog({ limit = 25 } = {}) {
+    const products = await prisma.product.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      include: { category: { select: { name: true } } },
+    })
+    if (!products.length) {
+      const map = new Map()
+      for (const item of assistantFallbackCatalog) {
+        map.set(item.id, item)
+      }
+      return { list: assistantFallbackCatalog, map }
     }
 
-    return {
-      productId: product.id,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      durationMinutes,
-      openTime,
-      closeTime,
-      openDays,
-      days,
+    const ownerIds = [...new Set(products.map((p) => p.ownerId).filter((v) => v != null))]
+    let ownersMap = new Map()
+    let repMap = new Map()
+    let avgMap = new Map()
+    if (ownerIds.length > 0) {
+      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true } })
+      ownersMap = new Map(owners.map((u) => [u.id, u]))
+      const reps = await prisma.userReputation.findMany({ where: { userId: { in: ownerIds } } })
+      repMap = new Map(reps.map((r) => [r.userId, r]))
+      try {
+        if (prisma?.orderReview?.groupBy) {
+          const avgs = await prisma.orderReview.groupBy({ by: ['sellerId'], where: { sellerId: { in: ownerIds } }, _avg: { rating: true } })
+          avgMap = new Map(avgs.map((a) => [a.sellerId, a._avg.rating || 0]))
+        }
+      } catch {}
     }
+
+    const enriched = []
+    for (const product of products) {
+      const owner = ownersMap.get(product.ownerId)
+      const rep = repMap.get(product.ownerId)
+      const ownerAvgRating = avgMap.get(product.ownerId) || null
+      const negCount = rep?.negativeCount || 0
+      const ownerRating = compositeRating(ownerAvgRating ?? 5, negCount)
+      const base = {
+        id: product.id,
+        slug: product.slug,
+        title: product.title,
+        price: product.price,
+        type: product.type,
+        sellerId: product.ownerId,
+        seller: owner?.name || (owner?.email ? owner.email.split('@')[0] : product.seller || 'Verified seller'),
+        rating: product.rating ?? ownerRating ?? 4.7,
+        image: product.img || imageForServer(product.title, 640, 640),
+        description: product.description || '',
+        stockCount: product.stockCount,
+        category: product.category?.name || null,
+        tags: product.category?.name ? [product.category.name] : [],
+      }
+      if (product.type === 'service') {
+        try {
+          const availability = await fetchServiceAvailability(product, new Date(), 14)
+          base.service = {
+            openDays: availability.openDays,
+            openTime: availability.openTime,
+            closeTime: availability.closeTime,
+            durationMinutes: availability.durationMinutes,
+            dailyCapacity: product.serviceDailyCapacity ?? null,
+            availability: (availability.days || [])
+              .filter((d) => d.isOpen)
+              .flatMap((d) => (d.slots || []).filter((s) => s.available).slice(0, 2))
+              .slice(0, 6)
+              .map((slot) => slot.start),
+          }
+        } catch (e) {
+          base.service = {
+            openDays: product.serviceOpenDays || [],
+            openTime: product.serviceOpenTime || null,
+            closeTime: product.serviceCloseTime || null,
+            durationMinutes: product.serviceDurationMinutes || null,
+            dailyCapacity: product.serviceDailyCapacity || null,
+            availability: [],
+          }
+        }
+      }
+      enriched.push(base)
+    }
+
+    const map = new Map()
+    for (const item of enriched) map.set(item.id, item)
+    return { list: enriched, map }
   }
+
+  async function createAssistantOrders({
+    items,
+    buyerId,
+    customerName,
+    customerEmail,
+    customerPhone,
+    address,
+  }) {
+    if (!Array.isArray(items) || !items.length) throw new Error('No items to create an order with')
+    const productIds = [...new Set(items.map((item) => item.productId))]
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        ownerId: true,
+        title: true,
+        price: true,
+        type: true,
+        stockCount: true,
+        serviceOpenDays: true,
+        serviceOpenTime: true,
+        serviceCloseTime: true,
+        serviceDurationMinutes: true,
+        serviceDailyCapacity: true,
+      },
+    })
+    const productById = new Map(products.map((p) => [p.id, p]))
+    for (const productId of productIds) {
+      if (!productById.has(productId)) throw new Error(`Product ${productId} is no longer available`)
+    }
+
+    const normalizedItems = []
+    const goodsAdjustments = new Map()
+    const pendingServiceSlots = new Set()
+
+    for (const item of items) {
+      const product = productById.get(item.productId)
+      if (!product) throw new Error(`Product ${item.productId} is unavailable`)
+      const quantity = Math.max(1, Number(item.quantity || 1))
+      if (product.type === 'goods') {
+        const stock = Number(product.stockCount ?? 0)
+        if (quantity > stock) throw new Error(`"${product.title}" only has ${stock} in stock.`)
+        goodsAdjustments.set(product.id, (goodsAdjustments.get(product.id) || 0) + quantity)
+        normalizedItems.push({
+          productId: product.id,
+          quantity,
+          price: Number(product.price) || 0,
+          sellerId: product.ownerId ?? null,
+          title: product.title,
+          type: 'goods',
+        })
+      } else {
+        const slotString = item.appointmentSlot || item.meta || item.note
+        if (!slotString) throw new Error(`Select a valid appointment time for "${product.title}".`)
+        const slot = new Date(slotString)
+        if (Number.isNaN(slot.getTime())) throw new Error(`Invalid appointment time for "${product.title}".`)
+        slot.setSeconds(0, 0)
+        const slotKey = `${product.id}:${slot.getTime()}`
+        if (pendingServiceSlots.has(slotKey)) throw new Error(`Duplicate appointment time selected for "${product.title}".`)
+        pendingServiceSlots.add(slotKey)
+        const availability = await fetchServiceAvailability(product, slot, 1)
+        const slotAvailable = (availability.days || []).some((day) =>
+          (day.slots || []).some((entry) => entry.available && new Date(entry.start).getTime() === slot.getTime())
+        )
+        if (!slotAvailable) throw new Error(`That time for "${product.title}" was just taken. Please choose a different slot.`)
+        normalizedItems.push({
+          productId: product.id,
+          quantity: 1,
+          price: Number(product.price) || 0,
+          sellerId: product.ownerId ?? null,
+          title: product.title,
+          type: 'service',
+          appointmentAt: slot,
+        })
+      }
+    }
+
+    const groups = new Map()
+    for (const item of normalizedItems) {
+      const key = item.sellerId == null ? 'null' : String(item.sellerId)
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key).push(item)
+    }
+
+    const createdOrders = []
+    for (const [key, groupItems] of groups) {
+      const sellerId = key === 'null' ? null : Number(key)
+      const total = groupItems.reduce((sum, entry) => sum + Number(entry.price || 0) * Number(entry.quantity || 1), 0)
+      const order = await prisma.order.create({
+        data: {
+          buyerId: Number.isFinite(Number(buyerId)) ? Number(buyerId) : null,
+          sellerId,
+          total: Math.max(0, Math.round(total)),
+          status: 'pending',
+          customerName: customerName || null,
+          customerEmail: customerEmail || null,
+          customerPhone: customerPhone || null,
+          address: address || null,
+          accessCode: randomAssistantAccessCode(),
+          items: {
+            create: groupItems.map((entry) => ({
+              productId: entry.productId,
+              title: entry.title,
+              price: Number(entry.price) || 0,
+              quantity: Number(entry.quantity) || 1,
+              appointmentAt: entry.type === 'service' && entry.appointmentAt ? new Date(entry.appointmentAt) : null,
+              appointmentStatus: entry.type === 'service' ? 'requested' : null,
+            })),
+          },
+        },
+        include: { items: true },
+      })
+      createdOrders.push(order)
+    }
+
+    for (const [productId, decrement] of goodsAdjustments) {
+      await prisma.product.update({ where: { id: productId }, data: { stockCount: { decrement } } })
+    }
+
+    return createdOrders
+  }
+
+  async function applyAssistantActions({
+    actions,
+    state,
+    catalogMap,
+    customer,
+    buyerId,
+  }) {
+    const nextState = cloneAssistantState(state || {})
+    if (!Array.isArray(nextState.cart)) nextState.cart = []
+    if (!Array.isArray(nextState.recommendations)) nextState.recommendations = []
+    if (!Array.isArray(nextState.orders)) nextState.orders = []
+    if (!Array.isArray(nextState.appointments)) nextState.appointments = []
+    if (!Array.isArray(nextState.pendingInfoRequests)) nextState.pendingInfoRequests = []
+
+    const results = []
+    const createdOrders = []
+
+    for (const action of actions) {
+      try {
+        if (action.type === 'recommend_products') {
+          const resolved = action.products
+            .map((item) => {
+              const product = catalogMap.get(item.productId)
+              if (!product) return null
+              return {
+                ...item,
+                title: product.title,
+                price: product.price,
+                type: product.type,
+                image: product.image,
+                slug: product.slug,
+              }
+            })
+            .filter(Boolean)
+          if (resolved.length) {
+            const existingIds = new Set(nextState.recommendations.map((r) => r.productId))
+            for (const rec of resolved) {
+              if (!existingIds.has(rec.productId)) {
+                nextState.recommendations.push({ productId: rec.productId, reason: rec.reason, matchScore: rec.matchScore })
+                existingIds.add(rec.productId)
+              }
+            }
+          }
+          results.push({ ...action, status: 'applied', products: resolved })
+        } else if (action.type === 'add_to_cart') {
+          const payload = []
+          for (const entry of action.items) {
+            const product = catalogMap.get(entry.productId)
+            if (!product) throw new Error(`Product ${entry.productId} could not be found`)
+            payload.push({
+              productId: entry.productId,
+              quantity: Math.max(1, Number(entry.quantity || 1)),
+              appointmentSlot: entry.appointmentSlot,
+              note: entry.note,
+              title: product.title,
+              price: product.price,
+              type: product.type,
+              slug: product.slug,
+            })
+          }
+          if (action.replace) {
+            nextState.cart = payload.map((item) => ({ productId: item.productId, quantity: item.quantity, appointmentSlot: item.appointmentSlot, note: item.note }))
+          } else {
+            const byId = new Map(nextState.cart.map((item) => [item.productId, item]))
+            for (const entry of payload) {
+              if (byId.has(entry.productId)) {
+                const existing = byId.get(entry.productId)
+                existing.quantity = Math.min(99, Math.max(1, Number(existing.quantity || 1) + Number(entry.quantity || 1)))
+                if (entry.appointmentSlot) existing.appointmentSlot = entry.appointmentSlot
+                if (entry.note) existing.note = entry.note
+              } else {
+                const item = { productId: entry.productId, quantity: entry.quantity, appointmentSlot: entry.appointmentSlot, note: entry.note }
+                nextState.cart.push(item)
+                byId.set(entry.productId, item)
+              }
+            }
+          }
+          results.push({ ...action, status: 'applied', items: payload })
+        } else if (action.type === 'book_service') {
+          const product = catalogMap.get(action.productId)
+          if (!product) throw new Error(`Service ${action.productId} not found`)
+          const slot = new Date(action.slot)
+          if (Number.isNaN(slot.getTime())) throw new Error('Invalid appointment time provided')
+          const dbProduct = await prisma.product.findUnique({ where: { id: action.productId } })
+          if (!dbProduct) throw new Error('Selected service is not available in the live catalogue')
+          const availability = await fetchServiceAvailability(dbProduct, slot, 1)
+          const slotAvailable = (availability?.days || []).some((day) =>
+            (day.slots || []).some((entry) => entry.available && new Date(entry.start).getTime() === slot.getTime())
+          )
+          if (!slotAvailable) throw new Error('Selected appointment is no longer available')
+          nextState.appointments.push({
+            productId: action.productId,
+            slot: slot.toISOString(),
+            status: 'requested',
+            note: action.note,
+          })
+          nextState.cart.push({ productId: action.productId, quantity: 1, appointmentSlot: slot.toISOString() })
+          results.push({ ...action, status: 'applied', slot: slot.toISOString() })
+        } else if (action.type === 'create_order') {
+          const sourceItems = action.useCart || !action.items?.length ? nextState.cart : action.items
+          if (!sourceItems || !sourceItems.length) throw new Error('No items available to create an order')
+          const normalized = sourceItems.map((item) => ({
+            productId: item.productId,
+            quantity: Math.max(1, Number(item.quantity || 1)),
+            appointmentSlot: item.appointmentSlot,
+            note: item.note,
+          }))
+          const orders = await createAssistantOrders({
+            items: normalized,
+            buyerId,
+            customerName: action.customerName || customer?.name || null,
+            customerEmail: action.customerEmail || customer?.email || null,
+            customerPhone: action.customerPhone || customer?.phone || null,
+            address: action.address || null,
+          })
+          createdOrders.push(...orders)
+          for (const order of orders) {
+            nextState.orders.push({
+              id: order.id,
+              total: order.total,
+              status: order.status,
+              paymentLink: buildAssistantPaymentLink(order),
+              accessCode: order.accessCode || null,
+              createdAt: order.createdAt?.toISOString?.() || new Date().toISOString(),
+            })
+          }
+          nextState.cart = []
+          nextState.pendingInfoRequests = []
+          results.push({ ...action, status: 'applied', orders: orders.map((o) => ({ id: o.id, total: o.total })) })
+        } else if (action.type === 'generate_payment_link') {
+          const orderId = action.orderId || (nextState.orders[nextState.orders.length - 1]?.id ?? null)
+          if (!orderId) throw new Error('No order to generate a payment link for')
+          let orderSummary = nextState.orders.find((o) => o.id === orderId)
+          if (!orderSummary) {
+            const order = await prisma.order.findUnique({ where: { id: orderId } })
+            if (!order) throw new Error('Order not found')
+            orderSummary = {
+              id: order.id,
+              total: order.total,
+              status: order.status,
+              paymentLink: buildAssistantPaymentLink(order),
+              accessCode: order.accessCode || null,
+              createdAt: order.createdAt?.toISOString?.() || new Date().toISOString(),
+            }
+            nextState.orders.push(orderSummary)
+          }
+          if (!orderSummary.paymentLink) {
+            const order = await prisma.order.findUnique({ where: { id: orderSummary.id } })
+            if (order?.accessCode) orderSummary.paymentLink = buildAssistantPaymentLink(order)
+          }
+          results.push({ ...action, status: 'applied', paymentLink: orderSummary.paymentLink, orderId: orderSummary.id })
+        } else if (action.type === 'ask_information') {
+          nextState.pendingInfoRequests.push({ fields: action.fields, reason: action.reason })
+          results.push({ ...action, status: 'applied' })
+        } else if (action.type === 'clear_cart') {
+          nextState.cart = []
+          results.push({ ...action, status: 'applied' })
+        } else if (action.type === 'update_metadata') {
+          nextState.metadata = { ...(nextState.metadata || {}), ...action.patch }
+          results.push({ ...action, status: 'applied' })
+        } else {
+          results.push({ ...action, status: 'ignored' })
+        }
+      } catch (err) {
+        results.push({ ...action, status: 'error', error: err?.message || 'Unknown error' })
+      }
+    }
+
+    return { state: nextState, results, createdOrders }
+  }
+
+  router.post('/assistant/chat', async (req, res) => {
+    try {
+      const apiKey = process.env.OPENAI_API_KEY
+      if (!apiKey) return res.status(503).json({ error: 'Assistant not configured. Provide OPENAI_API_KEY.' })
+
+      const parseResult = SalesAssistantRequestSchema.safeParse(req.body || {})
+      if (!parseResult.success) {
+        return res.status(400).json({ error: 'Invalid assistant payload', detail: parseResult.error.flatten() })
+      }
+
+      const { message, conversation, state, customer } = parseResult.data
+      const { list: catalog, map: catalogMap } = await loadAssistantCatalog({ limit: 20 })
+      const buyerId = Number.isFinite(Number(req.user?.uid)) ? Number(req.user.uid) : null
+      const sanitizedState = cloneAssistantState(state || {})
+
+      const systemPrompt = `You are Hedgetech's AI commerce assistant helping buyers discover products and services, collect missing details, and trigger marketplace actions.
+Respond with valid JSON only. Never include markdown or plain text outside JSON. Stay friendly, concise, and human — imagine a knowledgeable retail concierge in Australia.
+
+JSON response schema:
+{
+  "reply": string; // conversational response for the buyer in Australian English
+  "actions": Action[]; // see action specs below
+  "suggestions": string[]; // optional follow-up quick replies (≤4, succinct)
+}
+
+Action types you can request:
+- recommend_products: suggest SKUs from the provided catalog. Include productId and optional reason/matchScore.
+- add_to_cart: stage one or more products with quantity and optional appointmentSlot for services.
+- book_service: reserve a service slot (requires slot ISO timestamp from availability window).
+- create_order: when buyer is ready. Supply customer details (if known) and items or set useCart true to consume current cart.
+- generate_payment_link: provide when an order exists so the buyer can complete payment.
+- ask_information: request mandatory details (e.g., customer_email, address, service_time) you are missing.
+- clear_cart: remove staged items when buyer changes direction.
+- update_metadata: store facts about buyer preferences to guide future recommendations.
+
+Rules:
+- Only recommend or sell items present in "catalog". Use productId exactly as provided.
+- If info is missing to proceed (like email, service time), emit ask_information before create_order.
+- Services require appointmentSlot aligned with availability. Use ISO strings from availability data.
+- When you create an order for goods that need shipping, make sure an address is collected.
+- When payment is outstanding after order creation, request generate_payment_link so the customer can pay.
+- Keep reply warm, factual, and helpful. Reference seller or service details when useful.
+- Respect prior conversation context supplied.`
+
+      const historyMessages = (conversation || [])
+        .slice(-8)
+        .map((entry) => ({
+          role: entry.role,
+          content: String(entry.content || '').slice(0, 2000),
+        }))
+
+      const assistantContext = {
+        customer: customer || null,
+        state: {
+          cart: sanitizedState.cart || [],
+          recommendations: sanitizedState.recommendations || [],
+          orders: sanitizedState.orders || [],
+          appointments: sanitizedState.appointments || [],
+          pendingInfoRequests: sanitizedState.pendingInfoRequests || [],
+        },
+        catalog,
+      }
+
+      const userContent = [
+        'Customer message:',
+        message,
+        '',
+        'Assistant context JSON:',
+        JSON.stringify(assistantContext, null, 2),
+      ].join('\n')
+
+      const body = {
+        model: 'gpt-4o-mini',
+        temperature: 0.5,
+        max_tokens: 900,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...historyMessages,
+          { role: 'user', content: userContent },
+        ],
+      }
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!resp.ok) {
+        const detail = await resp.text().catch(() => '')
+        return res.status(502).json({ error: 'OpenAI error', detail })
+      }
+
+      const data = await resp.json()
+      const content = data?.choices?.[0]?.message?.content
+      if (!content) return res.status(502).json({ error: 'Assistant returned no content' })
+
+      let raw
+      try {
+        raw = JSON.parse(content)
+      } catch (e) {
+        return res.status(502).json({ error: 'Assistant produced invalid JSON', detail: e?.message || 'parse error', raw: content })
+      }
+
+      const parsedAssistant = AssistantLLMResponseSchema.safeParse(raw)
+      if (!parsedAssistant.success) {
+        return res.status(502).json({ error: 'Assistant response failed validation', detail: parsedAssistant.error.flatten(), raw })
+      }
+
+      const { state: nextState, results, createdOrders } = await applyAssistantActions({
+        actions: parsedAssistant.data.actions || [],
+        state: sanitizedState,
+        catalogMap,
+        customer,
+        buyerId,
+      })
+
+      const assistantMessage = {
+        id: `assistant-${randomAssistantAccessCode().slice(0, 8)}`,
+        role: 'assistant',
+        content: parsedAssistant.data.reply,
+        actions: results,
+        suggestions: parsedAssistant.data.suggestions || [],
+        createdAt: new Date().toISOString(),
+      }
+
+      res.json({
+        message: assistantMessage,
+        state: nextState,
+        usage: data?.usage || null,
+        raw: parsedAssistant.data,
+        createdOrders: (createdOrders || []).map((order) => ({
+          id: order.id,
+          total: order.total,
+          status: order.status,
+          paymentLink: buildAssistantPaymentLink(order),
+          accessCode: order.accessCode || null,
+        })),
+      })
+    } catch (e) {
+      console.error('POST /api/assistant/chat error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
 
   router.get('/products/:id/availability', async (req, res) => {
     try {
@@ -724,6 +1482,380 @@ export function createApiRouter() {
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('DELETE /api/categories error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Announcements -----------------------------------------------------------
+  router.get('/announcements', async (req, res) => {
+    try {
+      const audiences = ['all', 'buyers', 'sellers', 'drivers', 'admins']
+      const requested = String(req.query.audience || '').toLowerCase()
+      const filterAudience = audiences.includes(requested) ? requested : null
+      const now = new Date()
+      const baseWhere = {
+        AND: [
+          { OR: [{ startAt: null }, { startAt: { lte: now } }] },
+          { OR: [{ endAt: null }, { endAt: { gte: now } }] },
+        ],
+      }
+      if (filterAudience && filterAudience !== 'all') {
+        baseWhere.AND.push({ audience: { in: ['all', filterAudience] } })
+      }
+      const list = await prisma.announcement.findMany({
+        where: baseWhere,
+        orderBy: [{ pinned: 'desc' }, { publishedAt: 'desc' }],
+        take: 50,
+        include: { author: { select: { id: true, name: true, email: true } } },
+      })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/announcements error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/admin/announcements', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const { title, body, audience = 'all', pinned = false, startAt, endAt } = req.body || {}
+      if (!title || !body) return res.status(400).json({ error: 'Title and body are required' })
+      const normalizedAudience = ['all', 'buyers', 'sellers', 'drivers', 'admins'].includes(String(audience)) ? String(audience) : 'all'
+      const startDate = startAt ? new Date(startAt) : null
+      const endDate = endAt ? new Date(endAt) : null
+      if (startDate && Number.isNaN(startDate.getTime())) return res.status(400).json({ error: 'Invalid startAt' })
+      if (endDate && Number.isNaN(endDate.getTime())) return res.status(400).json({ error: 'Invalid endAt' })
+      const created = await prisma.announcement.create({
+        data: {
+          title: String(title).trim(),
+          body: String(body),
+          audience: normalizedAudience,
+          pinned: Boolean(pinned),
+          startAt: startDate,
+          endAt: endDate,
+          authorId: Number.isFinite(Number(req.user?.uid)) ? Number(req.user.uid) : null,
+        },
+      })
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/admin/announcements error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.put('/admin/announcements/:id', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing id' })
+      const { title, body, audience, pinned, startAt, endAt } = req.body || {}
+      const patch = {}
+      if (title !== undefined) patch.title = String(title).trim()
+      if (body !== undefined) patch.body = String(body)
+      if (audience !== undefined && ['all', 'buyers', 'sellers', 'drivers', 'admins'].includes(String(audience))) patch.audience = String(audience)
+      if (pinned !== undefined) patch.pinned = Boolean(pinned)
+      if (startAt !== undefined) {
+        const startDate = startAt ? new Date(startAt) : null
+        if (startDate && Number.isNaN(startDate.getTime())) return res.status(400).json({ error: 'Invalid startAt' })
+        patch.startAt = startDate
+      }
+      if (endAt !== undefined) {
+        const endDate = endAt ? new Date(endAt) : null
+        if (endDate && Number.isNaN(endDate.getTime())) return res.status(400).json({ error: 'Invalid endAt' })
+        patch.endAt = endDate
+      }
+      const updated = await prisma.announcement.update({ where: { id }, data: patch })
+      res.json(updated)
+    } catch (e) {
+      console.error('PUT /api/admin/announcements/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.delete('/admin/announcements/:id', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing id' })
+      await prisma.announcement.delete({ where: { id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/admin/announcements/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Support tickets ---------------------------------------------------------
+  function canViewTicket(user, ticket) {
+    if (!user || !ticket) return false
+    if (user.role === 'admin') return true
+    const uid = Number(user.uid)
+    if (!Number.isFinite(uid)) return false
+    if (ticket.requesterId === uid) return true
+    if (ticket.sellerId && ticket.sellerId === uid) return true
+    return false
+  }
+
+  const ticketInclude = {
+    requester: { select: { id: true, name: true, email: true, image: true } },
+    seller: { select: { id: true, name: true, email: true, image: true } },
+    order: { select: { id: true, status: true } },
+    orderItem: { select: { id: true, title: true } },
+    messages: {
+      orderBy: { createdAt: 'asc' },
+      include: { author: { select: { id: true, name: true, email: true, image: true } } },
+    },
+  }
+
+  router.get('/support/tickets', ensureAuth, async (req, res) => {
+    try {
+      const uid = Number(req.user.uid)
+      const role = req.user.role
+      const where = role === 'admin'
+        ? {}
+        : { OR: [{ requesterId: uid }, { sellerId: uid }] }
+      const list = await prisma.supportTicket.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        include: ticketInclude,
+      })
+      res.json(list)
+    } catch (e) {
+      console.error('GET /api/support/tickets error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/support/tickets/:id', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing ticket id' })
+      const ticket = await prisma.supportTicket.findUnique({ where: { id }, include: ticketInclude })
+      if (!ticket) return res.status(404).json({ error: 'Not found' })
+      if (!canViewTicket(req.user, ticket)) return res.status(403).json({ error: 'Forbidden' })
+      res.json(ticket)
+    } catch (e) {
+      console.error('GET /api/support/tickets/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/support/tickets', ensureAuth, async (req, res) => {
+    try {
+      const uid = Number(req.user.uid)
+      if (!Number.isFinite(uid)) return res.status(401).json({ error: 'Unauthorized' })
+      const { subject, body, type = 'general', orderId, orderItemId, priority = 'normal' } = req.body || {}
+      if (!subject) return res.status(400).json({ error: 'Subject required' })
+      if (!body) return res.status(400).json({ error: 'Message required' })
+      let sellerId = null
+      let order = null
+      if (orderId) {
+        order = await prisma.order.findUnique({ where: { id: orderId }, include: { items: true } })
+        if (order) {
+          sellerId = order.sellerId ?? null
+        }
+      }
+      if (!sellerId && orderItemId) {
+        const orderItem = await prisma.orderItem.findUnique({ where: { id: orderItemId }, include: { product: true } })
+        if (orderItem?.product?.ownerId) sellerId = orderItem.product.ownerId
+      }
+      const created = await prisma.supportTicket.create({
+        data: {
+          subject: String(subject).trim(),
+          type: ['general', 'order', 'service', 'billing'].includes(String(type)) ? String(type) : 'general',
+          priority: String(priority || 'normal'),
+          orderId: order?.id || (orderId || null),
+          orderItemId: orderItemId || null,
+          requesterId: uid,
+          sellerId,
+          messages: {
+            create: [{ body: String(body), authorId: uid }],
+          },
+        },
+        include: ticketInclude,
+      })
+      if (created.seller?.email) {
+        await sendMarketplaceEmail({
+          to: created.seller.email,
+          subject: 'New Hedgetech support ticket',
+          html: `<p>You have a new support ticket from ${created.requester?.name || created.requester?.email || 'a buyer'}.</p><p><strong>${created.subject}</strong></p><p>${body}</p>`,
+        })
+      }
+      res.status(201).json(created)
+    } catch (e) {
+      console.error('POST /api/support/tickets error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/support/tickets/:id/messages', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing ticket id' })
+      const ticket = await prisma.supportTicket.findUnique({ where: { id } })
+      if (!ticket) return res.status(404).json({ error: 'Not found' })
+      if (!canViewTicket(req.user, ticket)) return res.status(403).json({ error: 'Forbidden' })
+      const { body, attachments } = req.body || {}
+      if (!body) return res.status(400).json({ error: 'Message body required' })
+      const message = await prisma.supportMessage.create({
+        data: {
+          ticketId: id,
+          authorId: Number.isFinite(Number(req.user.uid)) ? Number(req.user.uid) : null,
+          body: String(body),
+          attachments: Array.isArray(attachments) ? attachments.map((item) => String(item)) : [],
+        },
+        include: { author: { select: { id: true, name: true, email: true, image: true } } },
+      })
+      await prisma.supportTicket.update({ where: { id }, data: { updatedAt: new Date(), status: ticket.status === 'closed' ? 'in_progress' : ticket.status } })
+      res.status(201).json(message)
+    } catch (e) {
+      console.error('POST /api/support/tickets/:id/messages error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/support/tickets/:id/status', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      const { status } = req.body || {}
+      if (!id) return res.status(400).json({ error: 'Missing ticket id' })
+      const ticket = await prisma.supportTicket.findUnique({ where: { id } })
+      if (!ticket) return res.status(404).json({ error: 'Not found' })
+      if (!canViewTicket(req.user, ticket)) return res.status(403).json({ error: 'Forbidden' })
+      const validStatuses = ['open', 'in_progress', 'resolved', 'closed']
+      if (!validStatuses.includes(String(status))) return res.status(400).json({ error: 'Invalid status' })
+      const updated = await prisma.supportTicket.update({ where: { id }, data: { status: String(status) }, include: ticketInclude })
+      res.json(updated)
+    } catch (e) {
+      console.error('POST /api/support/tickets/:id/status error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Refunds & disputes -------------------------------------------------------
+  router.post('/orders/:id/refund', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing order id' })
+      const uid = Number(req.user.uid)
+      if (!Number.isFinite(uid)) return res.status(401).json({ error: 'Unauthorized' })
+      const { orderItemId, amount, reason } = req.body || {}
+      if (!reason) return res.status(400).json({ error: 'Reason required' })
+      const order = await prisma.order.findUnique({ where: { id }, include: { items: true } })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      if (req.user.role !== 'admin' && order.buyerId !== uid) return res.status(403).json({ error: 'Forbidden' })
+      let sellerId = order.sellerId
+      if (!sellerId) {
+        const firstItem = order.items[0]
+        if (firstItem) {
+          const product = await prisma.product.findUnique({ where: { id: firstItem.productId } })
+          if (product?.ownerId) sellerId = product.ownerId
+        }
+      }
+      if (orderItemId) {
+        const match = order.items.find((item) => item.id === orderItemId)
+        if (!match) return res.status(400).json({ error: 'Order item not found on order' })
+      }
+      const refund = await prisma.refundRequest.create({
+        data: {
+          orderId: order.id,
+          orderItemId: orderItemId || null,
+          buyerId: order.buyerId ?? uid,
+          sellerId,
+          amount: amount != null ? Number(amount) : null,
+          reason: String(reason),
+        },
+        include: {
+          order: { select: { id: true, status: true, customerName: true } },
+          orderItem: { select: { id: true, title: true } },
+        },
+      })
+      if (sellerId) {
+        const seller = await prisma.user.findUnique({ where: { id: sellerId }, select: { email: true, name: true } })
+        if (seller?.email) {
+          await sendMarketplaceEmail({
+            to: seller.email,
+            subject: 'Refund request awaiting review',
+            html: `<p>A buyer requested a refund for order ${order.id}.</p><p>Reason: ${refund.reason}</p>`,
+          })
+        }
+      }
+      res.status(201).json(refund)
+    } catch (e) {
+      console.error('POST /api/orders/:id/refund error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/refunds', ensureAuth, async (req, res) => {
+    try {
+      const uid = Number(req.user.uid)
+      const role = req.user.role
+      const scope = String(req.query.scope || '').toLowerCase()
+      let where
+      if (role === 'admin' || scope === 'all') {
+        where = {}
+      } else if (scope === 'buyers' || scope === 'buyer') {
+        where = { buyerId: uid }
+      } else if (scope === 'sellers' || scope === 'seller') {
+        where = { sellerId: uid }
+      } else {
+        where = { OR: [{ buyerId: uid }, { sellerId: uid }] }
+      }
+      const refunds = await prisma.refundRequest.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          order: { select: { id: true, status: true, customerName: true } },
+          orderItem: { select: { id: true, title: true } },
+          buyer: { select: { id: true, name: true, email: true } },
+          seller: { select: { id: true, name: true, email: true } },
+        },
+      })
+      res.json(refunds)
+    } catch (e) {
+      console.error('GET /api/refunds error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/refunds/:id/review', ensureAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id || '')
+      if (!id) return res.status(400).json({ error: 'Missing refund id' })
+      const refund = await prisma.refundRequest.findUnique({ where: { id }, include: { order: true, buyer: true, seller: true } })
+      if (!refund) return res.status(404).json({ error: 'Not found' })
+      const uid = Number(req.user.uid)
+      if (req.user.role !== 'admin' && refund.sellerId && refund.sellerId !== uid) return res.status(403).json({ error: 'Forbidden' })
+      const { action, notes, amount } = req.body || {}
+      const normalizedAction = String(action || '').toLowerCase()
+      const allowed = ['accept', 'reject', 'refund']
+      if (!allowed.includes(normalizedAction)) return res.status(400).json({ error: 'Invalid action' })
+      let nextStatus = refund.status
+      if (normalizedAction === 'reject') nextStatus = 'rejected'
+      if (normalizedAction === 'accept') nextStatus = 'accepted'
+      if (normalizedAction === 'refund') nextStatus = 'refunded'
+      const patch = {
+        status: nextStatus,
+        resolution: notes ? String(notes) : refund.resolution,
+        amount: amount != null ? Number(amount) : refund.amount,
+      }
+      const updated = await prisma.refundRequest.update({ where: { id }, data: patch, include: {
+        order: true,
+        orderItem: { select: { id: true, title: true } },
+        buyer: { select: { email: true, name: true } },
+        seller: { select: { email: true, name: true } },
+      } })
+      if (updated.status === 'accepted' || updated.status === 'refunded') {
+        await prisma.order.update({ where: { id: updated.orderId }, data: { status: 'refunded' } })
+      }
+      if (updated.buyer?.email) {
+        await sendMarketplaceEmail({
+          to: updated.buyer.email,
+          subject: 'Refund request update',
+          html: `<p>Your refund request for order ${updated.orderId} is now ${updated.status}.</p>${updated.resolution ? `<p>${updated.resolution}</p>` : ''}`,
+        })
+      }
+      res.json(updated)
+    } catch (e) {
+      console.error('POST /api/refunds/:id/review error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })
@@ -1115,6 +2247,25 @@ export function createApiRouter() {
       res.json(order)
     } catch (e) {
       console.error('GET /api/orders/track error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/orders/pay-with-code', async (req, res) => {
+    try {
+      const { code, paymentMethod } = req.body || {}
+      const normalized = String(code || '').trim()
+      if (!normalized) return res.status(400).json({ error: 'Missing code' })
+      const order = await prisma.order.findFirst({ where: { accessCode: normalized } })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      if (!['pending', 'scheduled'].includes(order.status)) {
+        return res.status(400).json({ error: 'Order is already paid or closed' })
+      }
+      const updated = await prisma.order.update({ where: { id: order.id }, data: { status: 'paid' } })
+      // Future: persist payment intent / receipt. For now acknowledge request.
+      res.json({ id: updated.id, status: updated.status, paymentMethod: paymentMethod || 'card' })
+    } catch (e) {
+      console.error('POST /api/orders/pay-with-code error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })

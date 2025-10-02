@@ -161,7 +161,15 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
     setSaving(true)
     setError(null)
     try {
-      const ownerId = user?.email || (user as any)?.accountNo || 'guest'
+      const useApi = typeof window !== 'undefined' && (import.meta as any)?.env?.VITE_USE_API === 'true'
+      const userId = (user as any)?.id
+      let ownerId: number | string | undefined
+      if (useApi) {
+        const numericId = Number(userId)
+        ownerId = Number.isFinite(numericId) ? numericId : undefined
+      } else {
+        ownerId = user?.email || (user as any)?.accountNo || 'guest'
+      }
       const stockCount = Math.max(0, Number(form.stockCount) || 0)
       const serviceDurationMinutes = Math.max(15, Number(form.serviceDurationMinutes) || 60)
       const serviceDailyCapacity = Math.max(1, Number(form.serviceDailyCapacity) || 1)

@@ -15,7 +15,7 @@ export type Product = {
   barcode?: string
   description?: string
   images?: string[]
-  ownerId?: string
+  ownerId?: string | number | null
   categoryId?: string
   stockCount?: number
   serviceDurationMinutes?: number
@@ -44,7 +44,7 @@ export type Order = {
   items: OrderItem[]
   total: number
   createdAt: string
-  status: 'pending' | 'paid' | 'shipped' | 'completed' | 'cancelled'
+  status: 'pending' | 'scheduled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
   customerName?: string
   customerEmail?: string
   address?: string

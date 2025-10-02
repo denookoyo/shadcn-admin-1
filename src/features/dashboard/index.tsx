@@ -37,7 +37,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-import { db, type Product, type Order, type Category } from '@/lib/data'
+import { db, type Product, type Order, type Category, type Announcement, type AnnouncementAudience } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 
 function slugify(value: string) {
@@ -123,6 +123,7 @@ export default function Dashboard() {
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
 
   const [productDialogOpen, setProductDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -161,6 +162,24 @@ export default function Dashboard() {
     }
   }, [userId])
 
+  useEffect(() => {
+    let mounted = true
+    if (typeof db.listAnnouncements !== 'function') return () => { mounted = false }
+    ;(async () => {
+      try {
+        const role = (user as any)?.role as AnnouncementAudience | undefined
+        const scope: AnnouncementAudience = role && ['admins', 'sellers', 'buyers', 'drivers'].includes(role) ? role : 'sellers'
+        const list = (await db.listAnnouncements?.(scope)) ?? []
+        if (mounted) setAnnouncements(list)
+      } catch {
+        if (mounted) setAnnouncements([])
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [user])
+
   const myProducts = useMemo(() => {
     return products.filter((product: any) => {
       if (product?.ownerId != null) {
@@ -181,16 +200,21 @@ export default function Dashboard() {
   const groupedOrders = useMemo(() => {
     const groups: Record<Order['status'], Order[]> = {
       pending: [],
+      scheduled: [],
       paid: [],
       shipped: [],
       completed: [],
       cancelled: [],
+      refunded: [],
     }
     for (const order of orders) {
+      if (!groups[order.status]) groups[order.status as keyof typeof groups] = []
       groups[order.status]?.push(order)
     }
     return groups
   }, [orders])
+
+  const visibleAnnouncements = useMemo(() => announcements.slice(0, 3), [announcements])
 
   const totalRevenue = useMemo(
     () => orders.reduce((sum, order) => sum + order.total, 0),
@@ -375,6 +399,36 @@ export default function Dashboard() {
       </Header>
 
       <Main className='space-y-10'>
+        {visibleAnnouncements.length ? (
+          <section className='rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 shadow-sm'>
+            <div className='flex flex-wrap items-center justify-between gap-2'>
+              <div>
+                <div className='text-sm font-semibold text-emerald-900'>Marketplace announcements</div>
+                <p className='text-xs text-emerald-700'>Pinned messages from Hedgetech operations.</p>
+              </div>
+              <span className='text-xs text-emerald-700'>Stay aligned with policy updates.</span>
+            </div>
+            <ul className='mt-4 space-y-3'>
+              {visibleAnnouncements.map((announcement) => (
+                <li key={announcement.id} className='rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm'>
+                  <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <div>
+                      <div className='text-sm font-semibold text-slate-900'>{announcement.title}</div>
+                      <div className='text-xs text-slate-500'>
+                        {format(new Date(announcement.publishedAt), 'PP')}
+                        {announcement.audience !== 'all' ? ` • ${announcement.audience}` : ''}
+                      </div>
+                    </div>
+                    {announcement.pinned ? (
+                      <span className='rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700'>Pinned</span>
+                    ) : null}
+                  </div>
+                  <p className='mt-2 text-sm text-slate-600'>{announcement.body}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <section className='relative overflow-hidden rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-[#102534] via-[#0f766e] to-[#34d399] px-6 py-10 text-white shadow-lg md:px-10'>
           <div className='absolute -left-24 top-12 hidden h-80 w-80 rounded-full bg-emerald-500/30 blur-3xl md:block' />
           <div className='relative grid gap-10 lg:grid-cols-[1.4fr_1fr]'>
@@ -404,7 +458,7 @@ export default function Dashboard() {
             <div className='grid gap-3 sm:grid-cols-2'>
               <MetricCard icon={Store} label='Active listings' value={myProducts.length} help='Owned or managed offerings' accent='emerald' />
               <MetricCard icon={TrendingUp} label='Marketplace revenue' value={`A$${totalRevenue.toLocaleString()}`} help='Lifetime gross' accent='emerald' />
-              <MetricCard icon={Truck} label='Orders in motion' value={groupedOrders.shipped.length + groupedOrders.pending.length + groupedOrders.paid.length} help='Awaiting fulfilment or shipping' accent='amber' />
+              <MetricCard icon={Truck} label='Orders in motion' value={groupedOrders.shipped.length + groupedOrders.pending.length + groupedOrders.paid.length + groupedOrders.scheduled.length} help='Awaiting fulfilment or shipping' accent='amber' />
               <MetricCard icon={Users} label='Active sellers' value={uniqueSellers} help='Based on current listings' />
             </div>
           </div>

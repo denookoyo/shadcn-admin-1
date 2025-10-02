@@ -22,6 +22,14 @@ Quick links:
 - Seller cockpit: KPI overview, product manager, POS, fulfilment pipelines, CSV import
 - Auth with JWT cookie and Google Sign-In helper
 - Blog CRUD, reputation/reviews, AI product description generation via OpenAI
+- Chat-based AI concierge that recommends catalogue items, books services, creates orders, and issues payment links
+
+## AI Concierge
+
+- Frontend: `/marketplace/assistant` — conversational UI that keeps the full chat context as JSON and surfaces cart/orders/appointments in a live side panel.
+- Backend: `/api/assistant/chat` — Express endpoint that streams catalogue context into OpenAI and executes returned actions (cart staging, bookings, order creation, payment link generation).
+- Payments: `/marketplace/order/pay?code=...` pairs with `/api/orders/pay-with-code` so buyers can finalise pending orders using the access code shared by the assistant.
+- Requirements: set `OPENAI_API_KEY` and ensure products/services exist in the catalogue (falls back to demo seeds if empty).
 
 ## Tech Stack
 
@@ -43,7 +51,7 @@ Copy `.env` and set values for your environment. Required keys vary by feature. 
 - DATABASE_URL / POSTGRES_URL: Postgres connection URL
 - JWT_SECRET / NEXTAUTH_SECRET: JWT signing secret (cookies)
 - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID: Google OAuth Client ID
-- OPENAI_API_KEY: for AI description endpoint
+- OPENAI_API_KEY: required for the AI product description endpoint and the new sales assistant
 
 3) Database
 
@@ -94,6 +102,7 @@ Orders
 - GET /api/orders — list orders for current user
 - GET /api/orders/:id — order details (auth)
 - GET /api/orders/track — public tracking by ID & email
+- POST /api/orders/pay-with-code — mark an order as paid using an access code (guest checkout)
 - POST /api/orders/:id/* — status transitions (auth)
 
 Users & Reviews
@@ -110,6 +119,7 @@ Blog
 
 AI
 - POST /api/ai/description — generate marketing text; requires `OPENAI_API_KEY`
+- POST /api/assistant/chat — AI concierge for catalogue search, order creation, and scheduling (requires `OPENAI_API_KEY`)
 
 See docs/API.md for payloads and responses.
 

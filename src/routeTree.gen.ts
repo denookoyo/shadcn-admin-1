@@ -68,7 +68,9 @@ import { Route as MarketplaceLayoutListingsIndexImport } from './routes/marketpl
 import { Route as MarketplaceLayoutDashboardIndexImport } from './routes/marketplace/_layout/dashboard/index'
 import { Route as MarketplaceLayoutCheckoutIndexImport } from './routes/marketplace/_layout/checkout/index'
 import { Route as MarketplaceLayoutCartIndexImport } from './routes/marketplace/_layout/cart/index'
+import { Route as MarketplaceLayoutAssistantIndexImport } from './routes/marketplace/_layout/assistant/index'
 import { Route as MarketplaceLayoutOrderTrackImport } from './routes/marketplace/_layout/order/track'
+import { Route as MarketplaceLayoutOrderPayImport } from './routes/marketplace/_layout/order/pay'
 import { Route as MarketplaceLayoutOrderIdImport } from './routes/marketplace/_layout/order/$id'
 import { Route as MarketplaceLayoutDashboardSupportImport } from './routes/marketplace/_layout/dashboard/support'
 import { Route as MarketplaceLayoutDashboardReportsImport } from './routes/marketplace/_layout/dashboard/reports'
@@ -450,12 +452,25 @@ const MarketplaceLayoutCartIndexRoute = MarketplaceLayoutCartIndexImport.update(
   } as any,
 )
 
+const MarketplaceLayoutAssistantIndexRoute =
+  MarketplaceLayoutAssistantIndexImport.update({
+    id: '/assistant/',
+    path: '/assistant/',
+    getParentRoute: () => MarketplaceLayoutRoute,
+  } as any)
+
 const MarketplaceLayoutOrderTrackRoute =
   MarketplaceLayoutOrderTrackImport.update({
     id: '/order/track',
     path: '/order/track',
     getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
+
+const MarketplaceLayoutOrderPayRoute = MarketplaceLayoutOrderPayImport.update({
+  id: '/order/pay',
+  path: '/order/pay',
+  getParentRoute: () => MarketplaceLayoutRoute,
+} as any)
 
 const MarketplaceLayoutOrderIdRoute = MarketplaceLayoutOrderIdImport.update({
   id: '/order/$id',
@@ -999,11 +1014,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketplaceLayoutOrderIdImport
       parentRoute: typeof MarketplaceLayoutImport
     }
+    '/marketplace/_layout/order/pay': {
+      id: '/marketplace/_layout/order/pay'
+      path: '/order/pay'
+      fullPath: '/marketplace/order/pay'
+      preLoaderRoute: typeof MarketplaceLayoutOrderPayImport
+      parentRoute: typeof MarketplaceLayoutImport
+    }
     '/marketplace/_layout/order/track': {
       id: '/marketplace/_layout/order/track'
       path: '/order/track'
       fullPath: '/marketplace/order/track'
       preLoaderRoute: typeof MarketplaceLayoutOrderTrackImport
+      parentRoute: typeof MarketplaceLayoutImport
+    }
+    '/marketplace/_layout/assistant/': {
+      id: '/marketplace/_layout/assistant/'
+      path: '/assistant'
+      fullPath: '/marketplace/assistant'
+      preLoaderRoute: typeof MarketplaceLayoutAssistantIndexImport
       parentRoute: typeof MarketplaceLayoutImport
     }
     '/marketplace/_layout/cart/': {
@@ -1243,7 +1272,9 @@ interface MarketplaceLayoutRouteChildren {
   MarketplaceLayoutDashboardReportsRoute: typeof MarketplaceLayoutDashboardReportsRoute
   MarketplaceLayoutDashboardSupportRoute: typeof MarketplaceLayoutDashboardSupportRoute
   MarketplaceLayoutOrderIdRoute: typeof MarketplaceLayoutOrderIdRoute
+  MarketplaceLayoutOrderPayRoute: typeof MarketplaceLayoutOrderPayRoute
   MarketplaceLayoutOrderTrackRoute: typeof MarketplaceLayoutOrderTrackRoute
+  MarketplaceLayoutAssistantIndexRoute: typeof MarketplaceLayoutAssistantIndexRoute
   MarketplaceLayoutCartIndexRoute: typeof MarketplaceLayoutCartIndexRoute
   MarketplaceLayoutCheckoutIndexRoute: typeof MarketplaceLayoutCheckoutIndexRoute
   MarketplaceLayoutDashboardIndexRoute: typeof MarketplaceLayoutDashboardIndexRoute
@@ -1275,7 +1306,9 @@ const MarketplaceLayoutRouteChildren: MarketplaceLayoutRouteChildren = {
   MarketplaceLayoutDashboardSupportRoute:
     MarketplaceLayoutDashboardSupportRoute,
   MarketplaceLayoutOrderIdRoute: MarketplaceLayoutOrderIdRoute,
+  MarketplaceLayoutOrderPayRoute: MarketplaceLayoutOrderPayRoute,
   MarketplaceLayoutOrderTrackRoute: MarketplaceLayoutOrderTrackRoute,
+  MarketplaceLayoutAssistantIndexRoute: MarketplaceLayoutAssistantIndexRoute,
   MarketplaceLayoutCartIndexRoute: MarketplaceLayoutCartIndexRoute,
   MarketplaceLayoutCheckoutIndexRoute: MarketplaceLayoutCheckoutIndexRoute,
   MarketplaceLayoutDashboardIndexRoute: MarketplaceLayoutDashboardIndexRoute,
@@ -1376,7 +1409,9 @@ export interface FileRoutesByFullPath {
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/assistant': typeof MarketplaceLayoutAssistantIndexRoute
   '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
   '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
   '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
@@ -1448,7 +1483,9 @@ export interface FileRoutesByTo {
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/assistant': typeof MarketplaceLayoutAssistantIndexRoute
   '/marketplace/cart': typeof MarketplaceLayoutCartIndexRoute
   '/marketplace/checkout': typeof MarketplaceLayoutCheckoutIndexRoute
   '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
@@ -1527,7 +1564,9 @@ export interface FileRoutesById {
   '/marketplace/_layout/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/_layout/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/_layout/order/$id': typeof MarketplaceLayoutOrderIdRoute
+  '/marketplace/_layout/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/_layout/order/track': typeof MarketplaceLayoutOrderTrackRoute
+  '/marketplace/_layout/assistant/': typeof MarketplaceLayoutAssistantIndexRoute
   '/marketplace/_layout/cart/': typeof MarketplaceLayoutCartIndexRoute
   '/marketplace/_layout/checkout/': typeof MarketplaceLayoutCheckoutIndexRoute
   '/marketplace/_layout/dashboard/': typeof MarketplaceLayoutDashboardIndexRoute
@@ -1605,7 +1644,9 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/reports'
     | '/marketplace/dashboard/support'
     | '/marketplace/order/$id'
+    | '/marketplace/order/pay'
     | '/marketplace/order/track'
+    | '/marketplace/assistant'
     | '/marketplace/cart'
     | '/marketplace/checkout'
     | '/marketplace/dashboard'
@@ -1676,7 +1717,9 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/reports'
     | '/marketplace/dashboard/support'
     | '/marketplace/order/$id'
+    | '/marketplace/order/pay'
     | '/marketplace/order/track'
+    | '/marketplace/assistant'
     | '/marketplace/cart'
     | '/marketplace/checkout'
     | '/marketplace/dashboard'
@@ -1753,7 +1796,9 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/dashboard/reports'
     | '/marketplace/_layout/dashboard/support'
     | '/marketplace/_layout/order/$id'
+    | '/marketplace/_layout/order/pay'
     | '/marketplace/_layout/order/track'
+    | '/marketplace/_layout/assistant/'
     | '/marketplace/_layout/cart/'
     | '/marketplace/_layout/checkout/'
     | '/marketplace/_layout/dashboard/'
@@ -1958,7 +2003,9 @@ export const routeTree = rootRoute
         "/marketplace/_layout/dashboard/reports",
         "/marketplace/_layout/dashboard/support",
         "/marketplace/_layout/order/$id",
+        "/marketplace/_layout/order/pay",
         "/marketplace/_layout/order/track",
+        "/marketplace/_layout/assistant/",
         "/marketplace/_layout/cart/",
         "/marketplace/_layout/checkout/",
         "/marketplace/_layout/dashboard/",
@@ -2133,8 +2180,16 @@ export const routeTree = rootRoute
       "filePath": "marketplace/_layout/order/$id.tsx",
       "parent": "/marketplace/_layout"
     },
+    "/marketplace/_layout/order/pay": {
+      "filePath": "marketplace/_layout/order/pay.tsx",
+      "parent": "/marketplace/_layout"
+    },
     "/marketplace/_layout/order/track": {
       "filePath": "marketplace/_layout/order/track.tsx",
+      "parent": "/marketplace/_layout"
+    },
+    "/marketplace/_layout/assistant/": {
+      "filePath": "marketplace/_layout/assistant/index.tsx",
       "parent": "/marketplace/_layout"
     },
     "/marketplace/_layout/cart/": {
