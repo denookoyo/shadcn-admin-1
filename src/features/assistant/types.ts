@@ -71,6 +71,19 @@ export type AssistantMessage = {
   actions?: AssistantActionResult[]
   suggestions?: string[]
   fresh?: boolean
+  attachments?: Array<{
+    name: string
+    type: string
+    url?: string
+    size?: number
+  }>
+}
+
+export type AssistantAttachment = {
+  name: string
+  type: string
+  size: number
+  data: string
 }
 
 export type AssistantChatRequest = {
@@ -82,6 +95,7 @@ export type AssistantChatRequest = {
     email?: string
     phone?: string
   }
+  attachments?: AssistantAttachment[]
 }
 
 export type AssistantChatResponse = {

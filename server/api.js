@@ -1,5 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
+import pdfParse from 'pdf-parse'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
@@ -550,6 +551,13 @@ export function createApiRouter() {
     'budget',
   ]
 
+  const AssistantAttachmentSchema = z.object({
+    name: z.string().min(1).max(200),
+    type: z.string().min(1),
+    size: z.number().int().min(1).max(5 * 1024 * 1024),
+    data: z.string().min(1),
+  })
+
   const AssistantCartItemInputSchema = z.object({
     productId: z.string().min(1),
     quantity: z.number().int().min(1).max(99).default(1),
@@ -886,6 +894,7 @@ export function createApiRouter() {
         phone: z.string().optional(),
       })
       .optional(),
+    attachments: z.array(AssistantAttachmentSchema).max(3).optional(),
   })
 
   function cloneAssistantState(state) {
@@ -1490,10 +1499,41 @@ export function createApiRouter() {
         return res.status(400).json({ error: 'Invalid assistant payload', detail: parseResult.error.flatten() })
       }
 
-      const { message, conversation, state, customer } = parseResult.data
+      const { message, conversation, state, customer, attachments = [] } = parseResult.data
       const { list: catalog, map: catalogMap } = await loadAssistantCatalog({ limit: 20 })
       const buyerId = Number.isFinite(Number(req.user?.uid)) ? Number(req.user.uid) : null
       const sanitizedState = cloneAssistantState(state || {})
+
+      const attachmentSummaries = []
+      const attachmentImages = []
+
+      for (const attachment of attachments) {
+        try {
+          const mime = String(attachment.type || '').toLowerCase()
+          if (!mime) continue
+          if (mime.startsWith('image/')) {
+            const dataUrl = attachment.data.startsWith('data:')
+              ? attachment.data
+              : `data:${mime};base64,${attachment.data}`
+            attachmentImages.push({ name: attachment.name, dataUrl })
+            attachmentSummaries.push(`${attachment.name} (image, ${(attachment.size / 1024).toFixed(1)} kB)`)
+          } else if (mime === 'application/pdf') {
+            const buffer = Buffer.from(attachment.data, 'base64')
+            const parsed = await pdfParse(buffer)
+            const text = (parsed?.text || '').replace(/\s+/g, ' ').trim()
+            const truncated = text.slice(0, 4000)
+            attachmentSummaries.push(
+              `${attachment.name} (PDF extract): ${truncated || 'No textual content detected.'}`,
+            )
+          } else {
+            attachmentSummaries.push(
+              `${attachment.name} (${mime}) provided. Describe its key points in your reply if relevant.`,
+            )
+          }
+        } catch (err) {
+          attachmentSummaries.push(`${attachment.name}: Failed to process (${err?.message || 'unknown error'})`)
+        }
+      }
 
       const systemPrompt = `You are Hedgetech's AI commerce assistant helping buyers discover products and services, collect missing details, and trigger marketplace actions.
 Respond with valid JSON only. Never include markdown or plain text outside JSON. Stay friendly, concise, and human — imagine a knowledgeable retail concierge in Australia.
@@ -1507,9 +1547,9 @@ JSON response schema:
 
 Action types you can request:
 - recommend_products: suggest SKUs from the provided catalog. Include productId and optional reason/matchScore.
-- add_to_cart: stage one or more products with quantity and optional appointmentSlot for services.
+- add_to_cart: stage one or more products with quantity and optional appointmentSlot for services. Always use catalog productId and include quantity.
 - book_service: reserve a service slot (requires slot ISO timestamp from availability window).
-- create_order: when buyer is ready. Supply customer details (if known) and items or set useCart true to consume current cart.
+- create_order: when buyer is ready. Supply customer details (if known) and items or set useCart true to consume current cart. Provide productId and quantity per item.
 - generate_payment_link: provide when an order exists so the buyer can complete payment.
 - ask_information: request mandatory details (e.g., customer_email, address, service_time) you are missing.
 - clear_cart: remove staged items when buyer changes direction.
@@ -1522,7 +1562,8 @@ Rules:
 - When you create an order for goods that need shipping, make sure an address is collected.
 - When payment is outstanding after order creation, request generate_payment_link so the customer can pay.
 - Keep reply warm, factual, and helpful. Reference seller or service details when useful.
-- Respect prior conversation context supplied.`
+- Respect prior conversation context supplied.
+- Use attachment notes and images to inform your reply and actions.`
 
       const historyMessages = (conversation || [])
         .slice(-8)
@@ -1541,6 +1582,7 @@ Rules:
           pendingInfoRequests: sanitizedState.pendingInfoRequests || [],
         },
         catalog,
+        attachments: attachments.map((file) => ({ name: file.name, type: file.type, size: file.size })),
       }
 
       const userContent = [
@@ -1549,7 +1591,15 @@ Rules:
         '',
         'Assistant context JSON:',
         JSON.stringify(assistantContext, null, 2),
-      ].join('\n')
+        attachmentSummaries.length ? '' : null,
+        attachmentSummaries.length ? 'Attachment notes:' : null,
+        ...attachmentSummaries,
+      ].filter(Boolean).join('\n')
+
+      const userContentParts = [
+        { type: 'input_text', text: userContent },
+        ...attachmentImages.map((image) => ({ type: 'input_image', image_url: { url: image.dataUrl } })),
+      ]
 
       const body = {
         model: 'gpt-4o-mini',
@@ -1559,7 +1609,7 @@ Rules:
         messages: [
           { role: 'system', content: systemPrompt },
           ...historyMessages,
-          { role: 'user', content: userContent },
+          { role: 'user', content: userContentParts },
         ],
       }
 

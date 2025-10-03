@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
-import { Sparkles, ShoppingBag, Clock, CreditCard, AlertCircle, X } from 'lucide-react'
+import { Sparkles, ShoppingBag, Clock, CreditCard, AlertCircle, X, Paperclip, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -13,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import type {
   AssistantActionResult,
+  AssistantAttachment,
   AssistantChatRequest,
   AssistantMessage,
   AssistantState,
@@ -51,6 +53,43 @@ function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2)}`
 }
 
+const MAX_ATTACHMENTS = 3
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024 // 5 MB
+const ACCEPTED_FILE_TYPES = 'image/*,application/pdf'
+
+type PendingAttachment = {
+  id: string
+  name: string
+  type: string
+  size: number
+  data: string
+  previewUrl?: string
+}
+
+async function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result === 'string') {
+        const base64 = result.includes(',') ? result.split(',')[1] : result
+        resolve(base64)
+      } else {
+        reject(new Error('Unsupported file reader result'))
+      }
+    }
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function formatBytes(size: number) {
+  if (!Number.isFinite(size)) return '0 B'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} kB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 type SalesAssistantProps = {
   variant?: 'page' | 'modal'
   onClose?: () => void
@@ -58,6 +97,7 @@ type SalesAssistantProps = {
 
 export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProps) {
   const isModal = variant === 'modal'
+  const navigate = useNavigate()
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [state, setState] = useState<AssistantState>(defaultState)
   const [customer, setCustomer] = useState<{ name?: string; email?: string; phone?: string }>({})
@@ -68,6 +108,8 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
   const messagesRef = useRef<AssistantMessage[]>([])
   const stateRef = useRef(state)
   const timersRef = useRef<number[]>([])
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -130,8 +172,97 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
     return latest?.fields ?? []
   }, [state.pendingInfoRequests])
 
+  const handleActionResults = useCallback(async (actions?: AssistantActionResult[]) => {
+    if (!actions || !actions.length) return
+    let cartUpdated = false
+    for (const action of actions) {
+      if (action.status !== 'applied') continue
+      if (action.type === 'add_to_cart') {
+        const items = Array.isArray(action.items) ? action.items : []
+        for (const item of items) {
+          const productId = String(item.productId || '')
+          if (!productId) continue
+          const quantity = Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : 1
+          try {
+            await db.addToCart(productId, quantity)
+            cartUpdated = true
+          } catch (error) {
+            console.error('Failed to sync cart item from assistant', error)
+          }
+        }
+      }
+      if (action.type === 'book_service') {
+        toast.success('Service appointment captured. We will confirm availability shortly.')
+      }
+      if (action.type === 'generate_payment_link') {
+        toast.success('Payment link generated. Check the assistant message for details.')
+      }
+    }
+    if (cartUpdated) {
+      toast.success('Items added to your cart')
+      navigate({ to: '/marketplace/checkout' })
+    }
+  }, [navigate])
+
+  const handleAttachmentClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
+
+  const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (!files.length) return
+    const availableSlots = Math.max(0, MAX_ATTACHMENTS - pendingAttachments.length)
+    if (!availableSlots) {
+      toast.error(`You can attach up to ${MAX_ATTACHMENTS} files per message`)
+      event.target.value = ''
+      return
+    }
+    const selected = files.slice(0, availableSlots)
+    const processed: PendingAttachment[] = []
+    for (const file of selected) {
+      if (file.size > MAX_ATTACHMENT_SIZE) {
+        toast.error(`${file.name} is too large (max ${formatBytes(MAX_ATTACHMENT_SIZE)})`)
+        continue
+      }
+      try {
+        const data = await fileToBase64(file)
+        const mime = file.type || 'application/octet-stream'
+        const previewUrl = mime.startsWith('image/') || mime === 'application/pdf'
+          ? `data:${mime};base64,${data}`
+          : undefined
+        processed.push({
+          id: generateId('file'),
+          name: file.name,
+          type: mime,
+          size: file.size,
+          data,
+          previewUrl,
+        })
+      } catch (error) {
+        console.error('Failed to read attachment', error)
+        toast.error(`Could not attach ${file.name}`)
+      }
+    }
+    if (processed.length) {
+      setPendingAttachments((prev) => [...prev, ...processed])
+    }
+    event.target.value = ''
+  }
+
+  const removeAttachment = useCallback((id: string) => {
+    setPendingAttachments((prev) => prev.filter((item) => item.id !== id))
+  }, [])
+
   const mutation = useMutation({
-    mutationFn: async ({ text, userMessage }: { text: string; userMessage: AssistantMessage }) => {
+    mutationFn: async ({
+      text,
+      userMessage,
+      attachments,
+    }: {
+      text: string
+      userMessage: AssistantMessage
+      attachments?: AssistantAttachment[]
+    }) => {
       if (!db.salesAssistantChat) throw new Error('AI assistant is not available in local mode.')
       const history = messagesRef.current.slice(-29)
       const baseConversation = history.map((item) => ({
@@ -144,10 +275,11 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
         conversation: [...baseConversation, { role: userMessage.role, content: userMessage.content, createdAt: userMessage.createdAt }],
         state: stateRef.current,
         customer,
+        attachments,
       }
       return db.salesAssistantChat(payload)
     },
-    onSuccess: (response) => {
+    onSuccess: async (response) => {
       setUsage(response.usage ?? null)
       setState(response.state)
       const assistantMessage: AssistantMessage = {
@@ -165,6 +297,7 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
         timersRef.current = timersRef.current.filter((id) => id !== timer)
       }, 1600)
       timersRef.current.push(timer)
+      await handleActionResults(response.message.actions)
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Something went wrong'
@@ -173,23 +306,43 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
   })
 
   const handleSend = useCallback(async (value?: string) => {
-    const text = (value ?? input).trim()
-    if (!text) return
+    if (mutation.isPending) return
+    const rawText = (value ?? input).trim()
+    if (!rawText && pendingAttachments.length === 0) return
+    const text = rawText || 'Please review the attached files and advise next steps.'
+    const attachmentsMeta = pendingAttachments.map((item) => ({
+      name: item.name,
+      type: item.type,
+      size: item.size,
+      url: item.previewUrl,
+    }))
+    const payloadAttachments: AssistantAttachment[] = pendingAttachments.map((item) => ({
+      name: item.name,
+      type: item.type,
+      size: item.size,
+      data: item.data,
+    }))
     const userMessage: AssistantMessage = {
       id: generateId('user'),
       role: 'user',
       content: text,
       createdAt: new Date().toISOString(),
       fresh: false,
+      attachments: attachmentsMeta,
     }
     setMessages((prev) => [...prev, userMessage])
     setInput('')
+    const previousAttachments = pendingAttachments
+    setPendingAttachments([])
     try {
-      await mutation.mutateAsync({ text, userMessage })
+      await mutation.mutateAsync({ text, userMessage, attachments: payloadAttachments })
     } catch (e) {
       // handled in onError
+      if (previousAttachments.length) {
+        setPendingAttachments(previousAttachments)
+      }
     }
-  }, [input, mutation])
+  }, [input, mutation, pendingAttachments])
 
   const latestAssistant = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -274,6 +427,34 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
                 handleSend()
               }}
             >
+              {pendingAttachments.length ? (
+                <div className='space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs text-slate-600'>
+                  <div className='text-[11px] font-semibold uppercase text-muted-foreground'>Attachments</div>
+                  <div className='flex flex-col gap-2'>
+                    {pendingAttachments.map((file) => (
+                      <div key={file.id} className='flex items-center gap-3 rounded-md border border-slate-200 bg-white p-2 shadow-xs'>
+                        {file.type.startsWith('image/') ? (
+                          <img src={file.previewUrl} alt={file.name} className='h-10 w-10 rounded-sm object-cover' />
+                        ) : (
+                          <FileText className='h-5 w-5 text-slate-400' />
+                        )}
+                        <div className='flex-1'>
+                          <div className='font-medium text-slate-800'>{file.name}</div>
+                          <div className='text-[11px] text-muted-foreground'>{formatBytes(file.size)}</div>
+                        </div>
+                        <button
+                          type='button'
+                          className='rounded-full border border-slate-200 p-1 text-slate-400 transition hover:border-slate-300 hover:text-slate-600'
+                          onClick={() => removeAttachment(file.id)}
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className='h-3.5 w-3.5' />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <Textarea
                 placeholder='Ask about a product, describe what you need, or request an order...'
                 value={input}
@@ -286,7 +467,7 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
                 }}
                 className='min-h-[96px] resize-none'
               />
-              <div className='flex items-center justify-between gap-2'>
+              <div className='flex flex-wrap items-center justify-between gap-2'>
                 <div className='flex flex-wrap gap-2'>
                   {latestAssistant?.suggestions?.map((suggestion) => (
                     <Button key={suggestion} type='button' variant='outline' size='sm' onClick={() => handleSend(suggestion)}>
@@ -294,9 +475,22 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
                     </Button>
                   ))}
                 </div>
-                <Button type='submit' disabled={mutation.isPending}>
-                  {mutation.isPending ? 'Sending…' : 'Send'}
-                </Button>
+                <div className='flex items-center gap-2'>
+                  <Button type='button' variant='outline' size='icon' onClick={handleAttachmentClick} aria-label='Attach files'>
+                    <Paperclip className='h-4 w-4' />
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type='file'
+                    accept={ACCEPTED_FILE_TYPES}
+                    multiple
+                    onChange={handleFilesSelected}
+                    className='hidden'
+                  />
+                  <Button type='submit' disabled={mutation.isPending}>
+                    {mutation.isPending ? 'Sending…' : 'Send'}
+                  </Button>
+                </div>
               </div>
             </form>
             {usage ? (
@@ -357,6 +551,7 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
 function MessageBubble({ message }: { message: AssistantMessage }) {
   const isAssistant = message.role === 'assistant'
   const [displayText, setDisplayText] = useState(message.content)
+  const attachments = Array.isArray(message.attachments) ? message.attachments : []
 
   useEffect(() => {
     if (!isAssistant || message.fresh !== true) {
@@ -409,6 +604,48 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
             {displayText}
           </ReactMarkdown>
         </div>
+        {attachments.length ? (
+          <div className='mt-3 grid gap-2'>
+            {attachments.map((attachment, index) => {
+              const key = `${attachment.name || 'attachment'}-${index}`
+              const isImage = typeof attachment.type === 'string' && attachment.type.startsWith('image/')
+              const hasUrl = typeof attachment.url === 'string' && attachment.url.length > 0
+              if (isImage && hasUrl) {
+                return (
+                  <img
+                    key={key}
+                    src={attachment.url}
+                    alt={attachment.name || 'Attachment'}
+                    className='max-h-48 w-full rounded-lg border border-slate-200 object-cover'
+                    loading='lazy'
+                  />
+                )
+              }
+              if (hasUrl) {
+                return (
+                  <a
+                    key={key}
+                    href={attachment.url}
+                    download={attachment.name}
+                    className='inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 transition hover:border-slate-300 hover:bg-slate-100'
+                  >
+                    <FileText className='h-3.5 w-3.5 text-slate-500' />
+                    <span className='truncate'>{attachment.name || 'Attachment'}</span>
+                  </a>
+                )
+              }
+              return (
+                <div
+                  key={key}
+                  className='inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600'
+                >
+                  <FileText className='h-3.5 w-3.5 text-slate-500' />
+                  <span>{attachment.name || 'Attachment'}</span>
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
         {isAssistant && message.actions?.length ? (
           <div className='mt-3 space-y-3'>
             {message.actions.map((action, index) => (
