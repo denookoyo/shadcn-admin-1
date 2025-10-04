@@ -1166,9 +1166,10 @@ export function createApiRouter() {
     for (const [key, groupItems] of groups) {
       const sellerId = key === 'null' ? null : Number(key)
       const total = groupItems.reduce((sum, entry) => sum + Number(entry.price || 0) * Number(entry.quantity || 1), 0)
+      const normalizedBuyerId = typeof buyerId === 'number' && Number.isFinite(buyerId) ? buyerId : null
       const order = await prisma.order.create({
         data: {
-          buyerId: Number.isFinite(Number(buyerId)) ? Number(buyerId) : null,
+          buyerId: normalizedBuyerId,
           sellerId,
           total: Math.max(0, Math.round(total)),
           status: 'pending',
