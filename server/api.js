@@ -1588,8 +1588,8 @@ Rules:
       ].filter(Boolean).join('\n')
 
       const userContentParts = [
-        { type: 'input_text', text: userContent },
-        ...attachmentImages.map((image) => ({ type: 'input_image', image_url: { url: image.dataUrl } })),
+        { type: 'text', text: userContent },
+        ...attachmentImages.map((image) => ({ type: 'image_url', image_url: { url: image.dataUrl } })),
       ]
 
       const body = {
