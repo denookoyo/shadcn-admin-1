@@ -1,6 +1,5 @@
 import express from 'express'
 import { z } from 'zod'
-import pdfParse from 'pdf-parse'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
@@ -1508,30 +1507,22 @@ export function createApiRouter() {
       const attachmentImages = []
 
       for (const attachment of attachments) {
-        try {
-          const mime = String(attachment.type || '').toLowerCase()
-          if (!mime) continue
-          if (mime.startsWith('image/')) {
-            const dataUrl = attachment.data.startsWith('data:')
-              ? attachment.data
-              : `data:${mime};base64,${attachment.data}`
-            attachmentImages.push({ name: attachment.name, dataUrl })
-            attachmentSummaries.push(`${attachment.name} (image, ${(attachment.size / 1024).toFixed(1)} kB)`)
-          } else if (mime === 'application/pdf') {
-            const buffer = Buffer.from(attachment.data, 'base64')
-            const parsed = await pdfParse(buffer)
-            const text = (parsed?.text || '').replace(/\s+/g, ' ').trim()
-            const truncated = text.slice(0, 4000)
-            attachmentSummaries.push(
-              `${attachment.name} (PDF extract): ${truncated || 'No textual content detected.'}`,
-            )
-          } else {
-            attachmentSummaries.push(
-              `${attachment.name} (${mime}) provided. Describe its key points in your reply if relevant.`,
-            )
-          }
-        } catch (err) {
-          attachmentSummaries.push(`${attachment.name}: Failed to process (${err?.message || 'unknown error'})`)
+        const mime = String(attachment.type || '').toLowerCase()
+        if (!mime) continue
+        if (mime.startsWith('image/')) {
+          const dataUrl = attachment.data.startsWith('data:')
+            ? attachment.data
+            : `data:${mime};base64,${attachment.data}`
+          attachmentImages.push({ name: attachment.name, dataUrl })
+          attachmentSummaries.push(`${attachment.name} (image, ${(attachment.size / 1024).toFixed(1)} kB)`)
+        } else if (mime === 'application/pdf') {
+          attachmentSummaries.push(
+            `${attachment.name} (PDF, ${(attachment.size / 1024).toFixed(1)} kB). Summarise the likely requirements based on the buyer's request and clarify any specifics in your reply.`,
+          )
+        } else {
+          attachmentSummaries.push(
+            `${attachment.name} (${mime}) provided. Describe its key points in your reply if relevant.`,
+          )
         }
       }
 
