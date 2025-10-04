@@ -161,15 +161,12 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
     setSaving(true)
     setError(null)
     try {
-      const useApi = typeof window !== 'undefined' && (import.meta as any)?.env?.VITE_USE_API === 'true'
       const userId = (user as any)?.id
-      let ownerId: number | string | undefined
-      if (useApi) {
+      const resolvedOwnerId = (() => {
         const numericId = Number(userId)
-        ownerId = Number.isFinite(numericId) ? numericId : undefined
-      } else {
-        ownerId = user?.email || (user as any)?.accountNo || 'guest'
-      }
+        if (Number.isFinite(numericId) && numericId > 0) return numericId
+        return undefined
+      })()
       const stockCount = Math.max(0, Number(form.stockCount) || 0)
       const serviceDurationMinutes = Math.max(15, Number(form.serviceDurationMinutes) || 60)
       const serviceDailyCapacity = Math.max(1, Number(form.serviceDailyCapacity) || 1)
@@ -186,7 +183,6 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         barcode: form.barcode?.trim() || undefined,
         description: form.description.trim() || undefined,
         images: form.gallery.length ? form.gallery.map(ensureAbsoluteUrl) : undefined,
-        ownerId,
         categoryId: product?.categoryId,
         stockCount,
         serviceOpenDays: isService ? form.serviceOpenDays : [],
@@ -194,6 +190,10 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         serviceCloseTime: isService ? serviceCloseTime : undefined,
         serviceDurationMinutes: isService ? serviceDurationMinutes : undefined,
         serviceDailyCapacity: isService ? serviceDailyCapacity : undefined,
+      }
+
+      if (resolvedOwnerId !== undefined) {
+        ;(payload as any).ownerId = resolvedOwnerId
       }
 
       if (!payload.title) throw new Error('Title is required')
