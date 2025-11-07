@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Calendar } from '@/components/ui/calendar'
 import { db } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/order/$id')({
   component: ShopOrderDetail,
@@ -45,8 +46,20 @@ function ShopOrderDetail() {
     }
   }, [data])
 
-  if (error) return <div className='mx-auto max-w-5xl px-4 py-8 text-sm text-red-600'>Error: {error}</div>
-  if (!data) return <div className='mx-auto max-w-5xl px-4 py-8 text-sm text-gray-500'>Loading order…</div>
+  if (error) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-red-600' topSpacing='md' bottomSpacing='md'>
+        Error: {error}
+      </MarketplacePageShell>
+    )
+  }
+  if (!data) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading order…
+      </MarketplacePageShell>
+    )
+  }
 
   const isService = (item: any) => item.product?.type === 'service'
   const hasService = (data.items || []).some((it: any) => isService(it))
@@ -65,7 +78,7 @@ function ShopOrderDetail() {
   }
 
   return (
-    <div className='mx-auto max-w-5xl px-4 py-8'>
+    <MarketplacePageShell width='default'>
       <div className='mb-2 text-sm'><Link to='/marketplace/dashboard/orders' className='underline'>Back to My Shop Orders</Link></div>
       <h1 className='text-2xl font-bold'>Order #{String(data.id).slice(0, 6)}</h1>
       <div className='mt-2 text-sm text-gray-600'>Status: <span className='capitalize font-semibold'>{data.status}</span></div>
@@ -198,6 +211,6 @@ function ShopOrderDetail() {
           ) : null}
         </div>
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }

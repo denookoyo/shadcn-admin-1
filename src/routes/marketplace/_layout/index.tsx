@@ -5,6 +5,7 @@ import { imageFor } from '@/features/marketplace/helpers'
 import { SafeImg } from '@/components/safe-img'
 import { db, type Category, type Product } from '@/lib/data'
 import { ChatLauncher } from '@/features/assistant/chat-launcher'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type QuickAction = {
   icon: LucideIcon
@@ -206,7 +207,7 @@ function MarketplaceHome() {
   const heroShowcase = products[0]
 
   return (
-    <div className='mx-auto max-w-7xl space-y-16 px-4 pb-16 pt-8'>
+    <MarketplacePageShell width='xl' className='space-y-16 pb-16 pt-8'>
       <section className='relative overflow-hidden rounded-3xl border border-emerald-100/40 bg-gradient-to-br from-[#102534] via-[#0f766e] to-[#34d399] px-6 py-10 text-white shadow-lg md:px-12 md:py-16'>
         <div className='absolute -left-24 top-10 hidden h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl md:block' />
         <div className='relative grid gap-12 lg:grid-cols-[1.2fr_1fr]'>
@@ -369,7 +370,7 @@ function MarketplaceHome() {
         </div>
       </section>
       <ChatLauncher />
-    </div>
+    </MarketplacePageShell>
   )
 }
 

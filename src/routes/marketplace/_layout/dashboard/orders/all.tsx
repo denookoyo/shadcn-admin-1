@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { db } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type AllOrder = any
 
@@ -25,10 +26,16 @@ function AllOrdersPage() {
     return () => { mounted = false }
   }, [])
 
-  if (loading) return <div className='mx-auto max-w-5xl px-4 py-8 text-sm text-gray-500'>Loading all orders…</div>
+  if (loading) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading all orders…
+      </MarketplacePageShell>
+    )
+  }
 
   return (
-    <div className='mx-auto max-w-5xl px-4 py-8'>
+    <MarketplacePageShell width='default'>
       <h1 className='text-2xl font-bold'>All Orders</h1>
       <div className='mt-4 w-full overflow-x-auto rounded-2xl border'>
         <table className='w-full text-sm'>
@@ -158,11 +165,10 @@ function AllOrdersPage() {
           </tbody>
         </table>
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/orders/all')({
   component: AllOrdersPage,
 })
-

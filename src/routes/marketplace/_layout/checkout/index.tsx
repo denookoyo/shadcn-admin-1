@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function CheckoutPage() {
   const { user } = useAuthStore((s) => s.auth)
@@ -89,7 +90,7 @@ function CheckoutPage() {
 
   if (orderId) {
     return (
-      <div className='mx-auto max-w-3xl space-y-6 px-4 py-12 text-center'>
+      <MarketplacePageShell width='narrow' className='space-y-6 text-center' topSpacing='md' bottomSpacing='md'>
         <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
           Checkout complete
         </div>
@@ -115,12 +116,12 @@ function CheckoutPage() {
             <Button onClick={() => router.navigate({ to: '/marketplace/dashboard' })} className='rounded-full px-4 py-2'>Go to dashboard</Button>
           ) : null}
         </div>
-      </div>
+      </MarketplacePageShell>
     )
   }
 
   return (
-    <div className='mx-auto max-w-6xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='wide' className='space-y-8'>
       <header className='rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm'>
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
@@ -247,7 +248,7 @@ function CheckoutPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { PackageCheck, PackageSearch, Clock3, Truck } from 'lucide-react'
 import { db, type Order } from '@/lib/data'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/my-orders')({
   component: MyOrders,
@@ -70,10 +71,16 @@ function MyOrders() {
     [orders]
   )
 
-  if (loading) return <div className='mx-auto max-w-5xl px-4 py-12 text-sm text-slate-500'>Loading orders…</div>
+  if (loading) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading orders…
+      </MarketplacePageShell>
+    )
+  }
 
   return (
-    <div className='mx-auto max-w-5xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-8'>
       <header className='rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm'>
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
@@ -193,6 +200,6 @@ function MyOrders() {
           ))
         )}
       </Section>
-    </div>
+    </MarketplacePageShell>
   )
 }

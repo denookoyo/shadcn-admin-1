@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useUiStore } from '@/stores/uiStore'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; type?: Product['type'] }
 
@@ -158,7 +159,13 @@ function PosPage() {
   }
 
   return (
-    <div className={hideChrome ? 'px-4 py-4' : 'mx-auto max-w-7xl px-4 py-6'}>
+    <MarketplacePageShell
+      width='xl'
+      padded={!hideChrome}
+      topSpacing='sm'
+      bottomSpacing='sm'
+      className={hideChrome ? 'px-4 py-4' : 'space-y-4'}
+    >
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Point of Sale</h1>
         <div className='flex items-center gap-2'>
@@ -346,7 +353,7 @@ function PosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

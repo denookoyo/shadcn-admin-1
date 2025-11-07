@@ -16,6 +16,7 @@ function imageForServer(query, w = 640, h = 640) {
 export function createApiRouter() {
   const router = express.Router()
   const prisma = getPrisma()
+  const externalApiKey = (process.env.EXTERNAL_PRODUCTS_API_KEY || '').trim()
   // Compute composite rating from average order reviews and negative reports
   function compositeRating(baseAvg = 5, negCount = 0) {
     const avg = Number.isFinite(baseAvg) && baseAvg > 0 ? baseAvg : 5
@@ -387,49 +388,83 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/products', async (_req, res) => {
-    try {
-      const products = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })
-      const ownerIds = [...new Set(products.map((p) => p.ownerId).filter((v) => v != null))]
-      let ownersMap = new Map()
-      let repMap = new Map()
-      let avgMap = new Map()
-      if (ownerIds.length > 0) {
-        const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true, image: true } })
-        ownersMap = new Map(owners.map((u) => [u.id, u]))
-        const reps = await prisma.userReputation.findMany({ where: { userId: { in: ownerIds } } })
-        repMap = new Map(reps.map((r) => [r.userId, r]))
-        try {
-          if (prisma?.orderReview?.groupBy) {
-            const avgs = await prisma.orderReview.groupBy({ by: ['sellerId'], where: { sellerId: { in: ownerIds } }, _avg: { rating: true } })
-            avgMap = new Map(avgs.map((a) => [a.sellerId, a._avg.rating || 0]))
-          } else if (prisma?.orderReview?.aggregate) {
-            const avgs = await Promise.all(
-              ownerIds.map(async (sellerId) => {
-                const r = await prisma.orderReview.aggregate({ where: { sellerId }, _avg: { rating: true } })
-                return { sellerId, _avg: { rating: r._avg?.rating || 0 } }
-              })
-            )
-            avgMap = new Map(avgs.map((a) => [a.sellerId, a._avg.rating || 0]))
-          }
-        } catch (_e) {
-          // ignore average rating errors; continue without ownerAvgRating
-          avgMap = new Map()
+  async function fetchProductsWithMeta({ limit } = {}) {
+    const take = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.min(Number(limit), 100) : undefined
+    const products = await prisma.product.findMany({ orderBy: { createdAt: 'desc' }, take })
+    const ownerIds = [...new Set(products.map((p) => p.ownerId).filter((v) => v != null))]
+    let ownersMap = new Map()
+    let repMap = new Map()
+    let avgMap = new Map()
+    if (ownerIds.length > 0) {
+      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true, image: true } })
+      ownersMap = new Map(owners.map((u) => [u.id, u]))
+      const reps = await prisma.userReputation.findMany({ where: { userId: { in: ownerIds } } })
+      repMap = new Map(reps.map((r) => [r.userId, r]))
+      try {
+        if (prisma?.orderReview?.groupBy) {
+          const avgs = await prisma.orderReview.groupBy({ by: ['sellerId'], where: { sellerId: { in: ownerIds } }, _avg: { rating: true } })
+          avgMap = new Map(avgs.map((a) => [a.sellerId, a._avg.rating || 0]))
+        } else if (prisma?.orderReview?.aggregate) {
+          const avgs = await Promise.all(
+            ownerIds.map(async (sellerId) => {
+              const r = await prisma.orderReview.aggregate({ where: { sellerId }, _avg: { rating: true } })
+              return { sellerId, _avg: { rating: r._avg?.rating || 0 } }
+            })
+          )
+          avgMap = new Map(avgs.map((a) => [a.sellerId, a._avg.rating || 0]))
         }
+      } catch (_e) {
+        avgMap = new Map()
       }
-      const enriched = products.map((p) => {
-        const owner = ownersMap.get(p.ownerId)
-        const rep = repMap.get(p.ownerId)
-        const ownerName = owner?.name || (owner?.email ? owner.email.split('@')[0] : undefined)
-        const ownerImage = owner?.image || null
-        const ownerAvgRating = avgMap.get(p.ownerId) || null
-        const negCount = rep?.negativeCount || 0
-        const ownerRating = compositeRating(ownerAvgRating ?? 5, negCount)
-        return { ...p, ownerName, ownerImage, ownerRating, ownerAvgRating, ownerNegativeCount: negCount }
-      })
+    }
+    return products.map((p) => {
+      const owner = ownersMap.get(p.ownerId)
+      const rep = repMap.get(p.ownerId)
+      const ownerName = owner?.name || (owner?.email ? owner.email.split('@')[0] : undefined)
+      const ownerImage = owner?.image || null
+      const ownerAvgRating = avgMap.get(p.ownerId) || null
+      const negCount = rep?.negativeCount || 0
+      const ownerRating = compositeRating(ownerAvgRating ?? 5, negCount)
+      return { ...p, ownerName, ownerImage, ownerRating, ownerAvgRating, ownerNegativeCount: negCount }
+    })
+  }
+
+  function sanitiseProductForExternal(product) {
+    const image = product.img || imageForServer(product.title, 640, 640)
+    const gallery = Array.isArray(product.images) ? product.images.filter(Boolean) : []
+    const tags = Array.isArray(product.tags) ? product.tags.filter(Boolean) : []
+    const rating = Number.isFinite(product.ownerRating) ? product.ownerRating : product.rating ?? null
+    return {
+      id: product.id,
+      slug: product.slug,
+      title: product.title,
+      description: product.description,
+      price: Number(product.price) || 0,
+      type: product.type,
+      image,
+      images: gallery,
+      seller: product.ownerName || product.seller || 'Marketplace seller',
+      rating,
+      tags,
+      owner: product.ownerName
+        ? { name: product.ownerName, image: product.ownerImage || null }
+        : null,
+      updatedAt: product.updatedAt?.toISOString?.() || null,
+    }
+  }
+
+  function requireExternalApiKey(req, res, next) {
+    if (!externalApiKey) return res.status(503).json({ error: 'External API disabled' })
+    const provided = String(req.get('x-api-key') || req.query.apiKey || req.query.api_key || '').trim()
+    if (!provided || provided !== externalApiKey) return res.status(401).json({ error: 'Invalid API key' })
+    return next()
+  }
+
+  router.get('/products', async (req, res) => {
+    try {
+      const enriched = await fetchProductsWithMeta({ limit: req.query.limit })
       res.json(enriched)
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.error('GET /api/products error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
@@ -445,6 +480,41 @@ export function createApiRouter() {
       res.json(p)
     } catch (e) {
       console.error('GET /api/products/barcode/:code error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/products', requireExternalApiKey, async (req, res) => {
+    try {
+      const enriched = await fetchProductsWithMeta({ limit: req.query.limit })
+      const payload = enriched.map(sanitiseProductForExternal)
+      res.json({ products: payload })
+    } catch (e) {
+      console.error('GET /api/external/products error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/products/:id', requireExternalApiKey, async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing product id' })
+      const enriched = await fetchProductsWithMeta()
+      const match = enriched.find((item) => item.id === id || item.slug === id)
+      if (!match) return res.status(404).json({ error: 'Not found' })
+      res.json({ product: sanitiseProductForExternal(match) })
+    } catch (e) {
+      console.error('GET /api/external/products/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/categories', requireExternalApiKey, async (_req, res) => {
+    try {
+      const categories = await prisma.category.findMany({ orderBy: { name: 'asc' }, select: { name: true } })
+      res.json({ categories: categories.map((item) => item.name).filter(Boolean) })
+    } catch (e) {
+      console.error('GET /api/external/categories error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })
@@ -918,6 +988,108 @@ export function createApiRouter() {
     return `/marketplace/order/${encodeURIComponent(order.id)}`
   }
 
+  const MARKETPLACE_BASE_URL = (() => {
+    const candidates = [
+      process.env.PUBLIC_MARKETPLACE_URL,
+      process.env.MARKETPLACE_BASE_URL,
+      process.env.MARKETPLACE_URL,
+      process.env.APP_BASE_URL,
+      process.env.APP_URL,
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.SITE_URL,
+      process.env.VITE_SITE_URL,
+      process.env.VERCEL_PROJECT_PRODUCTION_URL,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    ].filter(Boolean)
+    for (const raw of candidates) {
+      const normalized = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`
+      try {
+        const url = new URL(normalized)
+        return url.origin
+      } catch {}
+    }
+    return null
+  })()
+
+  function resolveMarketplaceUrl(path) {
+    if (!path) return null
+    if (path.startsWith('http://') || path.startsWith('https://')) return path
+    if (!MARKETPLACE_BASE_URL) return path
+    try {
+      return new URL(path, MARKETPLACE_BASE_URL).toString()
+    } catch {
+      return path
+    }
+  }
+
+  const MARKETPLACE_CURRENCY = process.env.MARKETPLACE_CURRENCY || 'AUD'
+  const MARKETPLACE_LOCALE = process.env.MARKETPLACE_LOCALE || 'en-AU'
+  const currencyFormatter = (() => {
+    try {
+      return new Intl.NumberFormat(MARKETPLACE_LOCALE, { style: 'currency', currency: MARKETPLACE_CURRENCY })
+    } catch {
+      return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
+    }
+  })()
+
+  function formatCurrency(amount) {
+    const value = Number(amount)
+    if (!Number.isFinite(value)) return ''
+    try {
+      return currencyFormatter.format(value)
+    } catch {
+      return `$${value.toFixed(2)}`
+    }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
+  async function sendAssistantPaymentEmail({ order, to, paymentLink, customerName }) {
+    if (!order || !to || !paymentLink) return
+    const paymentUrl = resolveMarketplaceUrl(paymentLink)
+    const total = formatCurrency(order.total)
+    const safeName = customerName ? escapeHtml(customerName) : null
+    const safeOrderId = escapeHtml(order.id)
+    const prettyItems = Array.isArray(order.items)
+      ? order.items.map((item) => {
+          const title = escapeHtml(item.title || 'Item')
+          const quantity = Number(item.quantity) || 1
+          const lineTotal = formatCurrency((Number(item.price) || 0) * quantity)
+          return `<li><strong>${title}</strong> × ${quantity}${lineTotal ? ` — ${lineTotal}` : ''}</li>`
+        }).join('')
+      : ''
+    const itemsSection = prettyItems ? `<ul>${prettyItems}</ul>` : ''
+    const paymentLinkHtml = escapeHtml(paymentUrl || paymentLink)
+    const intro = safeName ? `<p>Hi ${safeName},</p>` : ''
+    const totalLine = total ? ` totaling ${total}` : ''
+    const html = `
+      ${intro}
+      <p>Thanks for shopping with Hedgetech. We've placed order <strong>${safeOrderId}</strong>${totalLine}.</p>
+      <p>Complete payment using the secure link below:</p>
+      <p style="margin: 24px 0;"><a href="${paymentLinkHtml}" style="background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;">Pay for your order</a></p>
+      ${itemsSection}
+      <p>If the button doesn't work, copy and paste this link into your browser:</p>
+      <p><a href="${paymentLinkHtml}">${paymentLinkHtml}</a></p>
+      <p>Need help? Reply to this email and our team will assist.</p>
+    `
+    try {
+      await sendMarketplaceEmail({
+        to,
+        subject: `Complete your Hedgetech order ${order.id}`,
+        html,
+      })
+    } catch (err) {
+      console.error('Failed to send assistant payment email:', err)
+    }
+  }
+
   const assistantFallbackCatalog = [
     {
       id: 'demo-anc-headphones',
@@ -1215,6 +1387,9 @@ export function createApiRouter() {
     if (!Array.isArray(nextState.appointments)) nextState.appointments = []
     if (!Array.isArray(nextState.pendingInfoRequests)) nextState.pendingInfoRequests = []
 
+    const paymentEmailQueue = []
+    const paymentEmailOrderIds = new Set()
+
     const catalogEntries = Array.from(catalogMap.values())
     const catalogSlugMap = new Map()
     const catalogIdLowerMap = new Map()
@@ -1443,6 +1618,17 @@ export function createApiRouter() {
               accessCode: order.accessCode || null,
               createdAt: order.createdAt?.toISOString?.() || new Date().toISOString(),
             })
+            const paymentLink = buildAssistantPaymentLink(order)
+            const email = order.customerEmail || customer?.email || null
+            if (email && paymentLink && !paymentEmailOrderIds.has(order.id)) {
+              paymentEmailQueue.push({
+                order,
+                to: email,
+                paymentLink,
+                customerName: action.customerName || order.customerName || customer?.name || null,
+              })
+              paymentEmailOrderIds.add(order.id)
+            }
           }
           nextState.cart = []
           nextState.pendingInfoRequests = []
@@ -1469,6 +1655,21 @@ export function createApiRouter() {
             if (order?.accessCode) orderSummary.paymentLink = buildAssistantPaymentLink(order)
           }
           results.push({ ...action, status: 'applied', paymentLink: orderSummary.paymentLink, orderId: orderSummary.id })
+          if (!paymentEmailOrderIds.has(orderSummary.id) && orderSummary.paymentLink) {
+            const order = await prisma.order.findUnique({ where: { id: orderSummary.id }, include: { items: true } })
+            if (order) {
+              const email = order.customerEmail || customer?.email || null
+              if (email) {
+                paymentEmailQueue.push({
+                  order,
+                  to: email,
+                  paymentLink: orderSummary.paymentLink,
+                  customerName: order.customerName || customer?.name || null,
+                })
+                paymentEmailOrderIds.add(orderSummary.id)
+              }
+            }
+          }
         } else if (action.type === 'ask_information') {
           nextState.pendingInfoRequests.push({ fields: action.fields, reason: action.reason })
           results.push({ ...action, status: 'applied' })
@@ -1484,6 +1685,10 @@ export function createApiRouter() {
       } catch (err) {
         results.push({ ...action, status: 'error', error: err?.message || 'Unknown error' })
       }
+    }
+
+    if (paymentEmailQueue.length) {
+      await Promise.all(paymentEmailQueue.map((job) => sendAssistantPaymentEmail(job)))
     }
 
     return { state: nextState, results, createdOrders }
@@ -1553,6 +1758,7 @@ Rules:
 - Services require appointmentSlot aligned with availability. Use ISO strings from availability data.
 - When you create an order for goods that need shipping, make sure an address is collected.
 - When payment is outstanding after order creation, request generate_payment_link so the customer can pay.
+- The moment the buyer clearly confirms they want to place an order, immediately issue create_order (prefer useCart: true) with any known customer_name/email/phone and follow it with generate_payment_link. Do not ask the buyer to check out manually once you have their go-ahead.
 - Keep reply warm, factual, and helpful. Reference seller or service details when useful.
 - Respect prior conversation context supplied.
 - Use attachment notes and images to inform your reply and actions.`

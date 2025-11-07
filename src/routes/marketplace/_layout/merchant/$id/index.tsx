@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Star, ShieldCheck, MessageCircle } from 'lucide-react'
 import { db } from '@/lib/data'
 import { imageFor } from '@/features/marketplace/helpers'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type ReviewBundle = {
   avg: number
@@ -88,16 +89,34 @@ function MerchantPage() {
 
   const avgText = useMemo(() => (reviews?.avg ? reviews.avg.toFixed(1) : '—'), [reviews?.avg])
 
-  if (!Number.isFinite(sellerId)) return <div className='mx-auto max-w-5xl px-4 py-12 text-sm text-red-600'>Invalid seller id.</div>
-  if (loading) return <div className='mx-auto max-w-5xl px-4 py-12 text-sm text-slate-500'>Loading merchant…</div>
-  if (!user) return <div className='mx-auto max-w-5xl px-4 py-12 text-sm text-slate-500'>Merchant not found.</div>
+  if (!Number.isFinite(sellerId)) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-red-600' topSpacing='md' bottomSpacing='md'>
+        Invalid seller id.
+      </MarketplacePageShell>
+    )
+  }
+  if (loading) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading merchant…
+      </MarketplacePageShell>
+    )
+  }
+  if (!user) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Merchant not found.
+      </MarketplacePageShell>
+    )
+  }
 
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Merchant')
   const avatar = user?.image || imageFor(displayName, 200, 200)
   const rating = (user as any)?.rating ?? reviews?.avg ?? 0
 
   return (
-    <div className='mx-auto max-w-5xl space-y-10 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-10'>
       <div className='flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500'>
         <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>← Back to listings</Link>
         <span>Seller ID: {sellerId}</span>
@@ -198,7 +217,7 @@ function MerchantPage() {
           Hedgetech Marketplace syncs seller credentials and compliance checks automatically once platform integrations are enabled.
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

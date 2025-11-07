@@ -5,6 +5,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { useAuthStore } from '@/stores/authStore'
 import { db, type RefundRequest } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/order/$id')({
   component: OrderDetail,
@@ -13,28 +14,91 @@ export const Route = createFileRoute('/marketplace/_layout/order/$id')({
 function OrderDetail() {
   const { id } = useParams({ from: '/marketplace/_layout/order/$id' })
   const me = useAuthStore((s) => s.auth.user as any | null)
+  const namespace = me?.email || (me as any)?.accountNo || 'guest'
+  const isApiEnabled = typeof window !== 'undefined' && (import.meta as any)?.env?.VITE_USE_API === 'true'
   const [data, setData] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<number | null>(null)
   const [working, setWorking] = useState(false)
+  const [localFallback, setLocalFallback] = useState(false)
 
   useEffect(() => {
     let mounted = true
-    ;(async () => {
+
+    async function loadFromLocal(): Promise<boolean> {
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(id)}`)
+        const candidateNamespaces = Array.from(
+          new Set<string | undefined>([namespace, 'guest', 'pos', undefined])
+        )
+        const ordersByNamespace = await Promise.all(
+          candidateNamespaces.map(async (ns) => {
+            try {
+              return await db.listOrders(ns)
+            } catch {
+              return []
+            }
+          })
+        )
+        const allOrders = ordersByNamespace.flat()
+        const match = allOrders.find((order) => order.id === id)
+        if (!match) return false
+        const products = await db.listProducts()
+        const productMap = new Map(products.map((product: any) => [product.id, product]))
+        const normalized = {
+          ...match,
+          items: match.items.map((item: any) => ({
+            ...item,
+            product: productMap.get(item.productId) || null,
+          })),
+        }
+        if (mounted) {
+          setStatus(null)
+          setError(null)
+          setData(normalized)
+          setLocalFallback(true)
+        }
+        return true
+      } catch (_err) {
+        return false
+      }
+    }
+
+    async function loadOrder() {
+      if (!isApiEnabled) {
+        const ok = await loadFromLocal()
+        if (!ok && mounted) {
+          setError('Unable to load this order in demo mode. Try the tracking link or enable the API backend.')
+        }
+        return
+      }
+
+      try {
+        const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, { credentials: 'include' })
         if (!res.ok) {
           if (mounted) setStatus(res.status)
           throw new Error(`HTTP ${res.status}`)
         }
         const json = await res.json()
-        if (mounted) setData(json)
+        if (mounted) {
+          setData(json)
+          setError(null)
+          setLocalFallback(false)
+        }
       } catch (e: any) {
-        if (mounted) setError(e?.message || 'Failed to load order')
+        if (!mounted) return
+        const fallbackWorked = await loadFromLocal()
+        if (!fallbackWorked) {
+          setError(e?.message || 'Failed to load order')
+        }
       }
-    })()
-    return () => { mounted = false }
-  }, [id])
+    }
+
+    loadOrder()
+
+    return () => {
+      mounted = false
+    }
+  }, [id, namespace, isApiEnabled])
 
   // Compute hooks unconditionally to keep hook order stable
   const isBuyer = useMemo(() => {
@@ -90,19 +154,29 @@ function OrderDetail() {
   if (error) {
     if (status === 401 || status === 403) {
       return (
-        <div className='mx-auto max-w-4xl px-4 py-8 text-sm text-gray-700'>
-          <div className='text-lg font-semibold mb-2'>Sign in to view this order</div>
-          <div className='mb-3'>This order is only visible to the buyer or seller. If you checked out as a guest, use your tracking link.</div>
+        <MarketplacePageShell width='default' className='space-y-3 text-sm text-slate-700' topSpacing='md' bottomSpacing='md'>
+          <div className='text-lg font-semibold'>Sign in to view this order</div>
+          <div>This order is only visible to the buyer or seller. If you checked out as a guest, use your tracking link.</div>
           <div className='flex gap-2'>
             <Link to='/sign-in' search={{ redirect: `/marketplace/order/${id}` }} className='rounded-md border px-3 py-2'>Sign in</Link>
             <Link to='/marketplace/order/track' className='rounded-md border px-3 py-2'>Track with code</Link>
           </div>
-        </div>
+        </MarketplacePageShell>
       )
     }
-    return <div className='mx-auto max-w-4xl px-4 py-8 text-sm text-red-600'>Error: {error}</div>
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-red-600' topSpacing='md' bottomSpacing='md'>
+        Error: {error}
+      </MarketplacePageShell>
+    )
   }
-  if (!data) return <div className='mx-auto max-w-4xl px-4 py-8 text-sm text-gray-500'>Loading order…</div>
+  if (!data) {
+    return (
+      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading order…
+      </MarketplacePageShell>
+    )
+  }
 
   const isService = (item: any) => item.product?.type === 'service'
   const hasService = (data.items || []).some((it: any) => isService(it))
@@ -182,7 +256,7 @@ function OrderDetail() {
   }
 
   return (
-    <div className='mx-auto max-w-4xl px-4 py-8'>
+    <MarketplacePageShell width='default'>
       <div className='mb-2 text-sm'><Link to='/marketplace/my-orders' className='underline'>Back to My Orders</Link></div>
       <h1 className='text-2xl font-bold'>Order #{String(data.id).slice(0, 6)}</h1>
       <div className='mt-2 text-sm text-gray-600'>
@@ -196,6 +270,11 @@ function OrderDetail() {
       <div className='mt-3 text-sm text-gray-600'>
         Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : 'Not paid'}</span>
       </div>
+      {localFallback ? (
+        <div className='mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700'>
+          Viewing demo data. Connect the API backend or sign in to see live fulfilment details.
+        </div>
+      ) : null}
 
       {/* Buyer details */}
       <div className='mt-3 rounded-2xl border p-4'>
@@ -436,6 +515,6 @@ function OrderDetail() {
           }}>Pay Now</button>
         )}
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }

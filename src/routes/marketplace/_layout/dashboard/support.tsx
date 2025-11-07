@@ -5,6 +5,7 @@ import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-rea
 
 import { Button } from '@/components/ui/button'
 import { db, type RefundRequest, type SupportMessage, type SupportTicket, type SupportTicketStatus } from '@/lib/data'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function badgeClasses(status: string) {
   switch (status) {
@@ -178,7 +179,7 @@ function SupportConsolePage() {
   }
 
   return (
-    <div className='mx-auto max-w-5xl space-y-10 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-10'>
       <header className='flex flex-wrap items-center justify-between gap-3'>
         <div>
           <h1 className='text-3xl font-semibold text-slate-900'>Support console</h1>
@@ -325,7 +326,7 @@ function SupportConsolePage() {
           )}
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

@@ -1,0 +1,86 @@
+{
+  "products": [
+    {
+      "id": "demo-anc-headphones",
+      "title": "Wireless ANC Headphones",
+      "slug": "wireless-anc-headphones",
+      "description": "Immersive sound with adaptive noise cancelling and 28-hour battery life.",
+      "price": 229,
+      "type": "goods",
+      "image": "https://picsum.photos/seed/hedgephones/640/640",
+      "images": [
+        "https://picsum.photos/seed/hedgephones-1/640/640",
+        "https://picsum.photos/seed/hedgephones-2/640/640",
+        "https://picsum.photos/seed/hedgephones-3/640/640"
+      ],
+      "seller": "Nova Audio",
+      "rating": 4.8,
+      "tags": ["audio", "electronics"]
+    },
+    {
+      "id": "demo-studio-light",
+      "title": "4K Studio Lighting Kit",
+      "slug": "4k-studio-lighting-kit",
+      "description": "Two-point LED kit ideal for product shoots and livestreaming.",
+      "price": 399,
+      "type": "goods",
+      "image": "https://picsum.photos/seed/hedgelight/640/640",
+      "images": [
+        "https://picsum.photos/seed/hedgelight-1/640/640",
+        "https://picsum.photos/seed/hedgelight-2/640/640",
+        "https://picsum.photos/seed/hedgelight-3/640/640"
+      ],
+      "seller": "Photon Labs",
+      "rating": 4.6,
+      "tags": ["video", "studio"]
+    },
+    {
+      "id": "demo-social-retainer",
+      "title": "Social Media Strategy Retainer",
+      "slug": "social-media-strategy-retainer",
+      "description": "Monthly growth sprints tailored to your brand with weekly reporting.",
+      "price": 980,
+      "type": "service",
+      "image": "https://picsum.photos/seed/hedgesocial/640/640",
+      "images": [
+        "https://picsum.photos/seed/hedgesocial-1/640/640",
+        "https://picsum.photos/seed/hedgesocial-2/640/640",
+        "https://picsum.photos/seed/hedgesocial-3/640/640"
+      ],
+      "seller": "Signal Boost Collective",
+      "rating": 4.9,
+      "tags": ["marketing", "services"]
+    },
+    {
+      "id": "demo-fleet-maintenance",
+      "title": "Fleet Maintenance Inspection",
+      "slug": "fleet-maintenance-inspection",
+      "description": "Onsite inspection for logistics fleets up to 10 vehicles.",
+      "price": 450,
+      "type": "service",
+      "image": "https://picsum.photos/seed/hedgetruck/640/640",
+      "images": [
+        "https://picsum.photos/seed/hedgetruck-1/640/640",
+        "https://picsum.photos/seed/hedgetruck-2/640/640",
+        "https://picsum.photos/seed/hedgetruck-3/640/640"
+      ],
+      "seller": "Amazing Freight",
+      "rating": 4.7,
+      "tags": ["logistics", "services"]
+    }
+  ],
+  "categories": [
+    "Logistics & Freight",
+    "Retail & POS",
+    "Marketing",
+    "SaaS & Software",
+    "Fleet Operations",
+    "Financial Services",
+    "Media Production",
+    "HR & Talent",
+    "AI & Automation",
+    "Maintenance",
+    "Design & Creative",
+    "Support & CX"
+  ]
+}

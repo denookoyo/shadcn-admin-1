@@ -387,8 +387,9 @@ export default function Dashboard() {
         <TopNav
           links={[
             { title: 'Marketplace', href: '/marketplace', isActive: false },
+            { title: 'AI concierge', href: '/marketplace/assistant', isActive: false },
             { title: 'Seller cockpit', href: '/marketplace/dashboard', isActive: false },
-            { title: 'Team dashboard', href: '/_authenticated', isActive: true },
+            { title: 'Team dashboard', href: '/_authenticated/', isActive: true },
           ]}
         />
         <div className='ml-auto flex items-center space-x-3'>

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { db, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function RevenueBar({ label, value, max }: { label: string; value: number; max: number }) {
   const width = max === 0 ? 0 : Math.round((value / max) * 100)
@@ -65,7 +66,7 @@ function SellerAnalyticsPage() {
   const conversionRate = totalOrders ? Math.min((orders.filter((o: any) => o.status === 'completed').length / totalOrders) * 100, 100) : 0
 
   return (
-    <div className='mx-auto max-w-6xl space-y-10 px-4 py-10'>
+    <MarketplacePageShell width='wide' className='space-y-10'>
       <header className='space-y-2'>
         <h1 className='text-3xl font-semibold text-slate-900'>Analytics</h1>
         <p className='text-sm text-slate-600'>Understand pipeline performance and buyer behaviour across your Hedgetech channels.</p>
@@ -151,7 +152,7 @@ function SellerAnalyticsPage() {
           </div>
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

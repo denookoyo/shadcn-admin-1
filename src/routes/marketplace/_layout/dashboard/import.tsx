@@ -4,6 +4,7 @@ import { db, type Product } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type CsvRow = Partial<Pick<Product, 'title'|'slug'|'price'|'type'|'seller'|'img'>> & { barcode?: string }
 
@@ -70,7 +71,7 @@ function ImportCsvPage() {
   }
 
   return (
-    <div className='mx-auto max-w-3xl px-4 py-8'>
+    <MarketplacePageShell width='narrow'>
       <div className='mb-4 flex items-center justify-between'>
         <h1 className='text-2xl font-bold'>Import Products (CSV)</h1>
         <Link to='/marketplace/dashboard' className='rounded-md border px-3 py-2 text-sm'>Back</Link>
@@ -91,7 +92,7 @@ function ImportCsvPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

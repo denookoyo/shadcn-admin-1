@@ -4,6 +4,7 @@ import { Store, ShoppingCart, Filter, SlidersHorizontal } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export type ListingsSearch = { q?: string }
 
@@ -79,7 +80,7 @@ function Listings() {
   const serviceCount = products.length - goodsCount
 
   return (
-    <div className='mx-auto max-w-7xl px-4 py-8'>
+    <MarketplacePageShell width='xl' className='space-y-6' topSpacing='md' bottomSpacing='md'>
       <header className='rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm'>
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
@@ -251,7 +252,7 @@ function Listings() {
           )}
         </div>
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

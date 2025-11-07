@@ -4,6 +4,7 @@ import { StageBadge } from '@/components/stage-badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/authStore'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 const stages: Stage[] = ['test', 'preview', 'production']
 
@@ -13,7 +14,7 @@ function SellerSettingsPage() {
   const { stage, setStage } = useStageStore()
 
   return (
-    <div className='mx-auto max-w-4xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-8'>
       <header className='space-y-2'>
         <h1 className='text-3xl font-semibold text-slate-900'>Workspace settings</h1>
         <p className='text-sm text-slate-600'>Keep your Hedgetech cockpit aligned across environments and communication channels.</p>
@@ -60,7 +61,7 @@ function SellerSettingsPage() {
           <Button variant='ghost'>Cancel</Button>
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

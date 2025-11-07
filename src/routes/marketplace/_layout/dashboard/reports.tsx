@@ -5,6 +5,7 @@ import { db, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (!rows.length) return ''
@@ -72,7 +73,7 @@ function SellerReportsPage() {
   }
 
   return (
-    <div className='mx-auto max-w-4xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-8'>
       <header className='space-y-2'>
         <h1 className='text-3xl font-semibold text-slate-900'>Reports</h1>
         <p className='text-sm text-slate-600'>Export finance-ready CSVs, schedule automated digests, and share insights with your team.</p>
@@ -120,7 +121,7 @@ function SellerReportsPage() {
           {scheduled ? <p className='text-xs font-semibold text-emerald-600'>Digest scheduled! We will send weekly highlights to {scheduleEmail}.</p> : null}
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

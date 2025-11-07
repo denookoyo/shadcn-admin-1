@@ -5,6 +5,7 @@ import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function SellerListingsPage() {
   const { user } = useAuthStore((s) => s.auth)
@@ -46,7 +47,7 @@ function SellerListingsPage() {
   }, [mine, query])
 
   return (
-    <div className='mx-auto max-w-6xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='wide' className='space-y-8'>
       <header className='flex flex-wrap items-center justify-between gap-4'>
         <div>
           <h1 className='text-3xl font-semibold text-slate-900'>Catalogue manager</h1>
@@ -162,7 +163,7 @@ function SellerListingsPage() {
           </table>
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

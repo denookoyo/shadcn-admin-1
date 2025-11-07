@@ -5,6 +5,7 @@ import { db, type Product, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { StageBadge } from '@/components/stage-badge'
 import { Button } from '@/components/ui/button'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type Highlight = { heading: string; body: string; href: string }
 
@@ -93,7 +94,7 @@ function SellerDashboard() {
   }
 
   return (
-    <div className='mx-auto max-w-7xl space-y-10 px-4 py-10'>
+    <MarketplacePageShell width='xl' className='space-y-10'>
       <section className='rounded-4xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/40 px-8 py-10 shadow-sm'>
         <div className='flex flex-wrap items-start justify-between gap-6'>
           <div className='space-y-4'>
@@ -308,7 +309,7 @@ function SellerDashboard() {
           </div>
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

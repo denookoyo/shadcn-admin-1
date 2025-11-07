@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ProductEditor } from '@/features/dashboard/products/product-editor'
 import { db, type Product } from '@/lib/data'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/listings/product')({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -41,25 +42,25 @@ function ProductEditorRoute() {
 
   if (!id) {
     return (
-      <div className='mx-auto max-w-3xl px-4 py-12 text-center text-sm text-slate-500'>
+      <MarketplacePageShell width='narrow' className='text-center text-sm text-slate-500' topSpacing='lg' bottomSpacing='lg'>
         Select a product from the catalogue to begin editing.
-      </div>
+      </MarketplacePageShell>
     )
   }
 
   if (loading && !product) {
     return (
-      <div className='mx-auto max-w-3xl px-4 py-12 text-center text-sm text-slate-500'>
+      <MarketplacePageShell width='narrow' className='text-center text-sm text-slate-500' topSpacing='lg' bottomSpacing='lg'>
         Loading product…
-      </div>
+      </MarketplacePageShell>
     )
   }
 
   if (!product) {
     return (
-      <div className='mx-auto max-w-3xl px-4 py-12 text-center text-sm text-red-600'>
+      <MarketplacePageShell width='narrow' className='text-center text-sm text-red-600' topSpacing='lg' bottomSpacing='lg'>
         Product not found. It may have been removed or belongs to another account.
-      </div>
+      </MarketplacePageShell>
     )
   }
 

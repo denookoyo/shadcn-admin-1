@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 type Applicant = {
   id: string
@@ -41,7 +42,7 @@ function ApprovalsPage() {
   }
 
   return (
-    <div className='mx-auto max-w-5xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-8'>
       <header className='space-y-2'>
         <h1 className='text-3xl font-semibold text-slate-900'>Seller approvals</h1>
         <p className='text-sm text-slate-600'>Review onboarding applications and control which environment each merchant can access.</p>
@@ -86,7 +87,7 @@ function ApprovalsPage() {
           ))}
         </div>
       </section>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

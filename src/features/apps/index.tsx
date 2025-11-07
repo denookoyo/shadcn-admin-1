@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   IconAdjustmentsHorizontal,
   IconSortAscendingLetters,
@@ -123,13 +124,24 @@ export default function Apps() {
                 >
                   {app.logo}
                 </div>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  className={`${app.connected ? 'border border-blue-300 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900' : ''}`}
-                >
-                  {app.connected ? 'Connected' : 'Connect'}
-                </Button>
+                {app.href ? (
+                  <Button
+                    asChild
+                    variant='outline'
+                    size='sm'
+                    className={`${app.connected ? 'border border-blue-300 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900' : ''}`}
+                  >
+                    <Link to={app.href}>{app.connected ? 'Manage' : 'Connect'}</Link>
+                  </Button>
+                ) : (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className={`${app.connected ? 'border border-blue-300 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950 dark:hover:bg-blue-900' : ''}`}
+                  >
+                    {app.connected ? 'Connected' : 'Connect'}
+                  </Button>
+                )}
               </div>
               <div>
                 <h2 className='mb-1 font-semibold'>{app.name}</h2>

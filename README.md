@@ -52,6 +52,7 @@ Copy `.env` and set values for your environment. Required keys vary by feature. 
 - JWT_SECRET / NEXTAUTH_SECRET: JWT signing secret (cookies)
 - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID: Google OAuth Client ID
 - OPENAI_API_KEY: required for the AI product description endpoint and the new sales assistant
+- EXTERNAL_PRODUCTS_API_KEY: shared secret required for the external products API (Flutter/mobile clients)
 
 3) Database
 
@@ -86,6 +87,9 @@ Health
 
 Products & Categories
 - GET /api/products — list products (enriched with owner metrics)
+- GET /api/external/products — API-key protected product feed for external clients (`x-api-key` header)
+- GET /api/external/categories — API-key protected categories list for external clients
+- GET /api/external/products/:id — API-key protected product detail lookup (id or slug)
 - POST /api/products — create product (auth)
 - PUT /api/products — update product (auth)
 - DELETE /api/products — delete product (auth)

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, CalendarClock, Clock3, Loader2 } from 'lucide-react'
 import { db, type Order } from '@/lib/data'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/bookings/')({
   component: BookingsPage,
@@ -141,17 +142,17 @@ function BookingsPage() {
 
   if (!hasSellerApi) {
     return (
-      <div className='mx-auto max-w-4xl px-4 py-10'>
+      <MarketplacePageShell width='default'>
         <div className='rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800'>
           <AlertCircle className='mb-2 h-5 w-5' />
           Connect to the live API to manage service bookings. In local demo mode, booking workflows are disabled.
         </div>
-      </div>
+      </MarketplacePageShell>
     )
   }
 
   return (
-    <div className='mx-auto max-w-5xl px-4 py-10'>
+    <MarketplacePageShell width='default' className='space-y-8'>
       <header className='mb-8 flex flex-wrap items-center justify-between gap-3'>
         <div>
           <p className='text-xs font-semibold uppercase tracking-wide text-emerald-600'>Operations</p>
@@ -305,6 +306,6 @@ function BookingsPage() {
           </section>
         </div>
       )}
-    </div>
+    </MarketplacePageShell>
   )
 }

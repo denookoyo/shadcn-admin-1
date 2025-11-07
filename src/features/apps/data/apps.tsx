@@ -16,12 +16,21 @@ import {
   IconBrandZoom,
 } from '@tabler/icons-react'
 
-export const apps = [
+type AppDefinition = {
+  name: string
+  logo: React.ReactNode
+  connected: boolean
+  desc: string
+  href?: string
+}
+
+export const apps: AppDefinition[] = [
   {
     name: 'Telegram',
     logo: <IconBrandTelegram />,
     connected: false,
-    desc: 'Connect with Telegram for real-time communication.',
+    desc: 'Automate drops, concierge replies, and product sync to your Telegram channels.',
+    href: '/_authenticated/apps/telegram',
   },
   {
     name: 'Notion',

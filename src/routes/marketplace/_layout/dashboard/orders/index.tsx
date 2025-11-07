@@ -12,6 +12,7 @@ import {
 
 import { db, type Order } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 const statusBadge: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -222,7 +223,11 @@ export default function OrdersPage() {
   }
 
   if (loading) {
-    return <div className='mx-auto max-w-5xl px-4 py-12 text-sm text-slate-500'>Loading orders…</div>
+    return (
+      <MarketplacePageShell width='wide' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        Loading orders…
+      </MarketplacePageShell>
+    )
   }
 
   const renderSellerBoards = () => (
@@ -601,7 +606,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className='mx-auto max-w-6xl space-y-10 px-4 py-10'>
+    <MarketplacePageShell width='wide' className='space-y-10'>
       <section className='relative overflow-hidden rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-[#102534] via-[#0f766e] to-[#34d399] px-6 py-10 text-white shadow-lg md:px-10'>
         <div className='absolute -left-24 top-12 hidden h-72 w-72 rounded-full bg-emerald-500/30 blur-3xl md:block' />
         <div className='relative grid gap-8 lg:grid-cols-[1.6fr_1fr]'>
@@ -649,7 +654,7 @@ export default function OrdersPage() {
       </section>
 
       {view === 'seller' ? renderSellerBoards() : renderBuyerBoards()}
-    </div>
+    </MarketplacePageShell>
   )
 }
 

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { db, type Product } from '@/lib/data'
 import { Button } from '@/components/ui/button'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 declare global {
   interface Window { JsBarcode?: any }
@@ -37,7 +38,7 @@ function LabelsPage() {
   }, [jsbReady, mine])
 
   return (
-    <div className='mx-auto max-w-5xl px-6 py-6'>
+    <MarketplacePageShell width='default' className='px-6 py-6'>
       <div className='mb-4 flex items-center justify-between print:hidden'>
         <h1 className='text-2xl font-bold'>Print Labels</h1>
         <div className='flex items-center gap-2'>
@@ -59,11 +60,10 @@ function LabelsPage() {
           ))}
         </div>
       )}
-    </div>
+    </MarketplacePageShell>
   )
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/labels')({
   component: LabelsPage,
 })
-

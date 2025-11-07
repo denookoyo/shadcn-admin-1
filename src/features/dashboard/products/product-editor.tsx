@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export type ProductEditorMode = 'create' | 'edit'
 
@@ -229,7 +230,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
   }
 
   return (
-    <div className='mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1.1fr_0.9fr]'>
+    <MarketplacePageShell width='xl' className='grid gap-8 lg:grid-cols-[1.1fr_0.9fr]'>
       <section className='space-y-6'>
         <header className='flex flex-wrap items-center justify-between gap-3'>
           <div>
@@ -542,6 +543,6 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
           </ul>
         </div>
       </aside>
-    </div>
+    </MarketplacePageShell>
   )
 }

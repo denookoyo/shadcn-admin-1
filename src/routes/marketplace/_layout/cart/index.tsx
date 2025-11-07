@@ -5,6 +5,7 @@ import { imageFor } from '@/features/marketplace/helpers'
 import { db, type CartItem, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { SafeImg } from '@/components/safe-img'
+import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 function CartPage() {
   const { user } = useAuthStore((s) => s.auth)
@@ -44,7 +45,7 @@ function CartPage() {
   const subtotal = detailed.reduce((acc, entry) => acc + entry.product.price * entry.quantity, 0)
 
   return (
-    <div className='mx-auto max-w-6xl space-y-8 px-4 py-10'>
+    <MarketplacePageShell width='wide' className='space-y-8'>
       <header className='rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm'>
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
@@ -167,7 +168,7 @@ function CartPage() {
           </div>
         </aside>
       </div>
-    </div>
+    </MarketplacePageShell>
   )
 }
 

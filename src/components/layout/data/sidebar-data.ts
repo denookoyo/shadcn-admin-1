@@ -1,16 +1,21 @@
 import {
+  Bot,
   Boxes,
   CalendarClock,
   ClipboardList,
   CreditCard,
+  FileText,
   LayoutDashboard,
   LifeBuoy,
   MessageCircle,
   PackageCheck,
+  Receipt,
+  Search,
   Settings,
   ShoppingBag,
   Sparkles,
   Store,
+  TrendingUp,
   Users,
 } from 'lucide-react'
 
@@ -71,8 +76,13 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Team dashboard',
-          url: '/_authenticated/',
+          url: '/',
           icon: LayoutDashboard,
+        },
+        {
+          title: 'Marketplace home',
+          url: '/marketplace',
+          icon: ShoppingBag,
         },
         {
           title: 'Seller cockpit',
@@ -80,9 +90,9 @@ export const sidebarData: SidebarData = {
           icon: Store,
         },
         {
-          title: 'Marketplace home',
-          url: '/marketplace',
-          icon: ShoppingBag,
+          title: 'AI concierge',
+          url: '/marketplace/assistant',
+          icon: Bot,
         },
         {
           title: 'Point of sale',
@@ -110,7 +120,16 @@ export const sidebarData: SidebarData = {
               title: 'Labels & packaging',
               url: '/marketplace/dashboard/labels',
             },
+            {
+              title: 'Launch new listing',
+              url: '/marketplace/dashboard/listings/new',
+            },
           ],
+        },
+        {
+          title: 'Analytics & insights',
+          url: '/marketplace/dashboard/analytics',
+          icon: TrendingUp,
         },
         {
           title: 'Bookings calendar',
@@ -119,8 +138,17 @@ export const sidebarData: SidebarData = {
         },
         {
           title: 'Apps & promotions',
-          url: '/_authenticated/apps/',
           icon: Sparkles,
+          items: [
+            {
+              title: 'Browse apps',
+              url: '/apps/',
+            },
+            {
+              title: 'Telegram automation',
+              url: '/apps/telegram',
+            },
+          ],
         },
       ],
     },
@@ -138,13 +166,23 @@ export const sidebarData: SidebarData = {
           icon: PackageCheck,
         },
         {
+          title: 'Track guest orders',
+          url: '/marketplace/order/track',
+          icon: Search,
+        },
+        {
+          title: 'Guest payments',
+          url: '/marketplace/order/pay',
+          icon: Receipt,
+        },
+        {
           title: 'Support desk',
-          url: '/_authenticated/chats/',
+          url: '/chats/',
           icon: MessageCircle,
         },
         {
           title: 'Knowledge base',
-          url: '/_authenticated/help-center/',
+          url: '/help-center/',
           icon: LifeBuoy,
         },
       ],
@@ -154,8 +192,13 @@ export const sidebarData: SidebarData = {
       items: [
         {
           title: 'Team members',
-          url: '/_authenticated/users/',
+          url: '/users/',
           icon: Users,
+        },
+        {
+          title: 'Reports',
+          url: '/marketplace/dashboard/reports',
+          icon: FileText,
         },
         {
           title: 'Account settings',
@@ -163,19 +206,19 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: 'Profile overview',
-              url: '/_authenticated/settings',
+              url: '/settings',
             },
             {
               title: 'Account',
-              url: '/_authenticated/settings/account',
+              url: '/settings/account',
             },
             {
               title: 'Notifications',
-              url: '/_authenticated/settings/notifications',
+              url: '/settings/notifications',
             },
             {
               title: 'Appearance',
-              url: '/_authenticated/settings/appearance',
+              url: '/settings/appearance',
             },
           ],
         },
