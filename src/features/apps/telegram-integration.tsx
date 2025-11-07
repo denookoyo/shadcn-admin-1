@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Bot, PlugZap, Send, Sparkles } from 'lucide-react'
+import { Bot, Copy, PlugZap, Send, Sparkles } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { db, type Product } from '@/lib/data'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,8 @@ export function TelegramIntegration() {
     `🔥 {{product.title}} is live on Hedgetech.\n\n{{product.description}}\n\nAsk the AI concierge for a tailored bundle or tap the checkout link.`
   )
   const [connectedAt, setConnectedAt] = useState<string | null>(null)
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null)
+  const [loadingIntegration, setLoadingIntegration] = useState(true)
   const [intentCatalog, setIntentCatalog] = useState<Record<string, boolean>>({
     catalog: true,
     availability: true,
@@ -54,6 +56,29 @@ export function TelegramIntegration() {
     }
   }, [])
 
+  useEffect(() => {
+    let ignore = false
+    ;(async () => {
+      try {
+        setLoadingIntegration(true)
+        const resp = await fetch('/api/integrations/telegram', { credentials: 'include' })
+        if (!resp.ok) return
+        const data = await resp.json()
+        if (!data || ignore) return
+        setConnectedAt(data.connectedAt)
+        setWebhookUrl(data.webhookUrl)
+        if (data.botUsername) setBotUsername(`@${data.botUsername}`)
+      } catch {
+        // ignore
+      } finally {
+        if (!ignore) setLoadingIntegration(false)
+      }
+    })()
+    return () => {
+      ignore = true
+    }
+  }, [])
+
   const spotlightProducts = useMemo(() => {
     return products.slice(0, 8)
   }, [products])
@@ -70,11 +95,28 @@ export function TelegramIntegration() {
       return
     }
     setIsSavingConnection(true)
-    setTimeout(() => {
-      setConnectedAt(new Date().toLocaleString())
+    try {
+      const resp = await fetch('/api/integrations/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ botToken: botToken.trim(), botUsername: botUsername.trim() }),
+      })
+      if (!resp.ok) {
+        const detail = await resp.json().catch(() => ({}))
+        throw new Error(detail?.error || 'Failed to save Telegram integration')
+      }
+      const data = await resp.json()
+      setConnectedAt(data.connectedAt)
+      setWebhookUrl(data.webhookUrl)
+      toast.success('Telegram bot connected. Run setWebhook with the URL below.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to save Telegram bot right now.'
+      toast.error(message)
+    } finally {
       setIsSavingConnection(false)
-      toast.success('Telegram bot connected. Users can now DM the bot for listings.')
-    }, 900)
+      setBotToken('')
+    }
   }
 
   function handleSaveCampaign() {
@@ -186,9 +228,31 @@ export function TelegramIntegration() {
               <span>3. Paste the token above</span>
             </div>
           </div>
-          <Button onClick={handleSaveConnection} disabled={isSavingConnection}>
+          <Button onClick={handleSaveConnection} disabled={isSavingConnection || loadingIntegration}>
             {isSavingConnection ? 'Connecting…' : 'Save connection'}
           </Button>
+          {webhookUrl ? (
+            <div className='rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4 text-xs text-emerald-800'>
+              <div className='flex items-center justify-between text-sm font-semibold text-emerald-900'>
+                Webhook URL
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={() => {
+                    navigator.clipboard.writeText(webhookUrl).then(() => toast.success('Webhook URL copied'))
+                  }}
+                  className='h-7 px-2 text-xs text-emerald-700'
+                >
+                  <Copy className='mr-1 h-3.5 w-3.5' />
+                  Copy
+                </Button>
+              </div>
+              <code className='mt-2 block overflow-x-auto rounded-xl bg-white px-3 py-2 text-[11px] text-slate-700'>{webhookUrl}</code>
+              <p className='mt-2'>
+                Run <span className='rounded bg-white px-1 py-0.5 font-mono text-[10px]'>/setwebhook {webhookUrl}</span> in @BotFather so Telegram pushes DMs to Hedgetech.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className='space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm'>

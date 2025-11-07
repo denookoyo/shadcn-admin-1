@@ -1,5 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
+import { randomBytes } from 'node:crypto'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
@@ -17,6 +18,13 @@ export function createApiRouter() {
   const router = express.Router()
   const prisma = getPrisma()
   const externalApiKey = (process.env.EXTERNAL_PRODUCTS_API_KEY || '').trim()
+  function baseUrlFromRequest(req) {
+    const protoHeader = req.headers['x-forwarded-proto'] || req.protocol || 'https'
+    const proto = Array.isArray(protoHeader) ? protoHeader[0] : String(protoHeader).split(',')[0]
+    const host = req.headers['x-forwarded-host'] || req.headers.host || process.env.VERCEL_URL || 'localhost:3000'
+    const hostname = Array.isArray(host) ? host[0] : host
+    return `${proto}://${hostname}`
+  }
   // Compute composite rating from average order reviews and negative reports
   function compositeRating(baseAvg = 5, negCount = 0) {
     const avg = Number.isFinite(baseAvg) && baseAvg > 0 ? baseAvg : 5
@@ -3521,12 +3529,162 @@ Output as plain text with paragraphs separated by a blank line. Include the 3 bu
     }
   })
 
-  // Telegram webhook endpoint (public)
+  function serializeTelegramIntegration(entry, req) {
+    if (!entry) return null
+    const base = baseUrlFromRequest(req)
+    return {
+      id: entry.id,
+      botUsername: entry.botUsername,
+      connectedAt: entry.updatedAt,
+      webhookUrl: `${base}/api/integrations/telegram/webhook?secret=${entry.webhookSecret}`,
+    }
+  }
+
+  router.get('/integrations/telegram', ensureAuth, async (req, res) => {
+    try {
+      const uid = Number(req.user?.uid)
+      if (!Number.isFinite(uid)) return res.status(401).json({ error: 'Unauthorized' })
+      const integration = await prisma.telegramIntegration.findUnique({ where: { userId: uid } })
+      if (!integration) return res.json(null)
+      res.json(serializeTelegramIntegration(integration, req))
+    } catch (e) {
+      console.error('GET /api/integrations/telegram error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/integrations/telegram', ensureAuth, async (req, res) => {
+    try {
+      const uid = Number(req.user?.uid)
+      if (!Number.isFinite(uid)) return res.status(401).json({ error: 'Unauthorized' })
+      const { botToken, botUsername } = req.body || {}
+      if (!botToken || !botUsername) return res.status(400).json({ error: 'Missing bot token or username' })
+      const normalizedUsername = String(botUsername).trim().replace(/^@/, '')
+      if (!normalizedUsername) return res.status(400).json({ error: 'Invalid bot username' })
+
+      // Validate token with Telegram getMe to ensure it's correct.
+      try {
+        const verifyResp = await fetch(`https://api.telegram.org/bot${botToken}/getMe`)
+        if (!verifyResp.ok) {
+          const detail = await verifyResp.text().catch(() => '')
+          return res.status(400).json({ error: 'Failed to verify bot token', detail })
+        }
+        const verifyJson = await verifyResp.json()
+        if (!verifyJson?.ok) {
+          return res.status(400).json({ error: 'Telegram rejected bot token', detail: verifyJson })
+        }
+      } catch (err) {
+        console.error('Telegram token verification failed', err)
+        return res.status(400).json({ error: 'Unable to verify bot token' })
+      }
+
+      const existing = await prisma.telegramIntegration.findUnique({ where: { userId: uid } })
+      let record
+      if (existing) {
+        record = await prisma.telegramIntegration.update({
+          where: { id: existing.id },
+          data: {
+            botToken,
+            botUsername: normalizedUsername,
+          },
+        })
+      } else {
+        record = await prisma.telegramIntegration.create({
+          data: {
+            userId: uid,
+            botToken,
+            botUsername: normalizedUsername,
+            webhookSecret: randomBytes(16).toString('hex'),
+          },
+        })
+      }
+      res.json(serializeTelegramIntegration(record, req))
+    } catch (e) {
+      console.error('POST /api/integrations/telegram error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  // Telegram webhook endpoint (public, per integration via secret query)
   router.post('/integrations/telegram/webhook', async (req, res) => {
     try {
-      const update = req.body
-      if (!update) return res.json({ ok: true })
-      console.info('[telegram] incoming update', JSON.stringify(update).slice(0, 500))
+      const secret = String(req.query.secret || '')
+      if (!secret) return res.status(404).json({ ok: false })
+      const integration = await prisma.telegramIntegration.findUnique({
+        where: { webhookSecret: secret },
+        include: { user: true },
+      })
+      if (!integration) return res.status(404).json({ ok: false })
+
+      const update = req.body || {}
+      const message = update.message || update.edited_message
+      if (!message || !message.text) return res.json({ ok: true })
+
+      const openaiKey = process.env.OPENAI_API_KEY
+      const text = String(message.text || '')
+      const catalog = await prisma.product.findMany({
+        where: { ownerId: integration.userId },
+        take: 20,
+      })
+      const catalogSummary = catalog
+        .map((product) => {
+          const price = product.price
+          const priceText = Number.isFinite(price) ? `A$${price}` : 'Price on request'
+          return `- ${product.title} (${product.type}) — ${priceText}. ${product.description || ''}`.trim()
+        })
+        .join('\n')
+
+      let reply = 'Thanks for reaching out. A concierge will respond shortly.'
+      if (openaiKey) {
+        const systemPrompt = `You are Hedgetech's WhatsApp/Telegram concierge for ${integration.user?.name || 'our marketplace merchant'}.
+You know the provided product catalog. Answer concisely, promote relevant items, and offer to connect them with the AI concierge or checkout links.
+If a product fits, mention it and outline price and fulfilment timeline.`
+        const userPrompt = [
+          `Buyer message: ${text}`,
+          '',
+          'Product catalog:',
+          catalogSummary || 'No products are currently synced. Offer to take details for manual follow-up.',
+        ].join('\n')
+        try {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${openaiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              temperature: 0.5,
+              max_tokens: 400,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+              ],
+            }),
+          })
+          if (resp.ok) {
+            const data = await resp.json()
+            reply = data?.choices?.[0]?.message?.content?.trim?.() || reply
+          }
+        } catch (err) {
+          console.error('Telegram concierge OpenAI error', err)
+        }
+      }
+
+      try {
+        await fetch(`https://api.telegram.org/bot${integration.botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: message.chat.id,
+            text: reply,
+            reply_to_message_id: message.message_id,
+          }),
+        })
+      } catch (err) {
+        console.error('Failed to send Telegram reply', err)
+      }
+
       return res.json({ ok: true })
     } catch (e) {
       console.error('POST /api/integrations/telegram/webhook error:', e)
@@ -3534,8 +3692,12 @@ Output as plain text with paragraphs separated by a blank line. Include the 3 bu
     }
   })
 
-  router.get('/integrations/telegram/webhook', (_req, res) => {
-    res.json({ ok: true, message: 'Telegram webhook ready' })
+  router.get('/integrations/telegram/webhook', async (req, res) => {
+    const secret = String(req.query.secret || '')
+    if (!secret) return res.status(400).json({ ok: true, message: 'Provide ?secret=...' })
+    const integration = await prisma.telegramIntegration.findUnique({ where: { webhookSecret: secret } })
+    if (!integration) return res.status(404).json({ ok: false })
+    return res.json({ ok: true, botUsername: integration.botUsername })
   })
 
   return router

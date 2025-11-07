@@ -193,6 +193,7 @@ model User {
   accidents      AccidentReport[]
   fuelReceipts   FuelReceipt[]
   payments       Payment[]
+  telegramIntegrations TelegramIntegration[]
 }
 
 model Truck {
@@ -428,4 +429,18 @@ model RefundRequest {
   orderItem OrderItem? @relation(fields: [orderItemId], references: [id])
   buyer     User       @relation("RefundBuyer", fields: [buyerId], references: [id])
   seller    User?      @relation("RefundSeller", fields: [sellerId], references: [id])
+}
+
+model TelegramIntegration {
+  id            String   @id @default(cuid())
+  userId        Int
+  botUsername   String   @unique
+  botToken      String
+  webhookSecret String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
 }
