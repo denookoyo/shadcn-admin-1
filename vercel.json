@@ -4,7 +4,7 @@
     "buildCommand": "pnpm run build",
     "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/[...path].ts" },
+    { "source": "/api/(.*)", "destination": "/api/[...path]" },
     { "source": "/docs/user-guides", "destination": "/docs/user-guides/index.html" },
     { "source": "/docs/user-guides/marketplace-rules", "destination": "/docs/user-guides/marketplace-rules.html" },
     { "source": "/docs/user-guides/seller-guide", "destination": "/docs/user-guides/seller-guide.html" },
