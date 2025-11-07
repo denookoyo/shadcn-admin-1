@@ -3521,6 +3521,22 @@ Output as plain text with paragraphs separated by a blank line. Include the 3 bu
     }
   })
 
-  
+  // Telegram webhook endpoint (public)
+  router.post('/integrations/telegram/webhook', async (req, res) => {
+    try {
+      const update = req.body
+      if (!update) return res.json({ ok: true })
+      console.info('[telegram] incoming update', JSON.stringify(update).slice(0, 500))
+      return res.json({ ok: true })
+    } catch (e) {
+      console.error('POST /api/integrations/telegram/webhook error:', e)
+      return res.status(500).json({ ok: false })
+    }
+  })
+
+  router.get('/integrations/telegram/webhook', (_req, res) => {
+    res.json({ ok: true, message: 'Telegram webhook ready' })
+  })
+
   return router
 }
