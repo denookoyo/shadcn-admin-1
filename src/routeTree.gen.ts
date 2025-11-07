@@ -60,6 +60,7 @@ import { Route as AuthenticatedDriverMaintenanceImport } from './routes/_authent
 import { Route as AuthenticatedDriverHoursImport } from './routes/_authenticated/driver/hours'
 import { Route as AuthenticatedDriverDocketsImport } from './routes/_authenticated/driver/dockets'
 import { Route as AuthenticatedDriverAccidentsImport } from './routes/_authenticated/driver/accidents'
+import { Route as AuthenticatedAppsWhatsappImport } from './routes/_authenticated/apps/whatsapp'
 import { Route as AuthenticatedAppsTelegramImport } from './routes/_authenticated/apps/telegram'
 import { Route as AuthenticatedAdminTrucksImport } from './routes/_authenticated/admin/trucks'
 import { Route as AuthenticatedAdminHoursImport } from './routes/_authenticated/admin/hours'
@@ -399,6 +400,12 @@ const AuthenticatedDriverAccidentsRoute =
     path: '/driver/accidents',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+
+const AuthenticatedAppsWhatsappRoute = AuthenticatedAppsWhatsappImport.update({
+  id: '/apps/whatsapp',
+  path: '/apps/whatsapp',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 const AuthenticatedAppsTelegramRoute = AuthenticatedAppsTelegramImport.update({
   id: '/apps/telegram',
@@ -788,6 +795,13 @@ declare module '@tanstack/react-router' {
       path: '/apps/telegram'
       fullPath: '/apps/telegram'
       preLoaderRoute: typeof AuthenticatedAppsTelegramImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/apps/whatsapp': {
+      id: '/_authenticated/apps/whatsapp'
+      path: '/apps/whatsapp'
+      fullPath: '/apps/whatsapp'
+      preLoaderRoute: typeof AuthenticatedAppsWhatsappImport
       parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/driver/accidents': {
@@ -1190,6 +1204,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminHoursRoute: typeof AuthenticatedAdminHoursRoute
   AuthenticatedAdminTrucksRoute: typeof AuthenticatedAdminTrucksRoute
   AuthenticatedAppsTelegramRoute: typeof AuthenticatedAppsTelegramRoute
+  AuthenticatedAppsWhatsappRoute: typeof AuthenticatedAppsWhatsappRoute
   AuthenticatedDriverAccidentsRoute: typeof AuthenticatedDriverAccidentsRoute
   AuthenticatedDriverDocketsRoute: typeof AuthenticatedDriverDocketsRoute
   AuthenticatedDriverHoursRoute: typeof AuthenticatedDriverHoursRoute
@@ -1215,6 +1230,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminHoursRoute: AuthenticatedAdminHoursRoute,
   AuthenticatedAdminTrucksRoute: AuthenticatedAdminTrucksRoute,
   AuthenticatedAppsTelegramRoute: AuthenticatedAppsTelegramRoute,
+  AuthenticatedAppsWhatsappRoute: AuthenticatedAppsWhatsappRoute,
   AuthenticatedDriverAccidentsRoute: AuthenticatedDriverAccidentsRoute,
   AuthenticatedDriverDocketsRoute: AuthenticatedDriverDocketsRoute,
   AuthenticatedDriverHoursRoute: AuthenticatedDriverHoursRoute,
@@ -1392,6 +1408,7 @@ export interface FileRoutesByFullPath {
   '/admin/hours': typeof AuthenticatedAdminHoursRoute
   '/admin/trucks': typeof AuthenticatedAdminTrucksRoute
   '/apps/telegram': typeof AuthenticatedAppsTelegramRoute
+  '/apps/whatsapp': typeof AuthenticatedAppsWhatsappRoute
   '/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
   '/driver/dockets': typeof AuthenticatedDriverDocketsRoute
   '/driver/hours': typeof AuthenticatedDriverHoursRoute
@@ -1468,6 +1485,7 @@ export interface FileRoutesByTo {
   '/admin/hours': typeof AuthenticatedAdminHoursRoute
   '/admin/trucks': typeof AuthenticatedAdminTrucksRoute
   '/apps/telegram': typeof AuthenticatedAppsTelegramRoute
+  '/apps/whatsapp': typeof AuthenticatedAppsWhatsappRoute
   '/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
   '/driver/dockets': typeof AuthenticatedDriverDocketsRoute
   '/driver/hours': typeof AuthenticatedDriverHoursRoute
@@ -1549,6 +1567,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/hours': typeof AuthenticatedAdminHoursRoute
   '/_authenticated/admin/trucks': typeof AuthenticatedAdminTrucksRoute
   '/_authenticated/apps/telegram': typeof AuthenticatedAppsTelegramRoute
+  '/_authenticated/apps/whatsapp': typeof AuthenticatedAppsWhatsappRoute
   '/_authenticated/driver/accidents': typeof AuthenticatedDriverAccidentsRoute
   '/_authenticated/driver/dockets': typeof AuthenticatedDriverDocketsRoute
   '/_authenticated/driver/hours': typeof AuthenticatedDriverHoursRoute
@@ -1630,6 +1649,7 @@ export interface FileRouteTypes {
     | '/admin/hours'
     | '/admin/trucks'
     | '/apps/telegram'
+    | '/apps/whatsapp'
     | '/driver/accidents'
     | '/driver/dockets'
     | '/driver/hours'
@@ -1705,6 +1725,7 @@ export interface FileRouteTypes {
     | '/admin/hours'
     | '/admin/trucks'
     | '/apps/telegram'
+    | '/apps/whatsapp'
     | '/driver/accidents'
     | '/driver/dockets'
     | '/driver/hours'
@@ -1784,6 +1805,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/hours'
     | '/_authenticated/admin/trucks'
     | '/_authenticated/apps/telegram'
+    | '/_authenticated/apps/whatsapp'
     | '/_authenticated/driver/accidents'
     | '/_authenticated/driver/dockets'
     | '/_authenticated/driver/hours'
@@ -1921,6 +1943,7 @@ export const routeTree = rootRoute
         "/_authenticated/admin/hours",
         "/_authenticated/admin/trucks",
         "/_authenticated/apps/telegram",
+        "/_authenticated/apps/whatsapp",
         "/_authenticated/driver/accidents",
         "/_authenticated/driver/dockets",
         "/_authenticated/driver/hours",
@@ -2071,6 +2094,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/apps/telegram": {
       "filePath": "_authenticated/apps/telegram.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/apps/whatsapp": {
+      "filePath": "_authenticated/apps/whatsapp.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/driver/accidents": {

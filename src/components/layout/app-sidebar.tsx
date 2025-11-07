@@ -31,6 +31,8 @@ const allowedUrlSet = new Set<string>([
   '/marketplace/my-orders',
   '/_authenticated/',
   '/_authenticated/apps/',
+  '/_authenticated/apps/telegram',
+  '/_authenticated/apps/whatsapp',
   '/_authenticated/chats/',
   '/_authenticated/help-center/',
   '/_authenticated/users/',

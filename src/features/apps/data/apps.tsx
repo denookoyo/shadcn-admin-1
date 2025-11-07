@@ -33,6 +33,13 @@ export const apps: AppDefinition[] = [
     href: '/_authenticated/apps/telegram',
   },
   {
+    name: 'WhatsApp',
+    logo: <IconBrandWhatsapp />,
+    connected: false,
+    desc: 'Automate WhatsApp Cloud API for concierge DMs, VIP groups, and broadcast channels.',
+    href: '/_authenticated/apps/whatsapp',
+  },
+  {
     name: 'Notion',
     logo: <IconBrandNotion />,
     connected: true,

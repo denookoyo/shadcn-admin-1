@@ -142,11 +142,15 @@ export const sidebarData: SidebarData = {
           items: [
             {
               title: 'Browse apps',
-              url: '/apps/',
+              url: '/_authenticated/apps/',
             },
             {
               title: 'Telegram automation',
-              url: '/apps/telegram',
+              url: '/_authenticated/apps/telegram',
+            },
+            {
+              title: 'WhatsApp automation',
+              url: '/_authenticated/apps/whatsapp',
             },
           ],
         },
