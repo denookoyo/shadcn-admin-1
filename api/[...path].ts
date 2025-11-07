@@ -4,6 +4,20 @@ import { authMiddleware, createAuthRouter, createApiRouter } from './_bridge.js'
 
 const app = express()
 
+// Preserve original requested path when Vercel rewrites /api/(.*) to this file
+app.use((req, _res, next) => {
+  const originalPath = req.query?.path
+  if (originalPath && typeof originalPath === 'string') {
+    const searchIndex = req.url.indexOf('?')
+    const queryString = searchIndex > -1 ? req.url.slice(searchIndex) : ''
+    req.url = `/${originalPath}${queryString.replace(/(^\?path=[^&]*&?)|(&?path=[^&]*)/g, '').replace(/^\?&/, '?').replace(/\?$/, '')}`
+    if (req.query && typeof req.query === 'object') {
+      delete (req.query as Record<string, unknown>).path
+    }
+  }
+  next()
+})
+
 // Body parsers
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
