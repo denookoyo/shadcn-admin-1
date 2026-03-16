@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { MapPin, Droplets, ShieldCheck, Sparkles, PhoneCall, MessageCircle, Images } from 'lucide-react'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { listLandListings, createLandListing, formatKes, formatAcreage, type LandListing } from '@/features/land/data'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -80,6 +81,8 @@ const emptyRequest: ViewingRequest = {
   date: '',
   notes: '',
 }
+
+const DEFAULT_LAND_CONCIERGE_INTRO = "Hi! I'm evaluating Kenyan acreage on Hedgetech. Could you shortlist viable parcels, share due diligence packs, and arrange escorted viewings?"
 
 export const Route = createFileRoute('/marketplace/_layout/land/')({
   component: KenyaLandPage,
@@ -218,6 +221,14 @@ function KenyaLandPage() {
             </span>
             <h1 className='text-3xl font-semibold'>List Kenyan land, share photos, and invite qualified buyers</h1>
             <p className='text-sm text-emerald-50'>Centralise acreage across counties, keep documentation in one place, and let buyers request guided visits without leaving Hedgetech.</p>
+            <Link
+              to='/marketplace/assistant'
+              search={{ preset: 'land-general', intro: DEFAULT_LAND_CONCIERGE_INTRO }}
+              className='inline-flex items-center gap-2 rounded-full border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10'
+            >
+              <Sparkles className='h-4 w-4 text-white' />
+              Ask AI concierge to prep diligence
+            </Link>
           </div>
           <div className='rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-emerald-50'>
             <div>Total inventory: <span className='font-semibold'>{formatAcreage(totalAcreage)}</span></div>
@@ -514,6 +525,17 @@ function KenyaLandPage() {
                     ) : null}
                   </div>
                 </div>
+                <div className='rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-600 via-emerald-500 to-emerald-400 p-4 text-sm text-white shadow-sm'>
+                  <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/80'>
+                    <Sparkles className='h-3.5 w-3.5' /> AI concierge
+                  </div>
+                  <p className='mt-2 text-white/90'>Loop in Hedgetech to pull due diligence docs, comps, and coordinate escrow-ready viewing slots.</p>
+                  <Button asChild className='mt-3 w-full rounded-full bg-white text-emerald-700 hover:bg-emerald-50'>
+                    <Link to='/marketplace/assistant' search={{ preset: `land:${activeListing.slug}`, intro: createLandConciergeIntro(activeListing) }}>
+                      Ask AI concierge
+                    </Link>
+                  </Button>
+                </div>
                 <form className='space-y-3 rounded-2xl border border-slate-200 bg-white p-4' onSubmit={handleViewingRequest}>
                   <p className='text-sm font-semibold text-slate-900'>Arrange a guided viewing</p>
                   <Input placeholder='Your full name' value={viewingRequest.fullName} onChange={(event) => setViewingRequest({ ...viewingRequest, fullName: event.target.value })} required />
@@ -532,6 +554,7 @@ function KenyaLandPage() {
           ) : null}
         </SheetContent>
       </Sheet>
+      <ChatLauncher className='bottom-6 right-6 sm:bottom-8 sm:right-8' />
     </MarketplacePageShell>
   )
 }
@@ -550,6 +573,12 @@ function ensureUrl(url: string) {
   if (!url) return ''
   if (/^https?:\/\//i.test(url)) return url
   return `https://${url}`
+}
+
+function createLandConciergeIntro(listing: LandListing) {
+  const location = [listing.town, listing.county].filter(Boolean).join(', ')
+  const locationText = location ? ` near ${location}` : ''
+  return `Hi! I'm interested in ${listing.title}${locationText} from Hedgetech's land exchange. Please share due diligence files and coordinate an escorted viewing.`
 }
 
 function telHref(phone: string) {
