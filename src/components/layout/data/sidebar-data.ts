@@ -4,6 +4,7 @@ import {
   CalendarClock,
   ClipboardList,
   CreditCard,
+  Home,
   FileText,
   LayoutDashboard,
   LifeBuoy,
@@ -17,6 +18,7 @@ import {
   Store,
   TrendingUp,
   Users,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface BaseNavItem {
@@ -93,6 +95,11 @@ export const sidebarData: SidebarData = {
           title: 'AI concierge',
           url: '/marketplace/assistant',
           icon: Bot,
+        },
+        {
+          title: 'Shared spaces',
+          url: '/marketplace/spaces',
+          icon: Home,
         },
         {
           title: 'Point of sale',
@@ -198,6 +205,11 @@ export const sidebarData: SidebarData = {
           title: 'Team members',
           url: '/users/',
           icon: Users,
+        },
+        {
+          title: 'Seller verification',
+          url: '/marketplace/dashboard/verification',
+          icon: ShieldCheck,
         },
         {
           title: 'Reports',

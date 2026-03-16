@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouter } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ShieldCheck, CreditCard, CheckCircle2 } from 'lucide-react'
-import { db, type CartItem, type Product } from '@/lib/data'
+import { ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { db, type CartItem, type Product, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,7 @@ function CheckoutPage() {
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [placing, setPlacing] = useState(false)
-  const [orderId, setOrderId] = useState<string | null>(null)
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null)
   const [accessCode, setAccessCode] = useState<string | null>(null)
   const isGuest = !user
 
@@ -78,17 +78,17 @@ function CheckoutPage() {
         quantity: d.quantity,
         meta: d.product.type === 'service' ? d.meta : undefined,
       }))
-      const order: any = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)
+      const order: Order = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)
       await db.clearCart(ns)
       window.dispatchEvent(new CustomEvent('cart:changed'))
-      setOrderId(order.id)
-      if (isGuest && order?.accessCode) setAccessCode(order.accessCode)
+      setConfirmedOrder(order)
+      if (isGuest && (order as any)?.accessCode) setAccessCode((order as any).accessCode)
     } finally {
       setPlacing(false)
     }
   }
 
-  if (orderId) {
+  if (confirmedOrder) {
     return (
       <MarketplacePageShell width='narrow' className='space-y-6 text-center' topSpacing='md' bottomSpacing='md'>
         <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
@@ -96,7 +96,20 @@ function CheckoutPage() {
         </div>
         <CheckCircle2 className='mx-auto h-16 w-16 text-emerald-500' />
         <h1 className='text-2xl font-semibold text-slate-900'>Order confirmed</h1>
-        <p className='text-sm text-slate-600'>Your order ID is <span className='font-semibold text-emerald-700'>#{orderId}</span>. A confirmation was sent to {email || 'your email'}.</p>
+        <p className='text-sm text-slate-600'>Your order ID is <span className='font-semibold text-emerald-700'>#{confirmedOrder.id}</span>. A confirmation was sent to {email || 'your email'}.</p>
+        {confirmedOrder.paymentInstructions ? (
+          <div className='mx-auto max-w-md space-y-2 rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800 shadow-sm'>
+            <div className='text-xs font-semibold uppercase tracking-wide text-emerald-600'>Pay the seller directly</div>
+            <p className='text-[13px]'>Use the details below to send payment. Include your order ID in the reference so the seller can match it quickly.</p>
+            <pre className='whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-xs text-emerald-900'>
+              {confirmedOrder.paymentInstructions}
+            </pre>
+          </div>
+        ) : (
+          <div className='mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm'>
+            The seller will email payment instructions shortly. Keep an eye on your inbox.
+          </div>
+        )}
         {isGuest && accessCode ? (
           <div className='mx-auto max-w-md rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800'>
             <div className='text-sm font-semibold mb-2'>Guest tracking link</div>
@@ -126,16 +139,16 @@ function CheckoutPage() {
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
             <span className='inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-              Step 2 • Secure checkout
+              Step 2 • Confirm details
             </span>
             <h1 className='mt-3 text-2xl font-semibold text-slate-900'>Confirm delivery & contact details</h1>
-            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Protect your order with verified contact details. Hedgetech uses this information to issue invoices, delivery updates, and support.</p>
+            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Once your order is created, your seller will send payment instructions. Use accurate contact information so they can invoice you quickly and keep fulfilment aligned.</p>
           </div>
           <div className='flex items-center gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm'>
             <ShieldCheck className='h-4 w-4 text-emerald-600' />
             <div>
-              <div className='font-semibold text-slate-800'>Buyer protection active</div>
-              <div>Escrow + instant refunds if seller cancels</div>
+              <div className='font-semibold text-slate-800'>Manual payments</div>
+              <div>Pay sellers directly using their preferred method</div>
             </div>
           </div>
         </div>
@@ -176,20 +189,12 @@ function CheckoutPage() {
             </div>
           </div>
 
-          <div>
-            <h2 className='text-lg font-semibold text-slate-900'>Payment method</h2>
-            <div className='mt-3 grid gap-3 text-sm text-slate-600 md:grid-cols-3'>
-              <div className='rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800'>
-                <CreditCard className='mb-2 h-5 w-5' />
-                Pay securely on Hedgetech (cards, bank transfer, BNPL).
-              </div>
-              <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-                Automatically issue invoices and receipts.
-              </div>
-              <div className='rounded-2xl border border-slate-200 bg-white p-4'>
-                Connect saved payment methods from your dashboard.
-              </div>
-            </div>
+          <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600'>
+            <div className='font-semibold text-slate-900'>How payment works</div>
+            <p className='mt-1 text-xs text-slate-500'>
+              After you place the order, the seller&apos;s payment instructions will appear in the confirmation screen and in your inbox. Transfer funds
+              directly to them and share proof of payment so they can fulfil the order.
+            </p>
           </div>
         </section>
 
@@ -239,11 +244,11 @@ function CheckoutPage() {
           <div className='rounded-3xl border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600'>
             <div className='flex items-center gap-3'>
               <ShieldCheck className='h-4 w-4 text-emerald-600' />
-              Hedgetech keeps your payment in escrow until the order is fulfilled.
+              Pay sellers directly using the bank, PayID, or wallet details they share.
             </div>
             <div className='mt-2 flex items-center gap-3'>
               <CheckCircle2 className='h-4 w-4 text-emerald-600' />
-              Get instant status updates via email and dashboard notifications.
+              Track progress and upload remittance via your Hedgetech dashboard.
             </div>
           </div>
         </aside>

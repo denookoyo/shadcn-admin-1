@@ -147,6 +147,12 @@ function MyOrders() {
               <div>
                 <div className='text-sm font-semibold text-slate-900'>Order #{order.id.slice(0, 6)}</div>
                 <div className='text-xs text-slate-500'>Placed {new Date(order.createdAt).toLocaleString()}</div>
+                {order.paymentInstructions ? (
+                  <div className='mt-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800'>
+                    <div className='font-semibold uppercase text-[10px] tracking-wide text-emerald-600'>Payment instructions</div>
+                    <div className='mt-1 whitespace-pre-wrap break-words'>{order.paymentInstructions}</div>
+                  </div>
+                ) : null}
               </div>
               <div className='flex items-center gap-3'>
                 <StatusPill intent='amber'>

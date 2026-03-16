@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { db } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 type AllOrder = any
 
@@ -62,37 +63,57 @@ function AllOrdersPage() {
                 <td className='py-2 pr-4'>A${o.total}</td>
                 <td className='py-2 pr-4 capitalize'>{o.status}</td>
                 <td className='py-2 pr-4 text-right'>
-                  {(o.status === 'paid' && myId && (o.sellerId === myId)) ? (
-                    <button
-                      className='rounded-md bg-black px-3 py-1.5 text-white'
-                      onClick={async () => {
-                        const ok = window.confirm('Acknowledge payment and mark this order as shipped?')
-                        if (!ok) return
-                        try {
-                          const updated = await db.shipOrder?.(o.id, true)
-                          if (!updated) return
-                          setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
-                          window.dispatchEvent(new CustomEvent('orders:changed'))
-                        } catch {}
-                      }}
-                    >
-                      Mark Shipped
-                    </button>
-                  ) : (o.status === 'shipped' && myId && (o.buyerId === myId)) ? (
-                    <button
-                      className='rounded-md border px-3 py-1.5'
-                      onClick={async () => {
-                        try {
-                          const updated = await db.confirmReceived?.(o.id)
-                          if (!updated) return
-                          setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
-                          window.dispatchEvent(new CustomEvent('orders:changed'))
-                        } catch {}
-                      }}
-                    >
-                      Confirm Received
-                    </button>
-                  ) : null}
+                  <div className='space-y-2'>
+                    {(['pending', 'scheduled'].includes(o.status) && myId && (o.sellerId === myId)) ? (
+                      <button
+                        className='w-full rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100'
+                        onClick={async () => {
+                          const ok = window.confirm('Mark this order as paid? Only continue after verifying funds.')
+                          if (!ok) return
+                          try {
+                            const updated = db.markOrderPaid ? await db.markOrderPaid(o.id) : null
+                            if (!updated) return
+                            setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
+                            window.dispatchEvent(new CustomEvent('orders:changed'))
+                          } catch {}
+                        }}
+                      >
+                        Confirm Payment
+                      </button>
+                    ) : null}
+                    {(o.status === 'paid' && myId && (o.sellerId === myId)) ? (
+                      <button
+                        className='w-full rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white'
+                        onClick={async () => {
+                          const ok = window.confirm('Acknowledge payment and mark this order as shipped?')
+                          if (!ok) return
+                          try {
+                            const updated = await db.shipOrder?.(o.id, true)
+                            if (!updated) return
+                            setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
+                            window.dispatchEvent(new CustomEvent('orders:changed'))
+                          } catch {}
+                        }}
+                      >
+                        Mark Shipped
+                      </button>
+                    ) : null}
+                    {(o.status === 'shipped' && myId && (o.buyerId === myId)) ? (
+                      <button
+                        className='w-full rounded-md border px-3 py-1.5 text-xs font-semibold'
+                        onClick={async () => {
+                          try {
+                            const updated = await db.confirmReceived?.(o.id)
+                            if (!updated) return
+                            setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
+                            window.dispatchEvent(new CustomEvent('orders:changed'))
+                          } catch {}
+                        }}
+                      >
+                        Confirm Received
+                      </button>
+                    ) : null}
+                  </div>
                   <div className='inline-flex gap-2 pl-2'>
                     {o.status === 'pending' && (
                       <button
@@ -170,5 +191,6 @@ function AllOrdersPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/orders/all')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: AllOrdersPage,
 })

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useUiStore } from '@/stores/uiStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; type?: Product['type'] }
 
@@ -358,5 +359,6 @@ function PosPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/pos/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: PosPage,
 })

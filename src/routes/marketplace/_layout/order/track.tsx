@@ -26,6 +26,8 @@ type TrackedOrder = {
   total: number
   items?: TrackedOrderItem[]
   address?: string | null
+  seller?: { name?: string | null; email?: string | null; paymentInstructions?: string | null } | null
+  sellerPaymentInstructions?: string | null
 }
 
 export const Route = createFileRoute('/marketplace/_layout/order/track')({
@@ -205,14 +207,17 @@ function TrackOrder() {
 
         <aside className='space-y-4'>
           <div className='rounded-3xl border border-emerald-100 bg-emerald-50 p-6 text-sm text-emerald-800 shadow-sm'>
-            <div className='text-base font-semibold text-emerald-900'>Secure Hedgetech order</div>
-            <p className='mt-2 text-xs text-emerald-700'>Payments are held in escrow until fulfilment is confirmed. Keep this link to revisit updates without signing in.</p>
-            <a
-              className='mt-4 inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500'
-              href={`/marketplace/order/pay?code=${encodeURIComponent(code)}`}
-            >
-              Complete payment
-            </a>
+            <div className='text-base font-semibold text-emerald-900'>Pay the seller directly</div>
+            {data.sellerPaymentInstructions ? (
+              <>
+                <p className='mt-2 text-xs text-emerald-700'>Use these instructions to transfer payment. Include your order ID so the seller can reconcile it quickly.</p>
+                <pre className='mt-3 whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-[11px] text-emerald-900'>
+                  {data.sellerPaymentInstructions}
+                </pre>
+              </>
+            ) : (
+              <p className='mt-2 text-xs text-emerald-700'>Your seller will send payment instructions shortly. Reply to their email if you need them resent.</p>
+            )}
           </div>
 
           <div className='rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm'>

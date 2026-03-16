@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
-import express from 'express'
-import request from 'supertest'
+import { runRouter } from './utils/routerRunner'
 
 // Mock Prisma for all imports that rely on it
 const fakeNow = new Date()
@@ -19,6 +18,12 @@ const fakeProducts = [
   },
 ]
 
+type FakeUserUpsertArgs = {
+  where?: { email?: string }
+  update?: Record<string, unknown>
+  create?: Record<string, unknown>
+}
+
 // Minimal fake prisma covering the methods our tests hit
 const fakePrisma = {
   product: {
@@ -29,7 +34,12 @@ const fakePrisma = {
       { id: 1, name: 'Alice', email: 'alice@example.com', image: null },
     ],
     findUnique: async () => null,
-    upsert: async (args: any) => ({ id: 1, email: args?.where?.email || 'user@example.com', name: null, image: null }),
+    upsert: async (args: FakeUserUpsertArgs) => ({
+      id: 1,
+      email: args?.where?.email || 'user@example.com',
+      name: null,
+      image: null,
+    }),
     deleteMany: async () => ({ count: 0 }),
   },
   userReputation: {
@@ -50,48 +60,39 @@ vi.mock('../server/prisma.js', () => ({
   getPrisma: () => fakePrisma,
 }))
 
-import { authMiddleware, createAuthRouter } from '../server/auth.js'
+import { createAuthRouter } from '../server/auth.js'
 import { createApiRouter } from '../server/api.js'
 
-function buildApp() {
-  const app = express()
-  app.use(express.json())
-  app.use(express.urlencoded({ extended: true }))
-  authMiddleware(app)
-  app.use('/api/auth', createAuthRouter())
-  app.use('/api', createApiRouter())
-  return app
-}
+let authRouter: ReturnType<typeof createAuthRouter>
+let apiRouter: ReturnType<typeof createApiRouter>
 
-let app: express.Express
 beforeAll(() => {
   // Ensure AI route does not attempt network call in tests
   process.env.OPENAI_API_KEY = ''
-  app = buildApp()
+  authRouter = createAuthRouter()
+  apiRouter = createApiRouter()
 })
 
 describe('API routes', () => {
   it('GET /api/health returns ok', async () => {
-    const res = await request(app).get('/api/health')
+    const res = await runRouter(apiRouter, 'GET', '/health')
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ ok: true })
   })
 
   it('GET /api/auth/me returns null when not authenticated', async () => {
-    const res = await request(app).get('/api/auth/me')
+    const res = await runRouter(authRouter, 'GET', '/me')
     expect(res.status).toBe(200)
     expect(res.body).toBeNull()
   })
 
   it('POST /api/products requires authentication', async () => {
-    const res = await request(app)
-      .post('/api/products')
-      .send({ title: 'New Product' })
+    const res = await runRouter(apiRouter, 'POST', '/products', { body: { title: 'New Product' } })
     expect(res.status).toBe(401)
   })
 
   it('GET /api/products returns enriched list', async () => {
-    const res = await request(app).get('/api/products')
+    const res = await runRouter(apiRouter, 'GET', '/products')
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body)).toBe(true)
     expect(res.body.length).toBe(1)
@@ -105,9 +106,9 @@ describe('API routes', () => {
   })
 
   it('POST /api/ai/description returns 400 without OPENAI_API_KEY', async () => {
-    const res = await request(app)
-      .post('/api/ai/description')
-      .send({ title: 'A product' })
+    const res = await runRouter(apiRouter, 'POST', '/ai/description', {
+      body: { title: 'A product' },
+    })
     // Server route expects OPENAI_API_KEY; without it, 400
     expect(res.status).toBe(400)
   })

@@ -16,6 +16,14 @@ interface AuthState {
   }
 }
 
+function decorateUser(user: AuthUser | null): AuthUser | null {
+  if (!user) return null
+  const role = String((user as any)?.role ?? '').toLowerCase()
+  const isAdmin = Boolean((user as any)?.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
+  if ((user as any)?.isAdmin === isAdmin) return user
+  return { ...user, isAdmin }
+}
+
 export const useAuthStore = create<AuthState>()((set) => {
   const cookieState = Cookies.get(ACCESS_TOKEN)
   const initToken = cookieState ? JSON.parse(cookieState) : ''
@@ -23,7 +31,7 @@ export const useAuthStore = create<AuthState>()((set) => {
     auth: {
       user: null,
       setUser: (user) =>
-        set((state) => ({ ...state, auth: { ...state.auth, user } })),
+        set((state) => ({ ...state, auth: { ...state.auth, user: decorateUser(user) } })),
       accessToken: initToken,
       setAccessToken: (accessToken) =>
         set((state) => {

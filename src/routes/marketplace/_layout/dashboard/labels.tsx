@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db, type Product } from '@/lib/data'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 declare global {
   interface Window { JsBarcode?: any }
@@ -65,5 +66,6 @@ function LabelsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/labels')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: LabelsPage,
 })

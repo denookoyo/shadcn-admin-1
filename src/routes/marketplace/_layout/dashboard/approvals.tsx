@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 type Applicant = {
   id: string
@@ -92,5 +93,6 @@ function ApprovalsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/approvals')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: ApprovalsPage,
 })

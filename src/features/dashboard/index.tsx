@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { differenceInHours, format } from 'date-fns'
 import {
@@ -36,9 +36,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
 
 import { db, type Product, type Order, type Category, type Announcement, type AnnouncementAudience } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
+import { getSellerStatus, SELLER_VERIFICATION_EVENT, type SellerVerificationStatus } from '@/features/sellers/verification'
 
 function slugify(value: string) {
   return value
@@ -48,7 +51,89 @@ function slugify(value: string) {
     .replace(/(^-|-$)+/g, '')
 }
 
+function splitListInput(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
 type PersonaKey = 'owner' | 'operations' | 'sales' | 'admin'
+
+type SpaceFormState = {
+  type: 'room' | 'studio' | 'desk'
+  listingKind: 'roommate' | 'desk-pass' | 'lease-transfer'
+  suburb: string
+  city: string
+  state: string
+  availableFrom: string
+  stayLength: string
+  occupancyCurrent: number
+  occupancyTotal: number
+  furnished: boolean
+  bond: string
+  amenities: string
+  vibe: string
+  hostName: string
+  hostAvatar: string
+  hostBio: string
+  conciergeIntro: string
+}
+
+type ProductFormState = {
+  title: string
+  price: number
+  type: Product['type']
+  seller: string
+  img: string
+  images: string
+  description: string
+  slug: string
+  categoryId: string
+  vertical: 'commerce' | 'shared_space'
+  spaceProfile: SpaceFormState
+}
+
+function createEmptySpaceProfile(): SpaceFormState {
+  return {
+    type: 'room',
+    listingKind: 'roommate',
+    suburb: '',
+    city: '',
+    state: '',
+    availableFrom: new Date().toISOString().slice(0, 10),
+    stayLength: '3-6 months',
+    occupancyCurrent: 1,
+    occupancyTotal: 2,
+    furnished: true,
+    bond: '',
+    amenities: 'Queen bed, High-speed internet, Cleaner',
+    vibe: 'Remote work, Pet-friendly',
+    hostName: '',
+    hostAvatar: '',
+    hostBio: '',
+    conciergeIntro: 'I\'m looking for a considerate founder/creator who values community dinners and hybrid work.',
+  }
+}
+
+function createEmptyProductForm(): ProductFormState {
+  return {
+    title: '',
+    price: 0,
+    type: 'goods',
+    seller: 'You',
+    img: '',
+    images: '',
+    description: '',
+    slug: '',
+    categoryId: '',
+    vertical: 'commerce',
+    spaceProfile: createEmptySpaceProfile(),
+  }
+}
+
+const FLATMATES_CATEGORY_NAME = 'Flatmates & desks'
+const FLATMATES_CATEGORY_SLUG = 'flatmates'
 
 const personas: { value: PersonaKey; label: string; description: string }[] = [
   {
@@ -124,25 +209,46 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const creatingFlatmatesRef = useRef(false)
+  const [sellerStatus, setSellerStatus] = useState<SellerVerificationStatus>(() => getSellerStatus(userEmail))
 
   const [productDialogOpen, setProductDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [productForm, setProductForm] = useState({
-    title: '',
-    price: 0,
-    type: 'goods' as Product['type'],
-    seller: 'You',
-    img: '',
-    images: '' as string,
-    description: '' as string,
-    slug: '',
-    categoryId: '' as string,
-  })
+  const [productForm, setProductForm] = useState<ProductFormState>(() => createEmptyProductForm())
   const [generatingCopy, setGeneratingCopy] = useState(false)
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const [categoryForm, setCategoryForm] = useState({ name: '', slug: '' })
   const [categoryEditingId, setCategoryEditingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (productForm.vertical !== 'shared_space') return
+    const existing = categories.find((category) => category.slug === FLATMATES_CATEGORY_SLUG)
+    if (existing) {
+      if (productForm.categoryId !== existing.id) {
+        setProductForm((prev) => ({ ...prev, categoryId: existing.id }))
+      }
+      return
+    }
+    if (creatingFlatmatesRef.current || typeof db.createCategory !== 'function') return
+    creatingFlatmatesRef.current = true
+    ;(async () => {
+      try {
+        const created = await db.createCategory?.({
+          name: FLATMATES_CATEGORY_NAME,
+          slug: FLATMATES_CATEGORY_SLUG,
+        })
+        if (created) {
+          setCategories((prev) => [created, ...prev])
+          setProductForm((prev) => ({ ...prev, categoryId: created.id }))
+        }
+      } catch {
+        // ignore
+      } finally {
+        creatingFlatmatesRef.current = false
+      }
+    })()
+  }, [productForm.vertical, productForm.categoryId, categories])
 
   useEffect(() => {
     let mounted = true
@@ -161,6 +267,18 @@ export default function Dashboard() {
       mounted = false
     }
   }, [userId])
+
+  useEffect(() => {
+    setSellerStatus(getSellerStatus(userEmail))
+  }, [userEmail])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = () => setSellerStatus(getSellerStatus(userEmail))
+    window.addEventListener(SELLER_VERIFICATION_EVENT, handler)
+    return () => window.removeEventListener(SELLER_VERIFICATION_EVENT, handler)
+  }, [userEmail])
+
 
   useEffect(() => {
     let mounted = true
@@ -215,6 +333,16 @@ export default function Dashboard() {
   }, [orders])
 
   const visibleAnnouncements = useMemo(() => announcements.slice(0, 3), [announcements])
+  const role = String(user?.role ?? '').toLowerCase()
+  const canManageListings = sellerStatus === 'approved' || role === 'admin'
+  const verificationBannerDescription =
+    sellerStatus === 'pending'
+      ? 'Support is reviewing your documents. We will notify you once the cockpit unlocks.'
+      : sellerStatus === 'rejected'
+        ? 'Your previous submission needs updates. Refresh your documents and resubmit.'
+        : 'Submit your compliance pack so support can enable payouts, listings, and land brokerage.'
+  const verificationCtaLabel =
+    sellerStatus === 'pending' ? 'View submission' : sellerStatus === 'rejected' ? 'Resubmit' : 'Submit verification'
 
   const totalRevenue = useMemo(
     () => orders.reduce((sum, order) => sum + order.total, 0),
@@ -273,19 +401,36 @@ export default function Dashboard() {
     return 'owner'
   }, [user])
 
-  function resetProductForm() {
+  function resetProductForm(overrides?: Partial<ProductFormState>) {
     setEditingProduct(null)
-    setProductForm({
-      title: '',
-      price: 0,
-      type: 'goods',
-      seller: 'You',
-      img: '',
-      images: '',
-      description: '',
-      slug: '',
-      categoryId: '',
+    setProductForm(() => {
+      const base = createEmptyProductForm()
+      return {
+        ...base,
+        ...overrides,
+        spaceProfile: overrides?.spaceProfile
+          ? { ...createEmptySpaceProfile(), ...overrides.spaceProfile }
+          : base.spaceProfile,
+      }
     })
+  }
+
+  function startSharedSpaceFlow() {
+    if (!canManageListings) {
+      toast.error('Complete seller verification to add shared stays.')
+      return
+    }
+    resetProductForm({
+      vertical: 'shared_space',
+      type: 'service',
+      price: 450,
+      spaceProfile: {
+        ...createEmptySpaceProfile(),
+        hostName: user?.name || 'You',
+        hostAvatar: (user as any)?.image || '',
+      },
+    })
+    setProductDialogOpen(true)
   }
 
   async function saveProduct() {
@@ -293,15 +438,44 @@ export default function Dashboard() {
       .split(/\n|,/)
       .map((value) => value.trim())
       .filter(Boolean)
+    const isSharedSpace = productForm.vertical === 'shared_space'
+    const spaceProfilePayload = isSharedSpace
+      ? {
+          type: productForm.spaceProfile.type,
+          listingKind: productForm.spaceProfile.listingKind,
+          rentPerWeek: Number(productForm.price) || 0,
+          bond: productForm.spaceProfile.bond ? Number(productForm.spaceProfile.bond) : undefined,
+          suburb: productForm.spaceProfile.suburb,
+          city: productForm.spaceProfile.city,
+          state: productForm.spaceProfile.state,
+          availableFrom: productForm.spaceProfile.availableFrom || new Date().toISOString().slice(0, 10),
+          stayLength: productForm.spaceProfile.stayLength || 'Flexible',
+          occupancy: {
+            current: Number(productForm.spaceProfile.occupancyCurrent) || 0,
+            total: Math.max(1, Number(productForm.spaceProfile.occupancyTotal) || 1),
+          },
+          furnished: productForm.spaceProfile.furnished,
+          amenities: splitListInput(productForm.spaceProfile.amenities),
+          vibe: splitListInput(productForm.spaceProfile.vibe),
+          host: {
+            name: productForm.spaceProfile.hostName || productForm.seller || 'Host',
+            avatar: productForm.spaceProfile.hostAvatar || productForm.img,
+            bio: productForm.spaceProfile.hostBio || '',
+          },
+          conciergeIntro: productForm.spaceProfile.conciergeIntro || undefined,
+        }
+      : null
 
     const payload = {
       title: productForm.title,
       price: Number(productForm.price) || 0,
-      type: productForm.type,
+      type: isSharedSpace ? 'service' : productForm.type,
       seller: productForm.seller,
       img: productForm.img,
       slug: productForm.slug || slugify(productForm.title),
       categoryId: productForm.categoryId || undefined,
+      vertical: productForm.vertical,
+      spaceProfile: spaceProfilePayload,
       ...(images.length ? { images } : {}),
       ...(productForm.description ? { description: productForm.description } : {}),
     }
@@ -327,9 +501,33 @@ export default function Dashboard() {
 
   function openEditProduct(product: Product) {
     setEditingProduct(product)
+    const rawProfile = (product as any).spaceProfile
+    const nextSpaceProfile: SpaceFormState =
+      (product as any).vertical === 'shared_space' && rawProfile
+        ? {
+            ...createEmptySpaceProfile(),
+            type: rawProfile.type || 'room',
+            listingKind: rawProfile.listingKind || (rawProfile.type === 'desk' ? 'desk-pass' : 'roommate'),
+            suburb: rawProfile.suburb || '',
+            city: rawProfile.city || '',
+            state: rawProfile.state || '',
+            availableFrom: rawProfile.availableFrom || new Date().toISOString().slice(0, 10),
+            stayLength: rawProfile.stayLength || 'Flexible',
+            occupancyCurrent: rawProfile.occupancy?.current ?? 1,
+            occupancyTotal: rawProfile.occupancy?.total ?? 2,
+            furnished: rawProfile.furnished ?? true,
+            bond: rawProfile.bond != null ? String(rawProfile.bond) : '',
+            amenities: Array.isArray(rawProfile.amenities) ? rawProfile.amenities.join(', ') : rawProfile.amenities || '',
+            vibe: Array.isArray(rawProfile.vibe) ? rawProfile.vibe.join(', ') : rawProfile.vibe || '',
+            hostName: rawProfile.host?.name || '',
+            hostAvatar: rawProfile.host?.avatar || '',
+            hostBio: rawProfile.host?.bio || '',
+            conciergeIntro: rawProfile.conciergeIntro || '',
+          }
+        : createEmptySpaceProfile()
     setProductForm({
       title: product.title,
-      price: product.price,
+      price: (product as any).vertical === 'shared_space' && rawProfile?.rentPerWeek ? rawProfile.rentPerWeek : product.price,
       type: product.type,
       seller: product.seller,
       img: product.img,
@@ -337,6 +535,8 @@ export default function Dashboard() {
       description: (product as any).description || '',
       slug: product.slug,
       categoryId: product.categoryId || '',
+      vertical: ((product as any).vertical as 'commerce' | 'shared_space') || 'commerce',
+      spaceProfile: nextSpaceProfile,
     })
     setProductDialogOpen(true)
   }
@@ -400,75 +600,88 @@ export default function Dashboard() {
       </Header>
 
       <Main className='space-y-10'>
-        {visibleAnnouncements.length ? (
-          <section className='rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 shadow-sm'>
-            <div className='flex flex-wrap items-center justify-between gap-2'>
-              <div>
-                <div className='text-sm font-semibold text-emerald-900'>Marketplace announcements</div>
-                <p className='text-xs text-emerald-700'>Pinned messages from Hedgetech operations.</p>
-              </div>
-              <span className='text-xs text-emerald-700'>Stay aligned with policy updates.</span>
-            </div>
-            <ul className='mt-4 space-y-3'>
-              {visibleAnnouncements.map((announcement) => (
-                <li key={announcement.id} className='rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm'>
-                  <div className='flex flex-wrap items-center justify-between gap-2'>
-                    <div>
-                      <div className='text-sm font-semibold text-slate-900'>{announcement.title}</div>
-                      <div className='text-xs text-slate-500'>
-                        {format(new Date(announcement.publishedAt), 'PP')}
-                        {announcement.audience !== 'all' ? ` • ${announcement.audience}` : ''}
-                      </div>
-                    </div>
-                    {announcement.pinned ? (
-                      <span className='rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700'>Pinned</span>
-                    ) : null}
+        {canManageListings ? (
+          <>
+            {visibleAnnouncements.length ? (
+              <section className='rounded-3xl border border-emerald-100 bg-emerald-50/60 p-5 shadow-sm'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
+                  <div>
+                    <div className='text-sm font-semibold text-emerald-900'>Marketplace announcements</div>
+                    <p className='text-xs text-emerald-700'>Pinned messages from Hedgetech operations.</p>
                   </div>
-                  <p className='mt-2 text-sm text-slate-600'>{announcement.body}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-        <section className='relative overflow-hidden rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-[#102534] via-[#0f766e] to-[#34d399] px-6 py-10 text-white shadow-lg md:px-10'>
-          <div className='absolute -left-24 top-12 hidden h-80 w-80 rounded-full bg-emerald-500/30 blur-3xl md:block' />
-          <div className='relative grid gap-10 lg:grid-cols-[1.4fr_1fr]'>
-            <div className='space-y-5'>
-              <span className='inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-50'>
-                Hedgetech commerce cockpit
-              </span>
-              <h1 className='text-3xl font-semibold leading-tight md:text-4xl'>
-                Operate smarter across <span className='font-bold text-emerald-100'>storefronts, fulfilment, and growth</span>.
-              </h1>
-              <p className='max-w-2xl text-sm text-emerald-50/90 md:text-base'>
-                Switch perspectives to see exactly what store owners, marketplace operators, sales teams, and administrators need to act on today.
-              </p>
-              <div className='flex flex-wrap gap-3 text-sm font-semibold'>
-                <Button variant='secondary' className='rounded-full border border-white/40 bg-white/10 hover:bg-white/20'>
-                  <Sparkles className='mr-2 h-4 w-4' /> Open omnichannel POS
-                </Button>
-                <Link
-                  to='/marketplace/dashboard/orders'
-                  className='inline-flex items-center rounded-full border border-white/40 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10'
-                >
-                  View fulfilment board
-                  <ArrowUpRight className='ml-2 h-4 w-4' />
-                </Link>
+                  <span className='text-xs text-emerald-700'>Stay aligned with policy updates.</span>
+                </div>
+                <ul className='mt-4 space-y-3'>
+                  {visibleAnnouncements.map((announcement) => (
+                    <li key={announcement.id} className='rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm'>
+                      <div className='flex flex-wrap items-center justify-between gap-2'>
+                        <div>
+                          <div className='text-sm font-semibold text-slate-900'>{announcement.title}</div>
+                          <div className='text-xs text-slate-500'>
+                            {format(new Date(announcement.publishedAt), 'PP')}
+                            {announcement.audience !== 'all' ? ` • ${announcement.audience}` : ''}
+                          </div>
+                        </div>
+                        {announcement.pinned ? (
+                          <span className='rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700'>Pinned</span>
+                        ) : null}
+                      </div>
+                      <p className='mt-2 text-sm text-slate-600'>{announcement.body}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            <section className='relative overflow-hidden rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-[#102534] via-[#0f766e] to-[#34d399] px-6 py-10 text-white shadow-lg md:px-10'>
+              <div className='absolute -left-24 top-12 hidden h-80 w-80 rounded-full bg-emerald-500/30 blur-3xl md:block' />
+              <div className='relative grid gap-10 lg:grid-cols-[1.4fr_1fr]'>
+                <div className='space-y-5'>
+                  <span className='inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-50'>
+                    Hedgetech commerce cockpit
+                  </span>
+                  <h1 className='text-3xl font-semibold leading-tight md:text-4xl'>
+                    Operate smarter across <span className='font-bold text-emerald-100'>storefronts, fulfilment, and growth</span>.
+                  </h1>
+                  <p className='max-w-2xl text-sm text-emerald-50/90 md:text-base'>
+                    Switch perspectives to see exactly what store owners, marketplace operators, sales teams, and administrators need to act on today.
+                  </p>
+                  <div className='flex flex-wrap gap-3 text-sm font-semibold'>
+                    <Button variant='secondary' className='rounded-full border border-white/40 bg-white/10 hover:bg-white/20'>
+                      <Sparkles className='mr-2 h-4 w-4' /> Open omnichannel POS
+                    </Button>
+                    <Link
+                      to='/marketplace/dashboard/orders'
+                      className='inline-flex items-center rounded-full border border-white/40 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10'
+                    >
+                      View fulfilment board
+                      <ArrowUpRight className='ml-2 h-4 w-4' />
+                    </Link>
+                    <Button
+                      variant='outline'
+                      className='rounded-full border-white/40 text-white hover:bg-white/10'
+                      onClick={startSharedSpaceFlow}
+                      disabled={!canManageListings}
+                    >
+                      Add shared stay
+                    </Button>
+                    <Button variant='outline' className='rounded-full border-white/40 text-white hover:bg-white/10' asChild>
+                      <Link to='/marketplace/dashboard/verification'>Seller verification</Link>
+                    </Button>
+                  </div>
+                </div>
+                <div className='grid gap-3 sm:grid-cols-2'>
+                  <MetricCard icon={Store} label='Active listings' value={myProducts.length} help='Owned or managed offerings' accent='emerald' />
+                  <MetricCard icon={TrendingUp} label='Marketplace revenue' value={`A$${totalRevenue.toLocaleString()}`} help='Lifetime gross' accent='emerald' />
+                  <MetricCard icon={Truck} label='Orders in motion' value={groupedOrders.shipped.length + groupedOrders.pending.length + groupedOrders.paid.length + groupedOrders.scheduled.length} help='Awaiting fulfilment or shipping' accent='amber' />
+                  <MetricCard icon={Users} label='Active sellers' value={uniqueSellers} help='Based on current listings' />
+                </div>
               </div>
-            </div>
-            <div className='grid gap-3 sm:grid-cols-2'>
-              <MetricCard icon={Store} label='Active listings' value={myProducts.length} help='Owned or managed offerings' accent='emerald' />
-              <MetricCard icon={TrendingUp} label='Marketplace revenue' value={`A$${totalRevenue.toLocaleString()}`} help='Lifetime gross' accent='emerald' />
-              <MetricCard icon={Truck} label='Orders in motion' value={groupedOrders.shipped.length + groupedOrders.pending.length + groupedOrders.paid.length + groupedOrders.scheduled.length} help='Awaiting fulfilment or shipping' accent='amber' />
-              <MetricCard icon={Users} label='Active sellers' value={uniqueSellers} help='Based on current listings' />
-            </div>
-          </div>
-        </section>
+            </section>
 
-        <Tabs defaultValue={personaDefault} className='space-y-6'>
-          <TabsList className='flex flex-col gap-3 bg-transparent p-0 md:flex-row'>
-            {personas.map((persona) => (
-              <TabsTrigger
+            <Tabs defaultValue={personaDefault} className='space-y-6'>
+            <TabsList className='flex flex-col gap-3 bg-transparent p-0 md:flex-row'>
+              {personas.map((persona) => (
+                <TabsTrigger
                 key={persona.value}
                 value={persona.value}
                 className='flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition data-[state=active]:border-emerald-300 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-900'
@@ -494,15 +707,30 @@ export default function Dashboard() {
                     <CardTitle className='text-base font-semibold'>Listing manager</CardTitle>
                     <p className='text-xs text-slate-500'>Keep your storefront fresh and compliant.</p>
                   </div>
-                  <Button
-                    className='rounded-full'
-                    onClick={() => {
-                      resetProductForm()
-                      setProductDialogOpen(true)
-                    }}
-                  >
-                    Add listing
-                  </Button>
+                  <div className='flex flex-wrap gap-2'>
+                    <Button
+                      className='rounded-full'
+                      disabled={!canManageListings}
+                      onClick={() => {
+                        if (!canManageListings) {
+                          toast.error('Seller verification required before adding listings.')
+                          return
+                        }
+                        resetProductForm()
+                        setProductDialogOpen(true)
+                      }}
+                    >
+                      Add listing
+                    </Button>
+                    <Button
+                      variant='outline'
+                      className='rounded-full border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                      onClick={startSharedSpaceFlow}
+                      disabled={!canManageListings}
+                    >
+                      Add shared stay
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className='space-y-4'>
                   {productPreview.length === 0 ? (
@@ -822,6 +1050,34 @@ export default function Dashboard() {
             </Card>
           </TabsContent>
         </Tabs>
+          </>
+        ) : (
+          <section className='rounded-3xl border border-amber-200 bg-amber-50/80 p-8 text-amber-900 shadow-sm'>
+            <div className='space-y-4'>
+              <div className='space-y-2'>
+                <span className='inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900'>
+                  Seller status • {sellerStatus === 'pending' ? 'In review' : sellerStatus === 'rejected' ? 'Needs updates' : 'Not submitted'}
+                </span>
+                <h2 className='text-2xl font-semibold'>Finish verification to unlock the seller cockpit</h2>
+                <p className='text-sm text-amber-800'>{verificationBannerDescription}</p>
+              </div>
+              <ul className='space-y-2 rounded-2xl border border-amber-200 bg-white/80 p-4 text-sm text-amber-900'>
+                <li>• Open the “Seller verification” page (left nav → Organization) to submit your pack.</li>
+                <li>• Upload your business details, documents, and acreage track record.</li>
+                <li>• Ops reviews submissions within one business day.</li>
+                <li>• Once approved, product, land, and POS tools will unlock instantly.</li>
+              </ul>
+              <div className='flex flex-wrap gap-3 text-sm'>
+                <Button className='rounded-full bg-amber-600 text-white hover:bg-amber-500' asChild>
+                  <Link to='/marketplace/dashboard/verification'>{verificationCtaLabel}</Link>
+                </Button>
+                <Button variant='outline' className='rounded-full border-amber-300 text-amber-900 hover:bg-amber-100' asChild>
+                  <Link to='/marketplace/dashboard/support'>Contact support</Link>
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
       </Main>
 
       <Dialog open={productDialogOpen} onOpenChange={(value) => { setProductDialogOpen(value); if (!value) resetProductForm() }}>
@@ -838,9 +1094,28 @@ export default function Dashboard() {
                 onChange={(event) => setProductForm({ ...productForm, title: event.target.value, slug: slugify(event.target.value) })}
               />
             </div>
+            <div>
+              <Label className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Listing vertical</Label>
+              <div className='mt-2 grid grid-cols-2 gap-2'>
+                {[
+                  { key: 'commerce', label: 'Commerce & POS', description: 'Goods or services (inventory, POS, bookings).' },
+                  { key: 'shared_space', label: 'Shared space', description: 'Rooms, desks, or micro-studios with concierge.' },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type='button'
+                    onClick={() => setProductForm((prev) => ({ ...prev, vertical: option.key as 'commerce' | 'shared_space' }))}
+                    className={`rounded-2xl border p-3 text-left transition ${productForm.vertical === option.key ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                  >
+                    <div className='text-sm font-semibold text-slate-900'>{option.label}</div>
+                    <p className='mt-1 text-xs text-slate-500'>{option.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className='grid gap-3 md:grid-cols-3'>
               <div>
-                <Label htmlFor='product-price'>Price (A$)</Label>
+                <Label htmlFor='product-price'>{productForm.vertical === 'shared_space' ? 'Weekly rate (A$)' : 'Price (A$)'}</Label>
                 <Input
                   id='product-price'
                   type='number'
@@ -855,10 +1130,12 @@ export default function Dashboard() {
                   className='w-full rounded-md border px-3 py-2'
                   value={productForm.type}
                   onChange={(event) => setProductForm({ ...productForm, type: event.target.value as Product['type'] })}
+                  disabled={productForm.vertical === 'shared_space'}
                 >
                   <option value='goods'>Goods</option>
                   <option value='service'>Service</option>
                 </select>
+                {productForm.vertical === 'shared_space' ? <p className='mt-1 text-xs text-slate-500'>Shared spaces are treated like services for bookings + concierge.</p> : null}
               </div>
               <div>
                 <Label htmlFor='product-seller'>Seller label</Label>
@@ -869,6 +1146,190 @@ export default function Dashboard() {
                 />
               </div>
             </div>
+            {productForm.vertical === 'shared_space' ? (
+              <div className='space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4'>
+                <div>
+                  <p className='text-sm font-semibold text-emerald-900'>Space profile</p>
+                  <p className='text-xs text-emerald-700'>Location, host vibe, and concierge notes power the new Hedgetech Spaces page.</p>
+                </div>
+                <div className='grid gap-3 md:grid-cols-2'>
+                  <div>
+                    <Label htmlFor='space-kind'>Offer focus</Label>
+                    <select
+                      id='space-kind'
+                      className='w-full rounded-md border px-3 py-2 text-sm'
+                      value={productForm.spaceProfile.listingKind}
+                      onChange={(event) =>
+                        setProductForm({
+                          ...productForm,
+                          spaceProfile: { ...productForm.spaceProfile, listingKind: event.target.value as SpaceFormState['listingKind'] },
+                        })
+                      }
+                    >
+                      <option value='roommate'>Spare room / roommate</option>
+                      <option value='desk-pass'>Desk or studio</option>
+                      <option value='lease-transfer'>Lease transfer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor='space-type'>Space type</Label>
+                    <select
+                      id='space-type'
+                      className='w-full rounded-md border px-3 py-2 text-sm'
+                      value={productForm.spaceProfile.type}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, type: event.target.value as SpaceFormState['type'] } })}
+                    >
+                      <option value='room'>Room</option>
+                      <option value='studio'>Studio</option>
+                      <option value='desk'>Desk</option>
+                    </select>
+                  </div>
+                </div>
+                <div className='grid gap-3 md:grid-cols-3'>
+                  <div>
+                    <Label htmlFor='space-suburb'>Suburb</Label>
+                    <Input
+                      id='space-suburb'
+                      value={productForm.spaceProfile.suburb}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, suburb: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-city'>City</Label>
+                    <Input
+                      id='space-city'
+                      value={productForm.spaceProfile.city}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, city: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-state'>State</Label>
+                    <Input
+                      id='space-state'
+                      value={productForm.spaceProfile.state}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, state: event.target.value } })}
+                    />
+                  </div>
+                </div>
+                <div className='grid gap-3 md:grid-cols-2'>
+                  <div>
+                    <Label htmlFor='space-available'>Available from</Label>
+                    <Input
+                      id='space-available'
+                      type='date'
+                      value={productForm.spaceProfile.availableFrom}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, availableFrom: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-stay'>Preferred stay length</Label>
+                    <Input
+                      id='space-stay'
+                      value={productForm.spaceProfile.stayLength}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, stayLength: event.target.value } })}
+                    />
+                  </div>
+                </div>
+                <div className='grid gap-3 md:grid-cols-3'>
+                  <div>
+                    <Label htmlFor='space-bond'>Bond (A$)</Label>
+                    <Input
+                      id='space-bond'
+                      type='number'
+                      value={productForm.spaceProfile.bond}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, bond: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-occ-current'>Residents (current)</Label>
+                    <Input
+                      id='space-occ-current'
+                      type='number'
+                      value={productForm.spaceProfile.occupancyCurrent}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, occupancyCurrent: Number(event.target.value) } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-occ-total'>Residents (total)</Label>
+                    <Input
+                      id='space-occ-total'
+                      type='number'
+                      value={productForm.spaceProfile.occupancyTotal}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, occupancyTotal: Number(event.target.value) } })}
+                    />
+                  </div>
+                </div>
+                <div className='flex items-center justify-between rounded-2xl border border-emerald-100 bg-white/70 px-3 py-2'>
+                  <div>
+                    <div className='text-sm font-semibold text-slate-900'>Fully furnished</div>
+                    <p className='text-xs text-slate-500'>Include bed, storage, and work setup.</p>
+                  </div>
+                  <Switch
+                    checked={productForm.spaceProfile.furnished}
+                    onCheckedChange={(value) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, furnished: value } })}
+                  />
+                </div>
+                <div className='grid gap-3 md:grid-cols-2'>
+                  <div>
+                    <Label htmlFor='space-amenities'>Amenities (comma or newline)</Label>
+                    <textarea
+                      id='space-amenities'
+                      className='mt-1 w-full rounded-md border px-3 py-2 text-sm'
+                      rows={2}
+                      value={productForm.spaceProfile.amenities}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, amenities: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-vibe'>Vibe tags</Label>
+                    <textarea
+                      id='space-vibe'
+                      className='mt-1 w-full rounded-md border px-3 py-2 text-sm'
+                      rows={2}
+                      value={productForm.spaceProfile.vibe}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, vibe: event.target.value } })}
+                    />
+                  </div>
+                </div>
+                <div className='grid gap-3 md:grid-cols-3'>
+                  <div>
+                    <Label htmlFor='space-host-name'>Host name</Label>
+                    <Input
+                      id='space-host-name'
+                      value={productForm.spaceProfile.hostName}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, hostName: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-host-avatar'>Host avatar URL</Label>
+                    <Input
+                      id='space-host-avatar'
+                      value={productForm.spaceProfile.hostAvatar}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, hostAvatar: event.target.value } })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor='space-host-bio'>Host bio</Label>
+                    <Input
+                      id='space-host-bio'
+                      value={productForm.spaceProfile.hostBio}
+                      onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, hostBio: event.target.value } })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor='space-concierge'>Concierge intro cue</Label>
+                  <textarea
+                    id='space-concierge'
+                    className='mt-1 w-full rounded-md border px-3 py-2 text-sm'
+                    rows={3}
+                    value={productForm.spaceProfile.conciergeIntro}
+                    onChange={(event) => setProductForm({ ...productForm, spaceProfile: { ...productForm.spaceProfile, conciergeIntro: event.target.value } })}
+                    placeholder='Share the story, goals, or hosting style so the AI concierge can speak like you.'
+                  />
+                </div>
+              </div>
+            ) : null}
             <div>
               <Label htmlFor='product-images'>Additional image URLs (comma or newline separated)</Label>
               <textarea

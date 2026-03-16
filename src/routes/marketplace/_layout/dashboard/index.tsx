@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { StageBadge } from '@/components/stage-badge'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 type Highlight = { heading: string; body: string; href: string }
 
@@ -314,5 +315,6 @@ function SellerDashboard() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SellerDashboard,
 })

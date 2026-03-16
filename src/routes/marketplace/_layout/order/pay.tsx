@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useSearch } from '@tanstack/react-router'
-import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 
 export const Route = createFileRoute('/marketplace/_layout/order/pay')({
@@ -19,6 +17,8 @@ type OrderSummary = {
   customerEmail?: string | null
   address?: string | null
   items?: { id: string; title: string; quantity: number; price: number }[]
+  seller?: { name?: string | null; email?: string | null; paymentInstructions?: string | null } | null
+  sellerPaymentInstructions?: string | null
 }
 
 function PayOrderRoute() {
@@ -27,7 +27,6 @@ function PayOrderRoute() {
   const [order, setOrder] = useState<OrderSummary | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [paying, setPaying] = useState(false)
 
   useEffect(() => {
     if (!code) return
@@ -51,35 +50,15 @@ function PayOrderRoute() {
     }
   }, [code])
 
-  const handlePay = async () => {
-    if (!order?.id || !code) return
-    setPaying(true)
-    try {
-      const res = await fetch('/api/orders/pay-with-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
-      })
-      if (!res.ok) throw new Error(`Payment failed (${res.status})`)
-      const data = (await res.json()) as Pick<OrderSummary, 'status'>
-      setOrder((prev) => (prev ? { ...prev, status: data.status || 'paid' } : prev))
-      toast.success('Payment recorded. Thank you!')
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Payment failed')
-    } finally {
-      setPaying(false)
-    }
-  }
-
   if (!code) {
     return (
       <MarketplacePageShell width='narrow' className='space-y-6'>
         <header className='space-y-2 text-center'>
           <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-            Secure payment
+            Payment instructions
           </div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Complete your Hedgetech payment</h1>
-          <p className='text-sm text-slate-600'>Paste the code issued by the assistant to load your invoice and confirm payment.</p>
+          <h1 className='text-2xl font-semibold text-slate-900'>Retrieve seller payment details</h1>
+          <p className='text-sm text-slate-600'>Paste the code issued by the assistant to view how to pay your seller directly.</p>
         </header>
         <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div className='text-sm font-semibold text-slate-900'>Payment code</div>
@@ -128,7 +107,7 @@ function PayOrderRoute() {
     <MarketplacePageShell width='narrow' className='space-y-6'>
       <header className='space-y-2'>
         <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-          Invoice payment
+          Manual payment
         </div>
         <h1 className='text-2xl font-semibold text-slate-900'>Order #{order.id.slice(0, 8)}</h1>
         <p className='text-sm text-slate-600'>Placed {new Date(order.createdAt).toLocaleString()}</p>
@@ -162,14 +141,18 @@ function PayOrderRoute() {
         </ul>
       </section>
 
-      <div className='flex flex-col gap-4 rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700 shadow-sm sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <div className='font-semibold text-emerald-800'>Secure Hedgetech checkout</div>
-          <div className='text-xs text-emerald-600'>Payment is recorded instantly and sellers are notified.</div>
-        </div>
-        <Button onClick={handlePay} disabled={isPaid || paying} className='rounded-full px-5'>
-          {isPaid ? 'Already paid' : paying ? 'Processing…' : 'Mark as paid'}
-        </Button>
+      <div className='rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700 shadow-sm'>
+        <div className='font-semibold text-emerald-800'>Manual payment required</div>
+        {order.sellerPaymentInstructions ? (
+          <>
+            <p className='mt-1 text-xs text-emerald-600'>Use the instructions below to settle with the seller. Include your order ID when sending proof of payment.</p>
+            <pre className='mt-3 whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-[11px] text-emerald-900'>
+              {order.sellerPaymentInstructions}
+            </pre>
+          </>
+        ) : (
+          <p className='mt-1 text-xs text-emerald-600'>This seller will email you payment instructions shortly. Reach out to them if you need help.</p>
+        )}
       </div>
     </MarketplacePageShell>
   )

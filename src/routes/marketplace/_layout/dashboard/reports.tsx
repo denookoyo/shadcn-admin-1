@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 function toCsv(rows: Array<Record<string, unknown>>) {
   if (!rows.length) return ''
@@ -126,5 +127,6 @@ function SellerReportsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/reports')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SellerReportsPage,
 })

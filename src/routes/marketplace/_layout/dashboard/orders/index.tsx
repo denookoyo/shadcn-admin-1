@@ -13,6 +13,7 @@ import {
 import { db, type Order } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 const statusBadge: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -222,6 +223,20 @@ export default function OrdersPage() {
     } catch {}
   }
 
+  async function markPaymentReceived(orderId: string) {
+    const ok = window.confirm('Mark this order as paid? Only do this after verifying funds in your account.')
+    if (!ok) return
+    try {
+      const updated = db.markOrderPaid ? await db.markOrderPaid(orderId) : null
+      if (updated) {
+        setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? updated : order)))
+        window.dispatchEvent(new CustomEvent('orders:changed'))
+      }
+    } catch (err) {
+      window.alert((err as Error)?.message ?? 'Unable to mark payment as received.')
+    }
+  }
+
   if (loading) {
     return (
       <MarketplacePageShell width='wide' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
@@ -272,6 +287,14 @@ export default function OrdersPage() {
                     </div>
                     <div className='mt-1 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
                     <div className='mt-2 flex items-center gap-2 text-xs'>
+                      {['pending', 'scheduled'].includes(order.status) ? (
+                        <button
+                          className='rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
+                          onClick={() => markPaymentReceived(order.id)}
+                        >
+                          Confirm payment received
+                        </button>
+                      ) : null}
                       <button
                         className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
                         onClick={() => (isServiceOrder(order) ? openServiceAction(order) : confirmShipment(order.id))}
@@ -659,5 +682,6 @@ export default function OrdersPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/orders/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: OrdersPage,
 })

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
@@ -6,6 +6,9 @@ import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-rea
 import { Button } from '@/components/ui/button'
 import { db, type RefundRequest, type SupportMessage, type SupportTicket, type SupportTicketStatus } from '@/lib/data'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { listSellerApplications, reviewSellerApplication, type SellerApplication } from '@/features/sellers/verification'
+import { useAuthStore } from '@/stores/authStore'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 function badgeClasses(status: string) {
   switch (status) {
@@ -27,12 +30,26 @@ function badgeClasses(status: string) {
   }
 }
 
+function sellerStatusClasses(status: SellerApplication['status']) {
+  switch (status) {
+    case 'approved':
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    case 'pending':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'rejected':
+      return 'bg-red-50 text-red-700 border-red-200'
+    default:
+      return 'bg-slate-50 text-slate-600 border-slate-200'
+  }
+}
+
 async function refreshSupportData() {
-  const [ticketList, refundList] = await Promise.all([
+  const [ticketList, refundList, sellerList] = await Promise.all([
     typeof db.listSupportTickets === 'function' ? db.listSupportTickets() : Promise.resolve([]),
     typeof db.listRefundRequests === 'function' ? db.listRefundRequests('seller') : Promise.resolve([]),
+    listSellerApplications(),
   ])
-  return { tickets: ticketList, refunds: refundList }
+  return { tickets: ticketList, refunds: refundList, sellerApps: sellerList }
 }
 
 function lastMessagePreview(ticket: SupportTicket): string {
@@ -107,17 +124,21 @@ async function createLocalTicket(subject: string, body: string) {
 }
 
 function SupportConsolePage() {
+  const { user } = useAuthStore((s) => s.auth)
+  const isAdmin = Boolean((user as any)?.isAdmin)
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
+  const [sellerApps, setSellerApps] = useState<SellerApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const { tickets: ticketList, refunds: refundList } = await refreshSupportData()
+      const { tickets: ticketList, refunds: refundList, sellerApps: appList } = await refreshSupportData()
       setTickets(ticketList)
       setRefunds(refundList)
+      setSellerApps(appList)
       setError(null)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unable to load support data')
@@ -140,6 +161,7 @@ function SupportConsolePage() {
     const closed = tickets.filter((ticket) => ticket.status === 'resolved' || ticket.status === 'closed').length
     return `${Math.round((closed / tickets.length) * 100)}%`
   }, [tickets])
+  const pendingSellerApps = useMemo(() => sellerApps.filter((app) => app.status !== 'approved'), [sellerApps])
 
   async function handleCreateTicket() {
     const subject = window.prompt('Ticket subject')
@@ -176,6 +198,37 @@ function SupportConsolePage() {
     const notes = window.prompt('Add an optional resolution note', refund.resolution ?? '')
     const updated = await updateLocalRefund(refund.id, action, notes ?? undefined)
     setRefunds((prev) => prev.map((item) => (item.id === refund.id ? updated : item)))
+  }
+
+  async function handleSellerReviewAction(app: SellerApplication, action: 'approve' | 'reject') {
+    const notes = window.prompt('Add reviewer notes', app.reviewerNotes ?? '')
+    const updated = await reviewSellerApplication(app.id, action, notes ?? undefined)
+    setSellerApps((prev) => prev.map((item) => (item.id === app.id ? updated : item)))
+  }
+
+  if (!isAdmin) {
+    return (
+      <MarketplacePageShell width='default' className='space-y-8' topSpacing='lg' bottomSpacing='lg'>
+        <header>
+          <div className='inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800'>
+            Admin only
+          </div>
+          <h1 className='mt-3 text-3xl font-semibold text-slate-900'>Support console locked</h1>
+          <p className='text-sm text-slate-600'>Only Hedgetech administrators can review tickets, refunds, and seller applications. Contact support if you need to escalate a buyer issue.</p>
+        </header>
+        <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+          <p className='text-sm text-slate-600'>You can still open a support conversation from the buyer dashboard or track your seller verification progress.</p>
+          <div className='mt-4 flex flex-wrap gap-3 text-sm'>
+            <Button asChild className='rounded-full'>
+              <Link to='/marketplace/dashboard/verification'>View seller verification</Link>
+            </Button>
+            <Button asChild variant='outline' className='rounded-full'>
+              <Link to='/marketplace/my-orders'>Open buyer support</Link>
+            </Button>
+          </div>
+        </div>
+      </MarketplacePageShell>
+    )
   }
 
   return (
@@ -326,10 +379,53 @@ function SupportConsolePage() {
           )}
         </div>
       </section>
+
+      <section className='space-y-4'>
+        <div className='flex items-center justify-between'>
+          <h2 className='text-lg font-semibold text-slate-900'>Seller verification queue</h2>
+          <span className='text-xs text-slate-500'>{pendingSellerApps.length} awaiting review</span>
+        </div>
+        <div className='space-y-3'>
+          {pendingSellerApps.length === 0 ? (
+            <div className='rounded-3xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500'>
+              No pending seller applications. Approved sellers appear automatically once support reviews them.
+            </div>
+          ) : (
+            pendingSellerApps.map((app) => (
+              <div key={app.id} className='rounded-3xl border border-slate-200 bg-white p-5 shadow-sm'>
+                <div className='flex flex-wrap items-start justify-between gap-3'>
+                  <div>
+                    <div className='text-sm font-semibold text-slate-900'>{app.companyName}</div>
+                    <div className='text-xs text-slate-500'>{app.email}</div>
+                    <div className='text-xs text-slate-500'>Submitted {format(new Date(app.submittedAt), 'PP p')}</div>
+                    {app.location ? <div className='text-xs text-slate-500'>Counties: {app.location}</div> : null}
+                  </div>
+                  <span className={`rounded-full border px-3 py-1 text-xs font-semibold capitalize ${sellerStatusClasses(app.status)}`}>
+                    {app.status === 'pending' ? 'Pending review' : 'Needs update'}
+                  </span>
+                </div>
+                {app.pitch ? <p className='mt-3 text-sm text-slate-600'>{app.pitch}</p> : null}
+                {app.documents && app.documents.length ? (
+                  <p className='mt-2 text-xs text-slate-500'>Docs: {app.documents.join(' • ')}</p>
+                ) : null}
+                <div className='mt-4 flex flex-wrap gap-2 text-xs'>
+                  <Button size='sm' variant='secondary' onClick={() => handleSellerReviewAction(app, 'approve')}>
+                    Approve
+                  </Button>
+                  <Button size='sm' variant='outline' onClick={() => handleSellerReviewAction(app, 'reject')}>
+                    Request changes
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
     </MarketplacePageShell>
   )
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/support')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SupportConsolePage,
 })

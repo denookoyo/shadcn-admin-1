@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 function SellerListingsPage() {
   const { user } = useAuthStore((s) => s.auth)
@@ -168,5 +169,6 @@ function SellerListingsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/listings/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SellerListingsPage,
 })

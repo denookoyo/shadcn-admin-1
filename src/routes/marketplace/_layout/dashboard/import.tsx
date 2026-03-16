@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 type CsvRow = Partial<Pick<Product, 'title'|'slug'|'price'|'type'|'seller'|'img'>> & { barcode?: string }
 
@@ -97,5 +98,6 @@ function ImportCsvPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/import')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: ImportCsvPage,
 })

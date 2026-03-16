@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 const stages: Stage[] = ['test', 'preview', 'production']
 
@@ -66,5 +67,6 @@ function SellerSettingsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/settings/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SellerSettingsPage,
 })

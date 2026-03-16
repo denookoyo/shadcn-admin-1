@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { ShieldCheck, Truck, Clock3, MessageCircle } from 'lucide-react'
+import { ShieldCheck, Truck, Clock3, MessageCircle, MapPin, Users, Sparkles, CalendarClock, Home, Key } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
@@ -10,9 +10,16 @@ import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { productToSharedSpace, type SharedSpace } from '@/features/marketplace/spaces/data'
 
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>{children}</span>
+}
+
+const SHARED_OFFER_LABELS: Record<'roommate' | 'desk-pass' | 'lease-transfer', string> = {
+  roommate: 'Roommate / spare room',
+  'desk-pass': 'Desk or studio',
+  'lease-transfer': 'Lease transfer',
 }
 
 export const Route = createFileRoute('/marketplace/_layout/listing/$slug/')({
@@ -93,7 +100,7 @@ function ListingDetail() {
     () => [
       'Genuine item verified by Hedgetech operations.',
       'Flexible fulfilment windows and buyer-side support.',
-      'Secure payments with instant refund if seller cancels.',
+      'Pay sellers directly using the instructions they share.',
     ],
     []
   )
@@ -112,6 +119,11 @@ function ListingDetail() {
         This listing is no longer available.
       </MarketplacePageShell>
     )
+  }
+
+  const sharedSpace = productToSharedSpace(product)
+  if ((product as any)?.vertical === 'shared_space' && sharedSpace) {
+    return <SharedSpaceDetail product={product} space={sharedSpace} />
   }
 
   const isService = product.type === 'service'
@@ -254,10 +266,10 @@ function ListingDetail() {
                 <CardContent className='space-y-2 p-4'>
                   <div className='flex items-center justify-between text-sm font-semibold'>
                     <span>Buyer coverage</span>
-                    <span className='text-emerald-700'>Protected</span>
+                    <span className='text-emerald-700'>Manual payments</span>
                   </div>
                   <p>
-                    Every Hedgetech transaction is protected by identity verification, escrow-backed payments, and responsive dispute resolution.
+                    Sellers provide their preferred payment instructions after checkout. Transfer funds directly and share proof of payment to keep fulfilment on track.
                   </p>
                 </CardContent>
               </Card>
@@ -328,6 +340,166 @@ function ListingDetail() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <ChatLauncher className='bottom-6 right-6 sm:bottom-8 sm:right-8' />
+    </MarketplacePageShell>
+  )
+}
+
+function SharedSpaceDetail({ product, space }: { product: Product; space: SharedSpace }) {
+  const locationLabel = [space.suburb, space.city].filter(Boolean).join(', ')
+  const offerLabel = SHARED_OFFER_LABELS[(space.listingKind as keyof typeof SHARED_OFFER_LABELS) || 'roommate'] || 'Shared space'
+  const availabilityLabel = space.availableFrom ? new Date(space.availableFrom).toLocaleDateString() : 'Flexible'
+  const stayLabel = space.stayLength || 'Flexible stay'
+  const bondLabel = space.bond ? `Bond A$${space.bond}` : 'No bond listed'
+  const occupancy = `${space.occupancy?.current ?? 0}/${space.occupancy?.total ?? 1} residents`
+  const conciergeIntro = space.conciergeIntro || `Hi! I'm interested in ${space.title} that I found on Hedgetech Spaces.`
+  const cityFilter = space.city && space.state ? `${space.city}, ${space.state}` : 'all'
+  const amenities = space.amenities || []
+  const vibes = space.vibe || []
+  const hostName = space.host?.name || product.seller || 'Host'
+
+  return (
+    <MarketplacePageShell width='wide' className='space-y-10'>
+      <div className='flex flex-wrap items-center gap-2 text-xs text-slate-500'>
+        <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>
+          Marketplace
+        </Link>
+        <span>/</span>
+        <Link to='/marketplace/spaces' search={{ city: 'all' }} className='font-medium text-emerald-700 hover:underline'>
+          Flatmates
+        </Link>
+        <span>/</span>
+        <span>{space.title}</span>
+      </div>
+
+      <div className='grid gap-8 lg:grid-cols-[1.4fr_1fr]'>
+        <div className='space-y-6'>
+          <div className='overflow-hidden rounded-3xl border border-slate-200 shadow-sm'>
+            <SafeImg src={space.img || product.img} alt={space.title} className='h-full w-full object-cover' />
+          </div>
+          <div className='space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
+              {offerLabel}
+            </div>
+            <div className='space-y-2'>
+              <h1 className='text-3xl font-semibold text-slate-900'>{space.title}</h1>
+              <p className='text-sm text-slate-500'>{locationLabel}</p>
+            </div>
+            <p className='text-sm text-slate-600'>{space.description}</p>
+            {space.listingKind === 'lease-transfer' ? (
+              <div className='rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800'>
+                <div className='text-xs font-semibold uppercase tracking-wide'>Lease transfer</div>
+                Take over this lease with Hedgetech concierge guiding ID checks and paperwork so the handover is smooth.
+              </div>
+            ) : null}
+            <div className='grid gap-4 text-sm text-slate-600 sm:grid-cols-2'>
+              <div className='flex items-center gap-2'>
+                <MapPin className='h-4 w-4 text-emerald-600' />
+                {locationLabel}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Users className='h-4 w-4 text-emerald-600' />
+                {occupancy}
+              </div>
+              <div className='flex items-center gap-2'>
+                <CalendarClock className='h-4 w-4 text-emerald-600' />
+                Available {availabilityLabel}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Home className='h-4 w-4 text-emerald-600' />
+                {stayLabel}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Key className='h-4 w-4 text-emerald-600' />
+                {bondLabel}
+              </div>
+              <div className='flex items-center gap-2'>
+                <Sparkles className='h-4 w-4 text-emerald-600' />
+                Fully furnished: {space.furnished ? 'Yes' : 'Ask host'}
+              </div>
+            </div>
+            <div className='rounded-3xl border border-slate-100 bg-slate-50 p-4'>
+              <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Amenities & perks</div>
+              {amenities.length ? (
+                <ul className='mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2'>
+                  {amenities.map((item) => (
+                    <li key={item} className='inline-flex items-center gap-2'>
+                      <Sparkles className='h-3.5 w-3.5 text-emerald-600' /> {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className='mt-3 text-sm text-slate-500'>Host will share amenities once you message the concierge.</p>
+              )}
+            </div>
+            {vibes.length ? (
+              <div className='space-y-2'>
+                <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Vibe & culture</div>
+                <div className='flex flex-wrap gap-2'>
+                  {vibes.map((tag) => (
+                    <span key={tag} className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <div className='flex items-center gap-3'>
+              <img src={space.host?.avatar || product.img} alt={hostName} className='h-14 w-14 rounded-full object-cover' />
+              <div>
+                <div className='text-sm font-semibold text-slate-900'>Meet {hostName}</div>
+                <p className='text-xs text-slate-500'>{space.host?.bio || 'Verified Hedgetech host'}</p>
+              </div>
+            </div>
+            <p className='mt-4 text-sm text-slate-600'>
+              {space.conciergeIntro ||
+                "Share your story with the concierge and they'll connect you directly to the host with ID verification included."}
+            </p>
+          </div>
+        </div>
+
+        <div className='space-y-4'>
+          <div className='space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+            <div className='flex items-center justify-between text-xs text-slate-500'>
+              <span className='rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-700'>{offerLabel}</span>
+              <span className='font-mono text-[11px]'>ID {product.id.slice(0, 6)}</span>
+            </div>
+            <div className='text-4xl font-bold text-emerald-600'>A${space.rentPerWeek}/wk</div>
+            <p className='text-sm text-slate-500'>Hedgetech concierge can negotiate bundled services or cleaning add-ons.</p>
+            <div className='flex flex-col gap-2 sm:flex-row'>
+              <Button asChild className='flex-1 rounded-full'>
+                <Link to='/marketplace/assistant' search={{ preset: `space:${space.slug}`, intro: conciergeIntro }}>
+                  Message concierge
+                </Link>
+              </Button>
+              <Button asChild variant='outline' className='flex-1 rounded-full border-emerald-200 text-emerald-700 hover:bg-emerald-50'>
+                <Link to='/marketplace/spaces' search={{ city: cityFilter }}>
+                  Browse flatmates
+                </Link>
+              </Button>
+            </div>
+            <div className='rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-600'>
+              <div className='font-semibold text-slate-900'>What concierge handles</div>
+              <ul className='mt-2 list-disc space-y-1 pl-5'>
+                <li>Host introductions and ID verification.</li>
+                <li>Optional deposit escrow + payment links.</li>
+                <li>Lease addendums or move-in agreements.</li>
+              </ul>
+            </div>
+          </div>
+          <div className='space-y-3 rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm'>
+            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Next steps</div>
+            <ol className='list-decimal space-y-2 pl-5'>
+              <li>Send your intro and ideal move-in date via the concierge button.</li>
+              <li>We coordinate a viewing or video walk-through with {hostName}.</li>
+              <li>Secure the room with a digital agreement and optional payment link.</li>
+            </ol>
+          </div>
+        </div>
       </div>
 
       <ChatLauncher className='bottom-6 right-6 sm:bottom-8 sm:right-8' />

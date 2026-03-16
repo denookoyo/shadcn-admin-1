@@ -57,7 +57,7 @@ export function createAuthRouter() {
       const role = ADMIN_EMAILS.includes(String(email).toLowerCase()) ? 'admin' : 'driver'
       // Upsert by email to avoid races and ensure creation
       const baseUpdate = { googleSub, name: name || null, image: image || null }
-      const baseCreate = { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null }
+      const baseCreate = { email, name: name || null, image: image || null, googleSub, phoneNo: 'N/A', ABN: 'N/A', bio: null, paymentInstructions: null }
 
       const upsertWithoutRole = async () =>
         prisma.user.upsert({
@@ -87,6 +87,7 @@ export function createAuthRouter() {
       }
 
       const normalizedRole = typeof user.role === 'string' ? user.role : role
+      const isAdmin = ['admin', 'manager', 'superadmin'].includes(String(normalizedRole).toLowerCase())
 
       // If MFA is enabled, set a temporary cookie and require OTP verification
       if (user.mfaEnabled && user.mfaSecret) {
@@ -95,9 +96,9 @@ export function createAuthRouter() {
         return res.json({ mfaRequired: true })
       }
 
-      const token = jwt.sign({ uid: user.id, email: user.email, role: normalizedRole }, JWT_SECRET, { expiresIn: '7d' })
+      const token = jwt.sign({ uid: user.id, email: user.email, role: normalizedRole, isAdmin }, JWT_SECRET, { expiresIn: '7d' })
       res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
-      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: normalizedRole })
+      res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: normalizedRole, paymentInstructions: user.paymentInstructions || null, isAdmin })
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('POST /api/auth/google error:', e)
@@ -119,6 +120,8 @@ export function createAuthRouter() {
         return res.status(200).json(null)
       }
       const user = await prisma.user.findUnique({ where })
+      const normalizedRole = user?.role ?? null
+      const isAdmin = ['admin', 'manager', 'superadmin'].includes(String(normalizedRole || '').toLowerCase())
       return res.json(
         user
           ? {
@@ -130,7 +133,9 @@ export function createAuthRouter() {
               ABN: user.ABN,
               bio: user.bio,
               mfaEnabled: Boolean(user.mfaEnabled),
-              role: user.role,
+              role: normalizedRole,
+              paymentInstructions: user.paymentInstructions,
+              isAdmin,
             }
           : null
       )
@@ -146,17 +151,31 @@ export function createAuthRouter() {
   // Update current user profile
   router.put('/me', ensureAuth, async (req, res) => {
     try {
-      const { name, image, phoneNo, ABN, bio } = req.body || {}
+      const { name, image, phoneNo, ABN, bio, paymentInstructions } = req.body || {}
       const hasEmail = !!req.user?.email
       const where = hasEmail ? { email: req.user.email } : { id: Number(req.user.uid) }
-      const data = { name, image, phoneNo, ABN, bio }
+      const data = { name, image, phoneNo, ABN, bio, paymentInstructions }
       // Upsert to avoid 500 when record doesn't exist yet (e.g., after DB reset)
       const updated = await prisma.user.upsert({
         where,
         update: data,
         create: { email: req.user.email || `user${Date.now()}@local`, ...data },
       })
-      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled), role: updated.role })
+      const normalizedRole = updated.role ?? null
+      const isAdmin = ['admin', 'manager', 'superadmin'].includes(String(normalizedRole || '').toLowerCase())
+      res.json({
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        image: updated.image,
+        phoneNo: updated.phoneNo,
+        ABN: updated.ABN,
+        bio: updated.bio,
+        paymentInstructions: updated.paymentInstructions,
+        mfaEnabled: Boolean(updated.mfaEnabled),
+        role: normalizedRole,
+        isAdmin,
+      })
     } catch (e) {
       console.error('PUT /api/auth/me error:', e)
       res.status(500).json({ error: e?.message || 'Auth update error' })
@@ -166,16 +185,30 @@ export function createAuthRouter() {
   // Fallback for clients that use POST instead of PUT
   router.post('/me', ensureAuth, async (req, res) => {
     try {
-      const { name, image, phoneNo, ABN, bio } = req.body || {}
+      const { name, image, phoneNo, ABN, bio, paymentInstructions } = req.body || {}
       const hasEmail = !!req.user?.email
       const where = hasEmail ? { email: req.user.email } : { id: Number(req.user.uid) }
-      const data = { name, image, phoneNo, ABN, bio }
+      const data = { name, image, phoneNo, ABN, bio, paymentInstructions }
       const updated = await prisma.user.upsert({
         where,
         update: data,
         create: { email: req.user.email || `user${Date.now()}@local`, ...data },
       })
-      res.json({ id: updated.id, email: updated.email, name: updated.name, image: updated.image, phoneNo: updated.phoneNo, ABN: updated.ABN, bio: updated.bio, mfaEnabled: Boolean(updated.mfaEnabled), role: updated.role })
+      const normalizedRole = updated.role ?? null
+      const isAdmin = ['admin', 'manager', 'superadmin'].includes(String(normalizedRole || '').toLowerCase())
+      res.json({
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        image: updated.image,
+        phoneNo: updated.phoneNo,
+        ABN: updated.ABN,
+        bio: updated.bio,
+        paymentInstructions: updated.paymentInstructions,
+        mfaEnabled: Boolean(updated.mfaEnabled),
+        role: normalizedRole,
+        isAdmin,
+      })
     } catch (e) {
       console.error('POST /api/auth/me error:', e)
       res.status(500).json({ error: e?.message || 'Auth update error' })

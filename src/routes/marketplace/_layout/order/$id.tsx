@@ -124,6 +124,7 @@ function OrderDetail() {
   const [refundAmount, setRefundAmount] = useState('')
   const [selectedRefundItem, setSelectedRefundItem] = useState<string>('order')
   const [submittingRefund, setSubmittingRefund] = useState(false)
+  const [markingPaid, setMarkingPaid] = useState(false)
   useEffect(() => {
     // Preload proposals from current order once data arrives
     try {
@@ -181,6 +182,7 @@ function OrderDetail() {
   const isService = (item: any) => item.product?.type === 'service'
   const hasService = (data.items || []).some((it: any) => isService(it))
   const paymentMade = ['paid', 'shipped', 'completed'].includes(data.status)
+  const paymentInstructions = data.paymentInstructions || data.seller?.paymentInstructions || null
   const firstService = (data.items || []).find((it: any) => it?.product?.type === 'service')
   let proposals: string[] = []
   try { proposals = firstService?.appointmentAlternates ? JSON.parse(firstService.appointmentAlternates) : [] } catch {}
@@ -270,6 +272,37 @@ function OrderDetail() {
       <div className='mt-3 text-sm text-gray-600'>
         Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : 'Not paid'}</span>
       </div>
+      {isSeller && !paymentMade && ['pending', 'scheduled'].includes(data.status) ? (
+        <button
+          type='button'
+          onClick={async () => {
+            if (markingPaid) return
+            setMarkingPaid(true)
+            try {
+              const updated = db.markOrderPaid ? await db.markOrderPaid(id) : null
+              if (updated) setData(updated)
+            } catch (err) {
+              window.alert((err as Error)?.message ?? 'Unable to mark as paid.')
+            } finally {
+              setMarkingPaid(false)
+            }
+          }}
+          className='mt-2 inline-flex items-center rounded-full border border-emerald-200 px-4 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-50'
+        >
+          {markingPaid ? 'Updating…' : 'Mark payment received'}
+        </button>
+      ) : null}
+      {paymentInstructions ? (
+        <div className='mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>
+          <div className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>Payment instructions</div>
+          <p className='mt-1 text-xs text-emerald-700'>
+            {isSeller ? 'Share these details with the buyer so they can transfer funds directly.' : 'Use these details to pay your seller directly and include your order ID as the reference.'}
+          </p>
+          <pre className='mt-2 whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-xs text-emerald-900'>
+            {paymentInstructions}
+          </pre>
+        </div>
+      ) : null}
       {localFallback ? (
         <div className='mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700'>
           Viewing demo data. Connect the API backend or sign in to see live fulfilment details.

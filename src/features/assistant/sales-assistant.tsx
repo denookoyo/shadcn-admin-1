@@ -6,6 +6,7 @@ import { Sparkles, ShoppingBag, Clock, CreditCard, AlertCircle, X, Paperclip, Fi
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useAuthStore } from '@/stores/authStore'
 import { db } from '@/lib/data'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -98,6 +99,8 @@ type SalesAssistantProps = {
 export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProps) {
   const isModal = variant === 'modal'
   const navigate = useNavigate()
+  const { user } = useAuthStore((state) => state.auth)
+  const cartNamespace = user?.email || user?.accountNo || 'guest'
   const [messages, setMessages] = useState<AssistantMessage[]>([])
   const [state, setState] = useState<AssistantState>(defaultState)
   const [customer, setCustomer] = useState<{ name?: string; email?: string; phone?: string }>({})
@@ -131,8 +134,8 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
       } else {
         setMessages([welcomeMessage])
       }
-    } catch (error) {
-      console.warn('Failed to hydrate assistant history:', error)
+    } catch (_error) {
+      toast.error('Unable to restore previous assistant chats. Starting fresh.')
       setMessages([welcomeMessage])
     }
     setHydrated(true)
@@ -144,8 +147,8 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
       const serialisableMessages = messages.map(({ fresh, ...rest }) => rest)
       const payload = { messages: serialisableMessages, state, customer }
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-    } catch (error) {
-      console.warn('Failed to persist assistant history:', error)
+    } catch (_error) {
+      // Swallow storage errors silently to avoid interrupting the chat flow
     }
   }, [messages, state, customer, hydrated])
 
@@ -172,37 +175,83 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
     return latest?.fields ?? []
   }, [state.pendingInfoRequests])
 
-  const handleActionResults = useCallback(async (actions?: AssistantActionResult[]) => {
-    if (!actions || !actions.length) return
-    let cartUpdated = false
-    for (const action of actions) {
-      if (action.status !== 'applied') continue
-      if (action.type === 'add_to_cart') {
-        const items = Array.isArray(action.items) ? action.items : []
-        for (const item of items) {
-          const productId = String(item.productId || '')
-          if (!productId) continue
-          const quantity = Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : 1
-          try {
-            await db.addToCart(productId, quantity)
-            cartUpdated = true
-          } catch (error) {
-            console.error('Failed to sync cart item from assistant', error)
-          }
+  const handleActionResults = useCallback(
+    async (actions?: AssistantActionResult[]) => {
+      if (!actions || !actions.length) return
+      let cartUpdated = false
+
+      const emitCartChanged = () => {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('cart:changed'))
         }
       }
-      if (action.type === 'book_service') {
-        toast.success('Service appointment captured. We will confirm availability shortly.')
+
+      const syncCartItem = async (productId: string, quantity: number, meta?: string) => {
+        if (!productId) return
+        try {
+          await db.addToCart(productId, quantity, cartNamespace, meta)
+          cartUpdated = true
+        } catch (_error) {
+          toast.error('Unable to sync the assistant cart with your checkout.')
+        }
       }
-      if (action.type === 'generate_payment_link') {
-        toast.success('Payment link generated. Check the assistant message for details.')
+
+      for (const action of actions) {
+        if (action.status !== 'applied') continue
+        if (action.type === 'add_to_cart') {
+          const items = Array.isArray(action.items) ? action.items : []
+          for (const item of items) {
+            const productId = String(item.productId || '')
+            if (!productId) continue
+            const quantity = Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : 1
+            const meta = typeof item.appointmentSlot === 'string' ? item.appointmentSlot : undefined
+            await syncCartItem(productId, quantity, meta)
+          }
+        }
+        if (action.type === 'book_service') {
+          const productId = String(action.productId || '')
+          const slot = typeof action.slot === 'string' ? action.slot : undefined
+          if (productId) {
+            await syncCartItem(productId, 1, slot)
+          }
+          toast.success('Service appointment captured. We will confirm availability shortly.')
+        }
+        if (action.type === 'generate_payment_link') {
+          toast.success('Payment link generated. Check the assistant message for details.')
+        }
+        if (action.type === 'clear_cart') {
+          try {
+            await db.clearCart(cartNamespace)
+            emitCartChanged()
+            toast.success('Cart cleared')
+          } catch (_error) {
+            toast.error('We could not clear the cart. Please try again.')
+          }
+        }
+        if (action.type === 'create_order') {
+          try {
+            await db.clearCart(cartNamespace)
+            emitCartChanged()
+          } catch (_error) {
+            toast.error('Cart sync failed after the order. Refresh to confirm.')
+          }
+          const orders = Array.isArray(action.orders) ? action.orders : []
+          const hasInstructions = orders.some((order: any) => typeof order.paymentInstructions === 'string' && order.paymentInstructions.length > 0)
+          toast.success(
+            hasInstructions
+              ? 'Order created. Seller payment instructions are listed in the assistant reply.'
+              : 'Order created. Check your email for payment instructions.',
+          )
+        }
       }
-    }
-    if (cartUpdated) {
-      toast.success('Items added to your cart')
-      navigate({ to: '/marketplace/checkout' })
-    }
-  }, [navigate])
+      if (cartUpdated) {
+        emitCartChanged()
+        toast.success('Items added to your cart')
+        navigate({ to: '/marketplace/checkout' })
+      }
+    },
+    [cartNamespace, navigate],
+  )
 
   const handleAttachmentClick = useCallback(() => {
     fileInputRef.current?.click()
@@ -238,8 +287,7 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
           data,
           previewUrl,
         })
-      } catch (error) {
-        console.error('Failed to read attachment', error)
+      } catch (_error) {
         toast.error(`Could not attach ${file.name}`)
       }
     }
@@ -336,7 +384,7 @@ export function SalesAssistant({ variant = 'page', onClose }: SalesAssistantProp
     setPendingAttachments([])
     try {
       await mutation.mutateAsync({ text, userMessage, attachments: payloadAttachments })
-    } catch (e) {
+    } catch (_error) {
       // handled in onError
       if (previousAttachments.length) {
         setPendingAttachments(previousAttachments)
@@ -730,9 +778,19 @@ function ActionSummary({ action }: { action: AssistantActionResult }) {
             Order created
           </div>
           {orders.map((order: any) => (
-            <div key={order.id} className='flex items-center justify-between gap-3'>
-              <div>#{String(order.id).slice(0, 8)}</div>
-              <div className='font-medium'>A${order.total}</div>
+            <div key={order.id} className='space-y-2 rounded-md border border-slate-100 bg-slate-50/80 p-2'>
+              <div className='flex items-center justify-between gap-3 text-[11px]'>
+                <div className='font-semibold text-slate-800'>#{String(order.id).slice(0, 8)}</div>
+                <div className='font-medium text-slate-900'>A${order.total}</div>
+              </div>
+              {order.paymentInstructions ? (
+                <div className='space-y-1 rounded-md border border-emerald-100 bg-white/80 p-2 text-[11px] text-emerald-800'>
+                  <div className='font-semibold uppercase tracking-wide text-[10px] text-emerald-600'>Pay seller directly</div>
+                  <div className='whitespace-pre-wrap break-words'>{order.paymentInstructions}</div>
+                </div>
+              ) : (
+                <div className='text-[11px] text-slate-500'>Seller will share payment steps shortly.</div>
+              )}
             </div>
           ))}
         </div>
@@ -872,17 +930,22 @@ function StateSummary({ state, variant = 'panel' }: { state: AssistantState; var
           {state.orders.length ? (
             <ul className='space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs text-slate-700'>
               {state.orders.map((order) => (
-                <li key={order.id} className='flex flex-wrap items-center justify-between gap-2'>
-                  <span>#{String(order.id).slice(0, 8)}</span>
-                  <span className='font-medium text-slate-900'>A${order.total}</span>
-                  <Badge variant='outline' className='text-[10px] capitalize'>
-                    {order.status}
-                  </Badge>
-                  {order.paymentLink ? (
-                    <a className='text-[11px] text-emerald-600 underline' href={order.paymentLink}>
-                      Payment link
-                    </a>
-                  ) : null}
+                <li key={order.id} className='space-y-2 rounded-md border border-slate-200 bg-white/80 p-2'>
+                  <div className='flex flex-wrap items-center justify-between gap-2'>
+                    <span className='font-semibold text-slate-900'>#{String(order.id).slice(0, 8)}</span>
+                    <span className='font-medium text-slate-900'>A${order.total}</span>
+                    <Badge variant='outline' className='text-[10px] capitalize'>
+                      {order.status}
+                    </Badge>
+                  </div>
+                  {order.paymentInstructions ? (
+                    <div className='rounded-md border border-emerald-100 bg-emerald-50/80 p-2 text-[11px] text-emerald-800'>
+                      <div className='font-semibold uppercase text-[10px] tracking-wide text-emerald-600'>Payment instructions</div>
+                      <div className='mt-1 whitespace-pre-wrap break-words'>{order.paymentInstructions}</div>
+                    </div>
+                  ) : (
+                    <div className='text-[11px] text-slate-500'>Seller will message you with payment steps.</div>
+                  )}
                 </li>
               ))}
             </ul>

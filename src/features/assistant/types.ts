@@ -38,6 +38,7 @@ export type AssistantOrderSummary = {
   total: number
   status: string
   paymentLink?: string | null
+  paymentInstructions?: string | null
   accessCode?: string | null
   createdAt?: string
 }

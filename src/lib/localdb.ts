@@ -2,6 +2,29 @@
 // Provides Products, Cart, and Orders with async-like APIs
 
 export type ProductType = 'goods' | 'service'
+export type ProductVertical = 'commerce' | 'shared_space'
+
+export type SharedSpaceProfile = {
+  type: 'room' | 'studio' | 'desk'
+  listingKind?: 'roommate' | 'desk-pass' | 'lease-transfer'
+  rentPerWeek: number
+  bond?: number
+  suburb: string
+  city: string
+  state: string
+  availableFrom: string
+  stayLength: string
+  occupancy: { current: number; total: number }
+  furnished?: boolean
+  amenities?: string[]
+  vibe?: string[]
+  host?: {
+    name: string
+    avatar?: string
+    bio?: string
+  }
+  conciergeIntro?: string
+}
 
 export type Product = {
   id: string
@@ -23,6 +46,8 @@ export type Product = {
   serviceCloseTime?: string
   serviceOpenDays?: string[]
   serviceDailyCapacity?: number
+  vertical?: ProductVertical
+  spaceProfile?: SharedSpaceProfile | null
 }
 
 export type CartItem = {
@@ -49,6 +74,13 @@ export type Order = {
   customerEmail?: string
   address?: string
   customerPhone?: string
+  paymentInstructions?: string | null
+  seller?: {
+    id?: number | string | null
+    name?: string | null
+    email?: string | null
+    paymentInstructions?: string | null
+  } | null
 }
 
 function nsKey(key: string, namespace?: string) {
@@ -90,6 +122,8 @@ export const db = {
       id: uid('prod'),
       stockCount: input.stockCount ?? 0,
       serviceOpenDays: input.serviceOpenDays ?? [],
+      vertical: input.vertical ?? 'commerce',
+      spaceProfile: input.spaceProfile ?? null,
       ...input,
     }
     write(nsKey('db_products', namespace), [product, ...products])
@@ -140,7 +174,10 @@ export const db = {
   async listOrders(namespace?: string): Promise<Order[]> {
     return read<Order[]>(nsKey('db_orders', namespace), [])
   },
-  async createOrder(input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string): Promise<Order> {
+  async createOrder(
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    namespace?: string,
+  ): Promise<Order> {
     const orders = await this.listOrders(namespace)
     const order: Order = {
       id: uid('ord'),
@@ -152,6 +189,8 @@ export const db = {
       customerEmail: input.customerEmail,
       address: input.address,
       customerPhone: (input as any).customerPhone,
+      paymentInstructions: input.paymentInstructions ?? null,
+      seller: input.seller ?? null,
     }
     write(nsKey('db_orders', namespace), [order, ...orders])
     return order

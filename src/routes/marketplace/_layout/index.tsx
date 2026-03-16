@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Sparkles, ShieldCheck, Store, ShoppingBag, BarChart3, MessagesSquare, type LucideIcon } from 'lucide-react'
+import { Sparkles, ShieldCheck, Store, ShoppingBag, BarChart3, MessagesSquare, Home, type LucideIcon } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
 import { SafeImg } from '@/components/safe-img'
 import { db, type Category, type Product } from '@/lib/data'
 import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { SHARED_SPACES, type SharedSpace, productToSharedSpace } from '@/features/marketplace/spaces/data'
+import { listLandListings, type LandListing, formatKes as formatLandKes, formatAcreage as formatLandAcreage } from '@/features/land/data'
 
 type QuickAction = {
   icon: LucideIcon
@@ -19,6 +21,12 @@ type StatProps = {
   label: string
   value: string
   hint?: string
+}
+
+const SHARED_SPACE_LABELS: Record<'roommate' | 'desk-pass' | 'lease-transfer', string> = {
+  roommate: 'Roommate / spare room',
+  'desk-pass': 'Desk or studio',
+  'lease-transfer': 'Lease transfer',
 }
 
 function Stat({ label, value, hint }: StatProps) {
@@ -80,6 +88,40 @@ function CategoryCard({ name }: { name: string }) {
   )
 }
 
+function SharedSpaceTile({ space }: { space: SharedSpace }) {
+  const offerLabel = SHARED_SPACE_LABELS[(space.listingKind as keyof typeof SHARED_SPACE_LABELS) || 'roommate'] || SHARED_SPACE_LABELS.roommate
+  return (
+    <Link
+      to='/marketplace/spaces'
+      search={{ city: `${space.city}, ${space.state}` }}
+      className='flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-md'
+    >
+      <SafeImg src={space.img} alt={space.title} className='h-40 w-full object-cover' />
+      <div className='space-y-2 p-4'>
+        <div className='flex items-center justify-between text-xs text-slate-500'>
+          <span className='inline-flex items-center gap-1'>
+            <Home className='h-3.5 w-3.5 text-emerald-600' />
+            {space.suburb}
+          </span>
+          <span className='font-semibold text-emerald-700'>A${space.rentPerWeek}/wk</span>
+        </div>
+        <span className='inline-flex w-max items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700'>
+          {offerLabel}
+        </span>
+        <h3 className='text-sm font-semibold text-slate-900'>{space.title}</h3>
+        <p className='line-clamp-2 text-xs text-slate-500'>{space.description}</p>
+        <div className='flex flex-wrap gap-1'>
+          {(space.vibe || []).slice(0, 2).map((tag) => (
+            <span key={tag} className='rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700'>
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 function SpotlightCard({ product }: { product: Product }) {
   const sellerName = (product as any).ownerName || product.seller
   const ownerRating = Number((product as any).ownerRating ?? product.rating ?? 4.8).toFixed(1)
@@ -119,6 +161,8 @@ function SpotlightCard({ product }: { product: Product }) {
 function MarketplaceHome() {
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [landHighlights, setLandHighlights] = useState<LandListing[]>([])
+  const [landLoading, setLandLoading] = useState(true)
 
   useEffect(() => {
     let mounted = true
@@ -142,6 +186,24 @@ function MarketplaceHome() {
     }
   }, [])
 
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const items = await listLandListings()
+        if (!mounted) return
+        setLandHighlights(items.slice(0, 2))
+      } catch {
+        if (mounted) setLandHighlights([])
+      } finally {
+        if (mounted) setLandLoading(false)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   const avgRating = useMemo(() => {
     if (!products.length) return '4.9'
     const total = products.reduce((acc, item) => acc + Number(item.rating ?? 4.8), 0)
@@ -152,6 +214,14 @@ function MarketplaceHome() {
     () => products.filter((p) => p.type === 'service').length,
     [products]
   )
+  const sharedHighlights = useMemo(() => {
+    const derived = products
+      .map((product) => productToSharedSpace(product))
+      .filter(Boolean) as SharedSpace[]
+    if (derived.length >= 3) return derived.slice(0, 3)
+    if (derived.length > 0) return [...derived, ...SHARED_SPACES].slice(0, 3)
+    return SHARED_SPACES.slice(0, 3)
+  }, [products])
 
   const goodsCount = products.length - serviceCount
 
@@ -168,6 +238,13 @@ function MarketplaceHome() {
       title: 'Shop curated picks',
       body: 'Explore Hedgetech verified goods and services tailored to your goals.',
       href: '/marketplace/listings',
+      tone: 'emerald',
+    },
+    {
+      icon: Home,
+      title: 'Kenya land exchange',
+      body: 'Upload acreage, photos, and let Nairobi ops arrange escorted viewings.',
+      href: '/marketplace/land',
       tone: 'emerald',
     },
     {
@@ -330,6 +407,80 @@ function MarketplaceHome() {
           {categories.map((c) => (
             <CategoryCard key={c.id} name={c.name} />
           ))}
+        </div>
+      </section>
+
+      <section className='grid gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:grid-cols-[1fr_1.2fr]'>
+        <div className='space-y-3'>
+          <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
+            Hedgetech spaces
+          </div>
+          <h2 className='text-lg font-semibold text-slate-900'>Rooms, desks, and micro studios</h2>
+          <p className='text-sm text-slate-600'>Hosts list spare rooms and founder-friendly desks so you can relocate or run deep-work sprints with concierge support.</p>
+          <div className='flex flex-wrap gap-3 text-xs text-slate-500'>
+            <span>Hosts verified by Hedgetech</span>
+            <span>Concierge intros + background checks</span>
+          </div>
+          <Link
+            to='/marketplace/spaces'
+            search={{ city: 'all' }}
+            className='inline-flex w-max items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100'
+          >
+            Explore shared spaces
+          </Link>
+        </div>
+        <div className='grid gap-3 sm:grid-cols-2'>
+          {sharedHighlights.map((space) => (
+            <SharedSpaceTile key={space.id} space={space} />
+          ))}
+        </div>
+      </section>
+
+      <section className='grid gap-6 rounded-3xl border border-emerald-100/50 bg-gradient-to-br from-[#022c22] via-[#065f46] to-[#0f766e] p-6 text-white shadow-lg lg:grid-cols-[1fr_1fr]'>
+        <div className='space-y-4'>
+          <div className='inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-100'>
+            Kenya land exchange
+          </div>
+          <h2 className='text-2xl font-semibold leading-tight'>Post serviced acreage and let buyers arrange escorted viewings</h2>
+          <p className='text-sm text-emerald-50/80'>Purpose-built for Kenyan parcels — attach photos, note utilities, and capture interested buyers directly inside Hedgetech.</p>
+          <ul className='space-y-1 text-sm text-emerald-50/80'>
+            <li>• Showcase road access, soil, and beacons per county.</li>
+            <li>• Upload document checklists (title, mutation, search).</li>
+            <li>• Buyers tap Arrange Viewing for escrow-ready site visits.</li>
+          </ul>
+          <Link
+            to='/marketplace/land'
+            className='inline-flex w-max items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/20'
+          >
+            Open land board
+          </Link>
+        </div>
+        <div className='grid gap-3'>
+          {landLoading ? (
+            <div className='rounded-2xl border border-white/20 bg-white/10 p-6 text-sm text-emerald-50/70'>Loading featured parcels...</div>
+          ) : landHighlights.length === 0 ? (
+            <div className='rounded-2xl border border-dashed border-white/30 p-6 text-sm text-emerald-50/80'>Bring your first Kenyan land listing to unlock this showcase.</div>
+          ) : (
+            landHighlights.map((land) => (
+              <Link
+                key={land.id}
+                to='/marketplace/land'
+                className='group flex items-center gap-4 rounded-2xl border border-white/15 bg-white/5 p-3 text-left transition hover:bg-white/15'
+              >
+                <div className='h-20 w-24 overflow-hidden rounded-xl border border-white/20'>
+                  <SafeImg src={land.gallery[0]} alt={land.title} className='h-full w-full object-cover' loading='lazy' />
+                </div>
+                <div className='space-y-1 text-sm'>
+                  <div className='text-xs uppercase tracking-wide text-emerald-100/80'>
+                    {land.county} • {formatLandAcreage(land.acreage)}
+                  </div>
+                  <div className='font-semibold text-white'>{land.title}</div>
+                  <div className='text-xs text-emerald-50/80'>{formatLandKes(land.priceKes)}</div>
+                  <div className='text-[11px] text-emerald-50/70'>{land.highlights[0]}</div>
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </section>
 

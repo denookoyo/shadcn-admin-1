@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { HedgetechLogo } from '@/components/hedgetech-logo'
 import { StageBadge } from '@/components/stage-badge'
+import { useSellerAccess } from '@/features/sellers/access'
 
 function Nav() {
   const { user } = useAuthStore((s) => s.auth)
@@ -53,19 +54,33 @@ function Nav() {
     }
   }, [])
 
+  const { sellerStatus, canAccessSellerTools } = useSellerAccess()
   const primaryLinks = [
     { href: '/marketplace', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
+    { href: '/marketplace/land', label: 'Kenya land' },
     { href: '/marketplace/my-orders', label: 'Track order' },
     { href: '/marketplace/cart', label: 'Cart' },
   ] as const
-  const sellerLinks = [
-    { href: '/marketplace/dashboard', label: 'Seller cockpit' },
-    { href: '/marketplace/dashboard/analytics', label: 'Analytics' },
-    { href: '/marketplace/dashboard/reports', label: 'Reports' },
-    { href: '/marketplace/dashboard/support', label: 'Support' },
-    { href: '/marketplace/dashboard/pos', label: 'POS' },
-  ] as const
+  const sellerLinks = canAccessSellerTools
+    ? ([
+        { href: '/marketplace/dashboard', label: 'Seller cockpit' },
+        { href: '/marketplace/dashboard/analytics', label: 'Analytics' },
+        { href: '/marketplace/dashboard/reports', label: 'Reports' },
+        { href: '/marketplace/dashboard/support', label: 'Support' },
+        { href: '/marketplace/dashboard/pos', label: 'POS' },
+      ] as const)
+    : ([
+        {
+          href: '/marketplace/dashboard/verification',
+          label:
+            sellerStatus === 'pending'
+              ? 'Verification status'
+              : sellerStatus === 'rejected'
+                ? 'Fix verification'
+                : 'Become a seller',
+        },
+      ] as const)
   const supportLinks = [
     { href: '/marketplace/checkout', label: 'Checkout' },
     { href: '/marketplace/order/track', label: 'Guest tracking' },
@@ -112,10 +127,18 @@ function Nav() {
               </span>
             </Link>
             <Link
-              to="/marketplace/dashboard"
+              to={canAccessSellerTools ? '/marketplace/dashboard' : '/marketplace/dashboard/verification'}
               className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
             >
-              <span>Seller cockpit</span>
+              <span>
+                {canAccessSellerTools
+                  ? 'Seller cockpit'
+                  : sellerStatus === 'pending'
+                    ? 'View verification'
+                    : sellerStatus === 'rejected'
+                      ? 'Fix verification'
+                      : 'Become a seller'}
+              </span>
             </Link>
             {user ? (
               <ProfileDropdown />

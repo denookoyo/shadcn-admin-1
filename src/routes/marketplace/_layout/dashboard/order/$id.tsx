@@ -5,8 +5,10 @@ import { Calendar } from '@/components/ui/calendar'
 import { db } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/order/$id')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: ShopOrderDetail,
 })
 

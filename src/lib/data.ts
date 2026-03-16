@@ -144,7 +144,7 @@ export type DataAPI = {
   clearCart: (namespace?: string) => Promise<void>
   // Orders
   listOrders: (namespace?: string) => Promise<Order[]>
-  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<Order>
+  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null }, namespace?: string) => Promise<Order>
   // POS (seller-created order)
   createPosOrder?: (input: { items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
   listSellerOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>
@@ -155,6 +155,7 @@ export type DataAPI = {
   adminDeleteOrder?: (id: string) => Promise<void>
   submitOrderReview?: (orderId: string, rating: number, feedback: string) => Promise<{ rating: number; feedback: string }>
   getOrderReview?: (orderId: string) => Promise<{ rating: number; feedback: string } | null>
+  markOrderPaid?: (id: string) => Promise<Order>
   // Support
   listSupportTickets?: () => Promise<SupportTicket[]>
   getSupportTicket?: (id: string) => Promise<SupportTicket | null>
@@ -315,9 +316,14 @@ const api: DataAPI = {
   async listOrders(_namespace?: string): Promise<Order[]> {
     return http<Order[]>(`/api/orders`)
   },
-  async createOrder(input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, _namespace?: string): Promise<Order> {
+  async createOrder(
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    _namespace?: string,
+  ): Promise<Order> {
     // Do not pass ownerId; rely on session
-    const order = await http<Order & { accessCode?: string }>('/api/checkout', { method: 'POST', body: JSON.stringify({ ...input }) })
+    const payload = { ...input }
+    delete (payload as any).paymentInstructions
+    const order = await http<Order & { accessCode?: string }>('/api/checkout', { method: 'POST', body: JSON.stringify(payload) })
     // If guest checkout, persist tracking accessCode locally for convenience
     try {
       if (typeof window !== 'undefined' && (order as any)?.accessCode) {
@@ -350,6 +356,9 @@ const api: DataAPI = {
   },
   async adminDeleteOrder(id: string) {
     await http<void>(`/api/admin/orders/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  async markOrderPaid(id: string) {
+    return http<Order>(`/api/orders/${encodeURIComponent(id)}/mark-paid`, { method: 'POST' })
   },
   async submitOrderReview(orderId: string, rating: number, feedback: string) {
     return http<{ rating: number; feedback: string }>(`/api/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ rating, feedback }) })
@@ -598,7 +607,12 @@ const localWrapper: DataAPI = {
   async clearCart(namespace?: string) { return localdb.clearCart(namespace) },
   // Orders
   async listOrders(namespace?: string) { return localdb.listOrders(namespace) },
-  async createOrder(input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) { return localdb.createOrder(input, namespace) },
+  async createOrder(
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    namespace?: string,
+  ) {
+    return localdb.createOrder(input, namespace)
+  },
   async createPosOrder(input) {
     const ns = 'pos'
     const total = (input.items || []).reduce((a, c) => a + (c.price || 0) * (c.quantity || 0), 0)
@@ -617,6 +631,19 @@ const localWrapper: DataAPI = {
   async listAllOrders() { return [] },
   async adminUpdateOrderStatus(id: string, status: Order['status']) { return { id, items: [], total: 0, createdAt: new Date().toISOString(), status } as unknown as Order },
   async adminDeleteOrder(_id: string) { return },
+  async markOrderPaid(id: string) {
+    const orders = await localdb.listOrders()
+    const idx = orders.findIndex((order) => order.id === id)
+    if (idx === -1) throw new Error('Order not found')
+    const updated = { ...orders[idx], status: 'paid' as Order['status'] }
+    orders[idx] = updated
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('db_orders', JSON.stringify(orders))
+      }
+    } catch {}
+    return updated
+  },
   async submitOrderReview(_orderId: string, rating: number, feedback: string) { return { rating, feedback } },
   async getOrderReview(_orderId: string) { return null },
   async listSupportTickets() {

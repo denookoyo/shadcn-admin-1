@@ -17,13 +17,17 @@ const schema = z.object({
   phoneNo: z.string().optional().or(z.literal('')),
   ABN: z.string().optional().or(z.literal('')),
   bio: z.string().max(160).optional().or(z.literal('')),
+  paymentInstructions: z.string().max(2000).optional().or(z.literal('')),
 })
 
 type Values = z.infer<typeof schema>
 
 export default function ProfileForm() {
   const setUser = useAuthStore((s) => s.auth.setUser)
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', image: '', phoneNo: '', ABN: '', bio: '' } })
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', email: '', image: '', phoneNo: '', ABN: '', bio: '', paymentInstructions: '' },
+  })
 
   useEffect(() => {
     let mounted = true
@@ -39,6 +43,7 @@ export default function ProfileForm() {
           phoneNo: me.phoneNo ?? '',
           ABN: me.ABN ?? '',
           bio: me.bio ?? '',
+          paymentInstructions: me.paymentInstructions ?? '',
         })
       } catch {}
     })()
@@ -49,7 +54,14 @@ export default function ProfileForm() {
 
   async function onSubmit(values: Values) {
     try {
-      const patch = { name: values.name, image: values.image, phoneNo: values.phoneNo, ABN: values.ABN, bio: values.bio }
+      const patch = {
+        name: values.name,
+        image: values.image,
+        phoneNo: values.phoneNo,
+        ABN: values.ABN,
+        bio: values.bio,
+        paymentInstructions: values.paymentInstructions,
+      }
       const updated = await db.updateMe?.(patch)
       if (updated) {
         setUser(updated)
@@ -114,6 +126,20 @@ export default function ProfileForm() {
             <FormControl>
               <Textarea placeholder='Tell us a little bit about yourself' className='resize-none' {...field} />
             </FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+        <FormField control={form.control} name='paymentInstructions' render={({ field }) => (
+          <FormItem>
+            <FormLabel>Payment instructions for buyers</FormLabel>
+            <FormControl>
+              <Textarea
+                placeholder='e.g., Bank transfer BSB 123-456 Account 789012. Email remittance to pay@yourstudio.com.'
+                className='min-h-[120px] resize-none'
+                {...field}
+              />
+            </FormControl>
+            <p className='text-xs text-muted-foreground'>These instructions are shared automatically on checkout pages and in the AI concierge.</p>
             <FormMessage />
           </FormItem>
         )} />

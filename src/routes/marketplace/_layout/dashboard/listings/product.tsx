@@ -3,11 +3,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ProductEditor } from '@/features/dashboard/products/product-editor'
 import { db, type Product } from '@/lib/data'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/listings/product')({
   validateSearch: (search: Record<string, unknown>) => ({
     id: typeof search?.id === 'string' ? search.id : '',
   }),
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: ProductEditorRoute,
 })
 

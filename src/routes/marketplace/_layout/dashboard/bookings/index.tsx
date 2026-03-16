@@ -3,8 +3,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AlertCircle, CalendarClock, Clock3, Loader2 } from 'lucide-react'
 import { db, type Order } from '@/lib/data'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/bookings/')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: BookingsPage,
 })
 

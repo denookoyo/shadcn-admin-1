@@ -81,6 +81,68 @@ export function createApiRouter() {
     return `${hours}:${minutes}`
   }
 
+  function normalizeStringArray(value, fallback = []) {
+    if (Array.isArray(value)) {
+      return value
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(/[\n,]/)
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+    }
+    return [...fallback]
+  }
+
+  function normalizeSpaceProfile(raw) {
+    if (!raw && raw !== 0) return null
+    let profile = raw
+    if (typeof raw === 'string') {
+      try {
+        profile = JSON.parse(raw)
+      } catch {
+        return null
+      }
+    }
+    if (!profile || typeof profile !== 'object') return null
+    const rentPerWeek = parseIntOrDefault(profile.rentPerWeek ?? profile.price ?? profile.rate, 0, { min: 0 })
+    const bond = profile.bond === undefined || profile.bond === null ? undefined : parseIntOrDefault(profile.bond, 0, { min: 0 })
+    const occupancy = profile.occupancy || {}
+    const host = profile.host || {}
+    const allowedKinds = ['roommate', 'desk-pass', 'lease-transfer']
+    const requestedKind = typeof profile.listingKind === 'string' ? profile.listingKind.toLowerCase() : null
+    const listingKind = allowedKinds.includes(requestedKind) ? requestedKind : profile.type === 'desk' ? 'desk-pass' : 'roommate'
+
+    return {
+      type: ['studio', 'desk'].includes(String(profile.type)) ? String(profile.type) : 'room',
+      listingKind,
+      rentPerWeek,
+      bond,
+      suburb: String(profile.suburb || '').trim(),
+      city: String(profile.city || '').trim(),
+      state: String(profile.state || '').trim(),
+      availableFrom: profile.availableFrom ? new Date(profile.availableFrom).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+      stayLength: String(profile.stayLength || '').trim() || 'Flexible',
+      occupancy: {
+        current: parseIntOrDefault(occupancy.current, 0, { min: 0 }),
+        total: Math.max(1, parseIntOrDefault(occupancy.total, 1, { min: 1 })),
+      },
+      furnished: Boolean(profile.furnished ?? true),
+      amenities: normalizeStringArray(profile.amenities),
+      vibe: normalizeStringArray(profile.vibe),
+      host: host && (host.name || host.avatar || host.bio)
+        ? {
+            name: String(host.name || '').trim() || 'Host',
+            avatar: host.avatar ? String(host.avatar) : null,
+            bio: host.bio ? String(host.bio) : null,
+          }
+        : null,
+      conciergeIntro: profile.conciergeIntro ? String(profile.conciergeIntro) : null,
+    }
+  }
+
   function startOfDay(date) {
     const d = new Date(date)
     d.setHours(0, 0, 0, 0)
@@ -404,7 +466,7 @@ export function createApiRouter() {
     let repMap = new Map()
     let avgMap = new Map()
     if (ownerIds.length > 0) {
-      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true, image: true } })
+      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true, image: true, paymentInstructions: true } })
       ownersMap = new Map(owners.map((u) => [u.id, u]))
       const reps = await prisma.userReputation.findMany({ where: { userId: { in: ownerIds } } })
       repMap = new Map(reps.map((r) => [r.userId, r]))
@@ -433,7 +495,7 @@ export function createApiRouter() {
       const ownerAvgRating = avgMap.get(p.ownerId) || null
       const negCount = rep?.negativeCount || 0
       const ownerRating = compositeRating(ownerAvgRating ?? 5, negCount)
-      return { ...p, ownerName, ownerImage, ownerRating, ownerAvgRating, ownerNegativeCount: negCount }
+      return { ...p, ownerName, ownerImage, ownerRating, ownerAvgRating, ownerNegativeCount: negCount, ownerPaymentInstructions: owner?.paymentInstructions || null }
     })
   }
 
@@ -454,6 +516,8 @@ export function createApiRouter() {
       seller: product.ownerName || product.seller || 'Marketplace seller',
       rating,
       tags,
+      vertical: product.vertical || 'commerce',
+      sharedSpace: product.vertical === 'shared_space' ? product.spaceProfile || null : null,
       owner: product.ownerName
         ? { name: product.ownerName, image: product.ownerImage || null }
         : null,
@@ -665,7 +729,7 @@ export function createApiRouter() {
     id: z.string().min(1),
     total: z.number(),
     status: z.string().min(1),
-    paymentLink: z.string().optional(),
+    paymentInstructions: z.string().optional(),
     accessCode: z.string().optional(),
     createdAt: z.string().optional(),
   })
@@ -715,10 +779,6 @@ export function createApiRouter() {
       customerPhone: z.string().optional(),
       address: z.string().optional(),
       note: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal('generate_payment_link'),
-      orderId: z.string().optional(),
     }),
     z.object({
       type: z.literal('ask_information'),
@@ -813,8 +873,6 @@ export function createApiRouter() {
               }
               return null
             }
-            case 'generate_payment_link':
-              return { type: 'generate_payment_link', orderId: value?.orderId || value }
             case 'ask_information': {
               if (value && typeof value === 'object') {
                 return { type: 'ask_information', fields: Array.isArray(value.fields) ? value.fields : [], reason: value.reason }
@@ -895,12 +953,6 @@ export function createApiRouter() {
               }
             }
             break
-          }
-          case 'generate_payment_link': {
-            if (value && typeof value === 'object') {
-              return { type: 'generate_payment_link', orderId: value.orderId }
-            }
-            return { type: 'generate_payment_link', orderId: typeof value === 'string' ? value : undefined }
           }
           case 'ask_information': {
             if (Array.isArray(value)) {
@@ -990,114 +1042,6 @@ export function createApiRouter() {
     return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
   }
 
-  function buildAssistantPaymentLink(order) {
-    if (!order) return null
-    if (order.accessCode) return `/marketplace/order/pay?code=${encodeURIComponent(order.accessCode)}`
-    return `/marketplace/order/${encodeURIComponent(order.id)}`
-  }
-
-  const MARKETPLACE_BASE_URL = (() => {
-    const candidates = [
-      process.env.PUBLIC_MARKETPLACE_URL,
-      process.env.MARKETPLACE_BASE_URL,
-      process.env.MARKETPLACE_URL,
-      process.env.APP_BASE_URL,
-      process.env.APP_URL,
-      process.env.NEXT_PUBLIC_APP_URL,
-      process.env.SITE_URL,
-      process.env.VITE_SITE_URL,
-      process.env.VERCEL_PROJECT_PRODUCTION_URL,
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-    ].filter(Boolean)
-    for (const raw of candidates) {
-      const normalized = raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`
-      try {
-        const url = new URL(normalized)
-        return url.origin
-      } catch {}
-    }
-    return null
-  })()
-
-  function resolveMarketplaceUrl(path) {
-    if (!path) return null
-    if (path.startsWith('http://') || path.startsWith('https://')) return path
-    if (!MARKETPLACE_BASE_URL) return path
-    try {
-      return new URL(path, MARKETPLACE_BASE_URL).toString()
-    } catch {
-      return path
-    }
-  }
-
-  const MARKETPLACE_CURRENCY = process.env.MARKETPLACE_CURRENCY || 'AUD'
-  const MARKETPLACE_LOCALE = process.env.MARKETPLACE_LOCALE || 'en-AU'
-  const currencyFormatter = (() => {
-    try {
-      return new Intl.NumberFormat(MARKETPLACE_LOCALE, { style: 'currency', currency: MARKETPLACE_CURRENCY })
-    } catch {
-      return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' })
-    }
-  })()
-
-  function formatCurrency(amount) {
-    const value = Number(amount)
-    if (!Number.isFinite(value)) return ''
-    try {
-      return currencyFormatter.format(value)
-    } catch {
-      return `$${value.toFixed(2)}`
-    }
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-  }
-
-  async function sendAssistantPaymentEmail({ order, to, paymentLink, customerName }) {
-    if (!order || !to || !paymentLink) return
-    const paymentUrl = resolveMarketplaceUrl(paymentLink)
-    const total = formatCurrency(order.total)
-    const safeName = customerName ? escapeHtml(customerName) : null
-    const safeOrderId = escapeHtml(order.id)
-    const prettyItems = Array.isArray(order.items)
-      ? order.items.map((item) => {
-          const title = escapeHtml(item.title || 'Item')
-          const quantity = Number(item.quantity) || 1
-          const lineTotal = formatCurrency((Number(item.price) || 0) * quantity)
-          return `<li><strong>${title}</strong> × ${quantity}${lineTotal ? ` — ${lineTotal}` : ''}</li>`
-        }).join('')
-      : ''
-    const itemsSection = prettyItems ? `<ul>${prettyItems}</ul>` : ''
-    const paymentLinkHtml = escapeHtml(paymentUrl || paymentLink)
-    const intro = safeName ? `<p>Hi ${safeName},</p>` : ''
-    const totalLine = total ? ` totaling ${total}` : ''
-    const html = `
-      ${intro}
-      <p>Thanks for shopping with Hedgetech. We've placed order <strong>${safeOrderId}</strong>${totalLine}.</p>
-      <p>Complete payment using the secure link below:</p>
-      <p style="margin: 24px 0;"><a href="${paymentLinkHtml}" style="background:#0f766e;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;display:inline-block;">Pay for your order</a></p>
-      ${itemsSection}
-      <p>If the button doesn't work, copy and paste this link into your browser:</p>
-      <p><a href="${paymentLinkHtml}">${paymentLinkHtml}</a></p>
-      <p>Need help? Reply to this email and our team will assist.</p>
-    `
-    try {
-      await sendMarketplaceEmail({
-        to,
-        subject: `Complete your Hedgetech order ${order.id}`,
-        html,
-      })
-    } catch (err) {
-      console.error('Failed to send assistant payment email:', err)
-    }
-  }
-
   const assistantFallbackCatalog = [
     {
       id: 'demo-anc-headphones',
@@ -1107,10 +1051,12 @@ export function createApiRouter() {
       type: 'goods',
       seller: 'Nova Audio',
       rating: 4.8,
+      vertical: 'commerce',
       image: imageForServer('modern headphones product', 640, 640),
       description: 'Immersive over-ear wireless headphones with adaptive noise cancelling and 28-hour battery life.',
       stockCount: 38,
       tags: ['audio', 'electronics'],
+      paymentInstructions: 'Bank transfer — BSB 123-456, Account 987654. Use your order ID as the reference.',
     },
     {
       id: 'demo-smartphone-128',
@@ -1120,10 +1066,12 @@ export function createApiRouter() {
       type: 'goods',
       seller: 'Metro Gadgets',
       rating: 4.7,
+      vertical: 'commerce',
       image: imageForServer('modern smartphone product', 640, 640),
       description: '6.7" OLED display, triple camera system, and 128GB storage. Ships unlocked with 24-month warranty.',
       stockCount: 22,
       tags: ['electronics', 'mobile'],
+      paymentInstructions: 'Pay seller via PayID gadgetspay@metro.example. Include your order ID in the note.',
     },
     {
       id: 'demo-cleaning-2h',
@@ -1133,6 +1081,7 @@ export function createApiRouter() {
       type: 'service',
       seller: 'Sparkle Pro',
       rating: 4.9,
+      vertical: 'commerce',
       image: imageForServer('apartment cleaning service', 640, 640),
       description: 'Two-hour professional clean covering kitchen, bathroom, and living spaces. Eco-friendly supplies included.',
       service: {
@@ -1146,6 +1095,7 @@ export function createApiRouter() {
         },
       },
       tags: ['home', 'service'],
+      paymentInstructions: '50% deposit via bank transfer (BSB 082-123, Account 445566) within 24h to confirm the slot.',
     },
     {
       id: 'demo-portrait-photo',
@@ -1155,6 +1105,7 @@ export function createApiRouter() {
       type: 'service',
       seller: 'LensCraft',
       rating: 4.8,
+      vertical: 'commerce',
       image: imageForServer('portrait photography studio', 640, 640),
       description: 'Studio portrait session with professional lighting, 10 retouched images delivered within 72 hours.',
       service: {
@@ -1168,6 +1119,64 @@ export function createApiRouter() {
         },
       },
       tags: ['creative', 'service'],
+      paymentInstructions: 'Pay in full via PayPal to portraits@lenscraft.example or bank transfer referencing your order.',
+    },
+    {
+      id: 'demo-space-surry',
+      slug: 'surry-hills-terrace',
+      title: 'Room in Surry Hills terrace',
+      price: 420,
+      type: 'service',
+      seller: 'Mia (Host)',
+      rating: 4.9,
+      vertical: 'shared_space',
+      image: imageForServer('sunny sharehouse bedroom surry hills', 640, 480),
+      description: 'Light-filled queen room with creative housemates, courtyard dinners, and fibre internet.',
+      spaceProfile: {
+        type: 'room',
+        rentPerWeek: 420,
+        bond: 840,
+        suburb: 'Surry Hills',
+        city: 'Sydney',
+        state: 'NSW',
+        availableFrom: '2025-12-01',
+        stayLength: '6-12 months',
+        occupancy: { current: 2, total: 3 },
+        furnished: true,
+        amenities: ['Queen bed', 'High-speed fibre', 'Cleaner included'],
+        vibe: ['Design crew', 'Pet friendly'],
+        host: { name: 'Mia', avatar: imageForServer('creative host portrait', 200, 200), bio: 'Product designer & weekend market lover.' },
+        conciergeIntro: 'Looking for a respectful founder/creator who enjoys community dinners and hybrid work.',
+      },
+      paymentInstructions: 'Bond and first week rent by bank transfer (BSB 013-999, Account 112233). Email remittance to Mia.',
+    },
+    {
+      id: 'demo-space-loft',
+      slug: 'fintech-loft-desk',
+      title: 'Desk in fintech founder loft',
+      price: 180,
+      type: 'service',
+      seller: 'Arjun (Host)',
+      rating: 4.8,
+      vertical: 'shared_space',
+      image: imageForServer('modern loft workspace', 640, 480),
+      description: 'Dedicated desk inside a Collingwood loft with fellow operators, podcast booth, and investor demo nights.',
+      spaceProfile: {
+        type: 'desk',
+        rentPerWeek: 180,
+        suburb: 'Collingwood',
+        city: 'Melbourne',
+        state: 'VIC',
+        availableFrom: '2025-11-20',
+        stayLength: 'Flexible / month-to-month',
+        occupancy: { current: 4, total: 6 },
+        furnished: true,
+        amenities: ['27" monitor', 'Meeting pods', 'Locker storage'],
+        vibe: ['Operator community', 'Late-night builds'],
+        host: { name: 'Arjun', avatar: imageForServer('startup founder portrait', 200, 200), bio: 'Cofounder at LoopPay. Loves dumpling runs.' },
+        conciergeIntro: 'Great for fintech or marketplace teams needing a plugged-in desk with instant community.',
+      },
+      paymentInstructions: 'Pay monthly via Stripe invoice or bank transfer (BSB 032-111, Account 556677). Include desk ID.',
     },
   ]
 
@@ -1190,7 +1199,7 @@ export function createApiRouter() {
     let repMap = new Map()
     let avgMap = new Map()
     if (ownerIds.length > 0) {
-      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true } })
+      const owners = await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, email: true, paymentInstructions: true } })
       ownersMap = new Map(owners.map((u) => [u.id, u]))
       const reps = await prisma.userReputation.findMany({ where: { userId: { in: ownerIds } } })
       repMap = new Map(reps.map((r) => [r.userId, r]))
@@ -1221,6 +1230,7 @@ export function createApiRouter() {
         image: product.img || imageForServer(product.title, 640, 640),
         description: product.description || '',
         stockCount: product.stockCount,
+        paymentInstructions: owner?.paymentInstructions || null,
         category: product.category?.name || null,
         tags: product.category?.name ? [product.category.name] : [],
       }
@@ -1343,10 +1353,19 @@ export function createApiRouter() {
     }
 
     const createdOrders = []
+    const sellerInstructionsCache = new Map()
     for (const [key, groupItems] of groups) {
       const sellerId = key === 'null' ? null : Number(key)
       const total = groupItems.reduce((sum, entry) => sum + Number(entry.price || 0) * Number(entry.quantity || 1), 0)
       const normalizedBuyerId = typeof buyerId === 'number' && Number.isFinite(buyerId) ? buyerId : null
+      let sellerInstructions = null
+      if (sellerId) {
+        if (!sellerInstructionsCache.has(sellerId)) {
+          const seller = await prisma.user.findUnique({ where: { id: sellerId }, select: { paymentInstructions: true } })
+          sellerInstructionsCache.set(sellerId, seller?.paymentInstructions || null)
+        }
+        sellerInstructions = sellerInstructionsCache.get(sellerId)
+      }
       const order = await prisma.order.create({
         data: {
           buyerId: normalizedBuyerId,
@@ -1357,6 +1376,7 @@ export function createApiRouter() {
           customerEmail: customerEmail || null,
           customerPhone: customerPhone || null,
           address: address || null,
+          paymentInstructions: sellerInstructions || null,
           accessCode: randomAssistantAccessCode(),
           items: {
             create: groupItems.map((entry) => ({
@@ -1394,9 +1414,6 @@ export function createApiRouter() {
     if (!Array.isArray(nextState.orders)) nextState.orders = []
     if (!Array.isArray(nextState.appointments)) nextState.appointments = []
     if (!Array.isArray(nextState.pendingInfoRequests)) nextState.pendingInfoRequests = []
-
-    const paymentEmailQueue = []
-    const paymentEmailOrderIds = new Set()
 
     const catalogEntries = Array.from(catalogMap.values())
     const catalogSlugMap = new Map()
@@ -1622,62 +1639,18 @@ export function createApiRouter() {
               id: order.id,
               total: order.total,
               status: order.status,
-              paymentLink: buildAssistantPaymentLink(order),
+              paymentInstructions: order.paymentInstructions || null,
               accessCode: order.accessCode || null,
               createdAt: order.createdAt?.toISOString?.() || new Date().toISOString(),
             })
-            const paymentLink = buildAssistantPaymentLink(order)
-            const email = order.customerEmail || customer?.email || null
-            if (email && paymentLink && !paymentEmailOrderIds.has(order.id)) {
-              paymentEmailQueue.push({
-                order,
-                to: email,
-                paymentLink,
-                customerName: action.customerName || order.customerName || customer?.name || null,
-              })
-              paymentEmailOrderIds.add(order.id)
-            }
           }
           nextState.cart = []
           nextState.pendingInfoRequests = []
-          results.push({ ...action, status: 'applied', orders: orders.map((o) => ({ id: o.id, total: o.total })) })
-        } else if (action.type === 'generate_payment_link') {
-          const orderId = action.orderId || (nextState.orders[nextState.orders.length - 1]?.id ?? null)
-          if (!orderId) throw new Error('No order to generate a payment link for')
-          let orderSummary = nextState.orders.find((o) => o.id === orderId)
-          if (!orderSummary) {
-            const order = await prisma.order.findUnique({ where: { id: orderId } })
-            if (!order) throw new Error('Order not found')
-            orderSummary = {
-              id: order.id,
-              total: order.total,
-              status: order.status,
-              paymentLink: buildAssistantPaymentLink(order),
-              accessCode: order.accessCode || null,
-              createdAt: order.createdAt?.toISOString?.() || new Date().toISOString(),
-            }
-            nextState.orders.push(orderSummary)
-          }
-          if (!orderSummary.paymentLink) {
-            const order = await prisma.order.findUnique({ where: { id: orderSummary.id } })
-            if (order?.accessCode) orderSummary.paymentLink = buildAssistantPaymentLink(order)
-          }
-          results.push({ ...action, status: 'applied', paymentLink: orderSummary.paymentLink, orderId: orderSummary.id })
-          if (!paymentEmailOrderIds.has(orderSummary.id) && orderSummary.paymentLink) {
-            const order = await prisma.order.findUnique({ where: { id: orderSummary.id }, include: { items: true } })
-            if (order) {
-              const email = order.customerEmail || customer?.email || null
-              if (email) {
-                paymentEmailQueue.push({
-                  order,
-                  to: email,
-                  paymentLink: orderSummary.paymentLink,
-                  customerName: order.customerName || customer?.name || null,
-                })
-                paymentEmailOrderIds.add(orderSummary.id)
-              }
-            }
-          }
+          results.push({
+            ...action,
+            status: 'applied',
+            orders: orders.map((o) => ({ id: o.id, total: o.total, paymentInstructions: o.paymentInstructions || null })),
+          })
         } else if (action.type === 'ask_information') {
           nextState.pendingInfoRequests.push({ fields: action.fields, reason: action.reason })
           results.push({ ...action, status: 'applied' })
@@ -1693,10 +1666,6 @@ export function createApiRouter() {
       } catch (err) {
         results.push({ ...action, status: 'error', error: err?.message || 'Unknown error' })
       }
-    }
-
-    if (paymentEmailQueue.length) {
-      await Promise.all(paymentEmailQueue.map((job) => sendAssistantPaymentEmail(job)))
     }
 
     return { state: nextState, results, createdOrders }
@@ -1755,7 +1724,6 @@ Action types you can request:
 - add_to_cart: stage one or more products with quantity and optional appointmentSlot for services. Always use catalog productId and include quantity.
 - book_service: reserve a service slot (requires slot ISO timestamp from availability window).
 - create_order: when buyer is ready. Supply customer details (if known) and items or set useCart true to consume current cart. Provide productId and quantity per item.
-- generate_payment_link: provide when an order exists so the buyer can complete payment.
 - ask_information: request mandatory details (e.g., customer_email, address, service_time) you are missing.
 - clear_cart: remove staged items when buyer changes direction.
 - update_metadata: store facts about buyer preferences to guide future recommendations.
@@ -1765,11 +1733,25 @@ Rules:
 - If info is missing to proceed (like email, service time), emit ask_information before create_order.
 - Services require appointmentSlot aligned with availability. Use ISO strings from availability data.
 - When you create an order for goods that need shipping, make sure an address is collected.
-- When payment is outstanding after order creation, request generate_payment_link so the customer can pay.
-- The moment the buyer clearly confirms they want to place an order, immediately issue create_order (prefer useCart: true) with any known customer_name/email/phone and follow it with generate_payment_link. Do not ask the buyer to check out manually once you have their go-ahead.
+- Hedgetech never processes payments. Share the seller's paymentInstructions verbatim (from catalog.ownerPaymentInstructions or order.paymentInstructions) so the buyer knows how to pay them directly, and remind them to send proof to the seller.
+- The moment the buyer clearly confirms they want to place an order, immediately issue create_order (prefer useCart: true) with any known customer_name/email/phone. Do not ask the buyer to check out manually once you have their go-ahead.
 - Keep reply warm, factual, and helpful. Reference seller or service details when useful.
 - Respect prior conversation context supplied.
-- Use attachment notes and images to inform your reply and actions.`
+- Use attachment notes and images to inform your reply and actions.
+- Some catalog items include "vertical": "shared_space" with a "spaceProfile" containing rent per week, suburb, stay length, vibe tags, and host info. Reference those details when buyers ask about rooms/desks and mention rent + availability in your reply.`
+
+      const sharedSpaceContext = catalog
+        .filter((item) => item?.vertical === 'shared_space' && item?.spaceProfile)
+        .map((item) => ({
+          id: item.id,
+          title: item.title,
+          rentPerWeek: item.spaceProfile.rentPerWeek,
+          location: `${item.spaceProfile.suburb}, ${item.spaceProfile.city || item.spaceProfile.state}`,
+          stayLength: item.spaceProfile.stayLength,
+          vibe: item.spaceProfile.vibe,
+          amenities: item.spaceProfile.amenities,
+          host: item.spaceProfile.host,
+        }))
 
       const historyMessages = (conversation || [])
         .slice(-8)
@@ -1788,6 +1770,7 @@ Rules:
           pendingInfoRequests: sanitizedState.pendingInfoRequests || [],
         },
         catalog,
+        sharedSpaces: sharedSpaceContext,
         attachments: attachments.map((file) => ({ name: file.name, type: file.type, size: file.size })),
       }
 
@@ -1873,7 +1856,7 @@ Rules:
           id: order.id,
           total: order.total,
           status: order.status,
-          paymentLink: buildAssistantPaymentLink(order),
+          paymentInstructions: order.paymentInstructions || null,
           accessCode: order.accessCode || null,
         })),
       })
@@ -1913,6 +1896,8 @@ Rules:
         serviceOpenTime,
         serviceCloseTime,
         serviceDailyCapacity,
+        spaceProfile,
+        vertical,
         ...rest
       } = req.body || {}
       if (typeof images === 'string') {
@@ -1924,6 +1909,8 @@ Rules:
       if (!Array.isArray(images)) images = undefined
       const normalizedDescription = typeof description === 'string' ? description.trim() || null : description ?? null
       const normalizedBarcode = typeof barcode === 'string' ? barcode.trim() || null : undefined
+      const normalizedSpaceProfile = normalizeSpaceProfile(spaceProfile)
+      const normalizedVertical = vertical === 'shared_space' ? 'shared_space' : 'commerce'
       const data = {
         ...rest,
         stockCount: parseIntOrDefault(stockCount, 0, { min: 0 }),
@@ -1936,6 +1923,11 @@ Rules:
         images,
         barcode: normalizedBarcode === undefined ? undefined : normalizedBarcode,
         ownerId: req.user.uid,
+        vertical: normalizedVertical,
+        spaceProfile: normalizedSpaceProfile,
+      }
+      if (normalizedVertical === 'shared_space' && normalizedSpaceProfile) {
+        data.price = parseIntOrDefault(normalizedSpaceProfile.rentPerWeek ?? data.price, 0, { min: 0 })
       }
       const created = await prisma.product.create({ data })
       res.status(201).json(created)
@@ -1962,6 +1954,8 @@ Rules:
         serviceOpenTime,
         serviceCloseTime,
         serviceDailyCapacity,
+        spaceProfile,
+        vertical,
         ...rest
       } = req.body || {}
       if (!id) return res.status(400).send('Missing id')
@@ -1976,6 +1970,8 @@ Rules:
         description === undefined ? undefined : typeof description === 'string' ? description.trim() || null : description
       const normalizedBarcode =
         barcode === undefined ? undefined : typeof barcode === 'string' ? barcode.trim() || null : barcode
+      const normalizedSpaceProfile = spaceProfile === undefined ? undefined : normalizeSpaceProfile(spaceProfile)
+      const normalizedVertical = vertical === undefined ? undefined : (vertical === 'shared_space' ? 'shared_space' : 'commerce')
       const data = {
         ...rest,
         description: normalizedDescription,
@@ -1994,6 +1990,13 @@ Rules:
           serviceOpenTime === undefined ? undefined : normalizeTimeString(serviceOpenTime),
         serviceCloseTime:
           serviceCloseTime === undefined ? undefined : normalizeTimeString(serviceCloseTime),
+        spaceProfile: normalizedSpaceProfile,
+        vertical: normalizedVertical,
+      }
+      if (normalizedVertical === 'shared_space' && normalizedSpaceProfile) {
+        data.price = parseIntOrDefault(normalizedSpaceProfile.rentPerWeek ?? rest.price, 0, { min: 0 })
+      } else if (normalizedVertical === 'commerce') {
+        data.spaceProfile = normalizedSpaceProfile ?? null
       }
       let updated
       try {
@@ -2802,7 +2805,14 @@ Rules:
     try {
       const ownerId = req.query.ownerId ? Number(req.query.ownerId) : (req.user?.uid ? Number(req.user.uid) : NaN)
       if (!Number.isFinite(ownerId)) return res.status(400).send('ownerId required')
-      const orders = await prisma.order.findMany({ where: { buyerId: ownerId }, orderBy: { createdAt: 'desc' }, include: { items: { include: { product: true } } } })
+      const orders = await prisma.order.findMany({
+        where: { buyerId: ownerId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          items: { include: { product: true } },
+          seller: { select: { id: true, name: true, email: true, paymentInstructions: true } },
+        },
+      })
       res.json(orders)
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -2818,40 +2828,51 @@ Rules:
       if (!code) return res.status(400).json({ error: 'Missing code' })
       let order = await prisma.order.findFirst({
         where: { accessCode: code },
-        include: { items: { include: { product: true } }, seller: true },
+        include: {
+          items: { include: { product: true } },
+          seller: { select: { id: true, name: true, email: true, paymentInstructions: true } },
+        },
       })
       // Fallback for convenience: if a guest pastes the order id instead of the access code,
       // allow tracking by id as long as the order has an accessCode (guest checkout only).
       if (!order) {
         const byId = await prisma.order.findUnique({
           where: { id: code },
-          include: { items: { include: { product: true } }, seller: true },
+          include: {
+            items: { include: { product: true } },
+            seller: { select: { id: true, name: true, email: true, paymentInstructions: true } },
+          },
         })
         if (byId?.accessCode) order = byId
       }
       if (!order) return res.status(404).json({ error: 'Not found' })
-      res.json(order)
+      res.json({ ...order, sellerPaymentInstructions: order.seller?.paymentInstructions || null })
     } catch (e) {
       console.error('GET /api/orders/track error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })
 
-  router.post('/orders/pay-with-code', async (req, res) => {
+  router.post('/orders/pay-with-code', (_req, res) => {
+    return res.status(410).json({
+      error: 'Direct card payments are disabled. Please pay the seller using the instructions shared with your order.',
+    })
+  })
+
+  router.post('/orders/:id/mark-paid', ensureAuth, async (req, res) => {
     try {
-      const { code, paymentMethod } = req.body || {}
-      const normalized = String(code || '').trim()
-      if (!normalized) return res.status(400).json({ error: 'Missing code' })
-      const order = await prisma.order.findFirst({ where: { accessCode: normalized } })
-      if (!order) return res.status(404).json({ error: 'Order not found' })
+      const sellerId = req.user?.uid ? Number(req.user.uid) : NaN
+      if (!Number.isFinite(sellerId)) return res.status(401).send('Unauthorized')
+      const id = String(req.params.id)
+      const order = await prisma.order.findUnique({ where: { id } })
+      if (!order || order.sellerId !== sellerId) return res.status(404).json({ error: 'Order not found' })
       if (!['pending', 'scheduled'].includes(order.status)) {
-        return res.status(400).json({ error: 'Order is already paid or closed' })
+        return res.status(400).json({ error: 'Only pending or scheduled orders can be marked as paid' })
       }
-      const updated = await prisma.order.update({ where: { id: order.id }, data: { status: 'paid' } })
-      // Future: persist payment intent / receipt. For now acknowledge request.
-      res.json({ id: updated.id, status: updated.status, paymentMethod: paymentMethod || 'card' })
+      const updated = await prisma.order.update({ where: { id }, data: { status: 'paid' } })
+      res.json(updated)
     } catch (e) {
-      console.error('POST /api/orders/pay-with-code error:', e)
+      console.error('POST /api/orders/:id/mark-paid error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })
@@ -2865,7 +2886,11 @@ Rules:
       // Fetch order with relations
       const order = await prisma.order.findUnique({
         where: { id },
-        include: { items: { include: { product: true } }, buyer: true, seller: true },
+        include: {
+          items: { include: { product: true } },
+          buyer: true,
+          seller: { select: { id: true, name: true, email: true, paymentInstructions: true } },
+        },
       })
       if (!order) return res.status(404).json({ error: 'Not found' })
       // Authorize: buyer or seller (explicit or via product owner)

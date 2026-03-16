@@ -30,6 +30,8 @@ model Product {
   serviceDailyCapacity Int?
   ownerId   Int?
   categoryId String?
+  vertical  ProductVertical @default(commerce)
+  spaceProfile Json?
   category   Category? @relation(fields: [categoryId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -45,6 +47,11 @@ enum ProductType {
   service
 }
 
+enum ProductVertical {
+  commerce
+  shared_space
+}
+
 model Order {
   id            String      @id @default(cuid())
   buyerId       Int?
@@ -55,6 +62,7 @@ model Order {
   customerEmail String?
   address       String?
   customerPhone String?
+  paymentInstructions String?
   accessCode    String?     @unique
   createdAt     DateTime    @default(now())
 
@@ -161,6 +169,7 @@ model User {
   phoneNo    String?   // legacy column in existing DB, keep optional here
   ABN        String?   // legacy column in existing DB, keep optional here
   bio        String?
+  paymentInstructions String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime? @updatedAt
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { ensureSellerRouteAccess } from '@/features/sellers/access'
 
 function RevenueBar({ label, value, max }: { label: string; value: number; max: number }) {
   const width = max === 0 ? 0 : Math.round((value / max) * 100)
@@ -157,5 +158,6 @@ function SellerAnalyticsPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/analytics')({
+  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
   component: SellerAnalyticsPage,
 })
