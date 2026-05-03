@@ -1,22 +1,16 @@
 import {
   Bot,
   Boxes,
-  CalendarClock,
   ClipboardList,
   CreditCard,
-  Home,
   FileText,
-  LayoutDashboard,
   LifeBuoy,
-  MessageCircle,
   PackageCheck,
   Receipt,
   Search,
   Settings,
   ShoppingBag,
-  Sparkles,
   Store,
-  TrendingUp,
   Users,
   ShieldCheck,
 } from 'lucide-react'
@@ -77,11 +71,6 @@ export const sidebarData: SidebarData = {
       title: 'Command center',
       items: [
         {
-          title: 'Team dashboard',
-          url: '/',
-          icon: LayoutDashboard,
-        },
-        {
           title: 'Marketplace home',
           url: '/marketplace',
           icon: ShoppingBag,
@@ -95,11 +84,6 @@ export const sidebarData: SidebarData = {
           title: 'AI concierge',
           url: '/marketplace/assistant',
           icon: Bot,
-        },
-        {
-          title: 'Shared spaces',
-          url: '/marketplace/spaces',
-          icon: Home,
         },
         {
           title: 'Point of sale',
@@ -133,34 +117,6 @@ export const sidebarData: SidebarData = {
             },
           ],
         },
-        {
-          title: 'Analytics & insights',
-          url: '/marketplace/dashboard/analytics',
-          icon: TrendingUp,
-        },
-        {
-          title: 'Bookings calendar',
-          url: '/marketplace/dashboard/bookings',
-          icon: CalendarClock,
-        },
-        {
-          title: 'Apps & promotions',
-          icon: Sparkles,
-          items: [
-            {
-              title: 'Browse apps',
-              url: '/_authenticated/apps/',
-            },
-            {
-              title: 'Telegram automation',
-              url: '/_authenticated/apps/telegram',
-            },
-            {
-              title: 'WhatsApp automation',
-              url: '/_authenticated/apps/whatsapp',
-            },
-          ],
-        },
       ],
     },
     {
@@ -188,12 +144,7 @@ export const sidebarData: SidebarData = {
         },
         {
           title: 'Support desk',
-          url: '/chats/',
-          icon: MessageCircle,
-        },
-        {
-          title: 'Knowledge base',
-          url: '/help-center/',
+          url: '/marketplace/dashboard/support',
           icon: LifeBuoy,
         },
       ],

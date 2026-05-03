@@ -58,17 +58,16 @@ function Nav() {
   const primaryLinks = [
     { href: '/marketplace', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
-    { href: '/marketplace/land', label: 'Kenya land' },
+    { href: '/marketplace/land', label: 'Kenyan real estate' },
     { href: '/marketplace/my-orders', label: 'Track order' },
     { href: '/marketplace/cart', label: 'Cart' },
   ] as const
   const sellerLinks = canAccessSellerTools
     ? ([
         { href: '/marketplace/dashboard', label: 'Seller cockpit' },
-        { href: '/marketplace/dashboard/analytics', label: 'Analytics' },
-        { href: '/marketplace/dashboard/reports', label: 'Reports' },
+        { href: '/marketplace/dashboard/orders', label: 'Orders' },
         { href: '/marketplace/dashboard/support', label: 'Support' },
-        { href: '/marketplace/dashboard/pos', label: 'POS' },
+        { href: '/marketplace/dashboard/verification', label: 'Seller profile' },
       ] as const)
     : ([
         {
@@ -126,20 +125,28 @@ function Nav() {
                 {count}
               </span>
             </Link>
-            <Link
-              to={canAccessSellerTools ? '/marketplace/dashboard' : '/marketplace/dashboard/verification'}
-              className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
-            >
-              <span>
-                {canAccessSellerTools
-                  ? 'Seller cockpit'
-                  : sellerStatus === 'pending'
+            {canAccessSellerTools ? (
+              <Link
+                to='/marketplace/dashboard'
+                className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
+              >
+                <span>Seller cockpit</span>
+              </Link>
+            ) : (
+              <Link
+                to='/marketplace/dashboard/verification'
+                search={{ redirect: '' }}
+                className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
+              >
+                <span>
+                  {sellerStatus === 'pending'
                     ? 'View verification'
                     : sellerStatus === 'rejected'
                       ? 'Fix verification'
                       : 'Become a seller'}
-              </span>
-            </Link>
+                </span>
+              </Link>
+            )}
             {user ? (
               <ProfileDropdown />
             ) : (
@@ -221,7 +228,7 @@ function Footer() {
       items: [
         { label: 'Browse listings', href: '/marketplace/listings' },
         { label: 'Track an order', href: '/marketplace/my-orders' },
-        { label: 'Support desk', href: '/marketplace/order/track' },
+        { label: 'Refund policy', href: '/refund-policy' },
       ],
     },
     {
@@ -229,15 +236,15 @@ function Footer() {
       items: [
         { label: 'Seller cockpit', href: '/marketplace/dashboard' },
         { label: 'Manage orders', href: '/marketplace/dashboard/orders' },
-        { label: 'Point of sale', href: '/marketplace/dashboard/pos' },
+        { label: 'Seller verification', href: '/marketplace/dashboard/verification' },
       ],
     },
     {
       title: 'Company',
       items: [
-        { label: 'Docs', href: '#' },
-        { label: 'Status', href: '#' },
-        { label: 'Privacy', href: '#' },
+        { label: 'Privacy', href: '/privacy' },
+        { label: 'Terms', href: '/terms' },
+        { label: 'Contact', href: '/contact' },
       ],
     },
   ] as const
@@ -262,9 +269,9 @@ function Footer() {
               <ul className="mt-3 space-y-3 text-sm text-slate-300">
                 {col.items.map((item) => (
                   <li key={item.label}>
-                    <a href={item.href} className="transition hover:text-white">
+                    <Link to={item.href as any} className="transition hover:text-white">
                       {item.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -274,9 +281,9 @@ function Footer() {
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-slate-400 md:flex-row md:items-center md:justify-between">
           <span>© {year} Hedgetech Marketplace. Trade with confidence.</span>
           <div className="flex gap-4">
-            <a href="#" className="transition hover:text-white">Privacy</a>
-            <a href="#" className="transition hover:text-white">Terms</a>
-            <a href="#" className="transition hover:text-white">Contact</a>
+            <Link to='/privacy' className="transition hover:text-white">Privacy</Link>
+            <Link to='/terms' className="transition hover:text-white">Terms</Link>
+            <Link to='/contact' className="transition hover:text-white">Contact</Link>
           </div>
         </div>
       </div>

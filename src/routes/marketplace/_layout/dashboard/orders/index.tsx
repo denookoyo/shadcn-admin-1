@@ -1,6 +1,16 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   AlertTriangle,
   ArrowUpRight,
   CheckCircle2,
@@ -82,6 +92,8 @@ export default function OrdersPage() {
   const [reviewOrderId, setReviewOrderId] = useState<string | null>(null)
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewFeedback, setReviewFeedback] = useState('')
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'payment' | 'shipment' } | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -212,28 +224,32 @@ export default function OrdersPage() {
   }, [view, sellerNeedsAction, sellerInMotion, sellerCompleted, sellerOrders, buyerAttention, buyerHistory, buyerOrders])
 
   async function confirmShipment(orderId: string) {
-    const ok = window.confirm('Confirm the order is paid and you are shipping it now?')
-    if (!ok) return
     try {
       const updated = await db.shipOrder?.(orderId, true)
       if (updated) {
         setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? updated : order)))
         window.dispatchEvent(new CustomEvent('orders:changed'))
       }
-    } catch {}
+      setActionError(null)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Unable to mark order as shipped.')
+    } finally {
+      setPendingAction(null)
+    }
   }
 
   async function markPaymentReceived(orderId: string) {
-    const ok = window.confirm('Mark this order as paid? Only do this after verifying funds in your account.')
-    if (!ok) return
     try {
       const updated = db.markOrderPaid ? await db.markOrderPaid(orderId) : null
       if (updated) {
         setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? updated : order)))
         window.dispatchEvent(new CustomEvent('orders:changed'))
       }
-    } catch (err) {
-      window.alert((err as Error)?.message ?? 'Unable to mark payment as received.')
+      setActionError(null)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Unable to mark payment as received.')
+    } finally {
+      setPendingAction(null)
     }
   }
 
@@ -290,14 +306,14 @@ export default function OrdersPage() {
                       {['pending', 'scheduled'].includes(order.status) ? (
                         <button
                           className='rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
-                          onClick={() => markPaymentReceived(order.id)}
+                          onClick={() => setPendingAction({ orderId: order.id, kind: 'payment' })}
                         >
                           Confirm payment received
                         </button>
                       ) : null}
                       <button
                         className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
-                        onClick={() => (isServiceOrder(order) ? openServiceAction(order) : confirmShipment(order.id))}
+                        onClick={() => (isServiceOrder(order) ? openServiceAction(order) : setPendingAction({ orderId: order.id, kind: 'shipment' }))}
                       >
                         {isServiceOrder(order) ? 'Manage appointment' : 'Confirm shipped'}
                       </button>
@@ -490,22 +506,22 @@ export default function OrdersPage() {
             <div className='rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm'>
               <div className='font-semibold text-slate-900'>Message the seller</div>
               <p className='text-xs text-slate-500'>Clarify delivery info or ask for scheduling changes in chat.</p>
-              <a
-                href='/_authenticated/chats/'
+              <Link
+                to='/marketplace/my-orders'
                 className='mt-3 inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-emerald-200 hover:text-emerald-700'
               >
                 Open chat <ArrowUpRight className='ml-1 h-4 w-4' />
-              </a>
+              </Link>
             </div>
             <div className='rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm'>
               <div className='font-semibold text-slate-900'>Browse help topics</div>
               <p className='text-xs text-slate-500'>Find self-serve answers for returns, payouts, and booking questions.</p>
-              <a
-                href='/_authenticated/help-center/'
+              <Link
+                to='/contact'
                 className='mt-3 inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-emerald-200 hover:text-emerald-700'
               >
                 Visit help center <ArrowUpRight className='ml-1 h-4 w-4' />
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -676,7 +692,43 @@ export default function OrdersPage() {
         </div>
       </section>
 
+      {actionError ? (
+        <div className='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
+          <AlertTriangle className='mr-2 inline h-4 w-4' />
+          {actionError}
+        </div>
+      ) : null}
+
       {view === 'seller' ? renderSellerBoards() : renderBuyerBoards()}
+      <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open: boolean) => { if (!open) setPendingAction(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAction?.kind === 'payment' ? 'Confirm payment received' : 'Confirm shipment'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.kind === 'payment'
+                ? 'Only continue after the funds have been verified in your account.'
+                : 'Use this after you have handed the order to the carrier or completed dispatch.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingAction) return
+                if (pendingAction.kind === 'payment') {
+                  void markPaymentReceived(pendingAction.orderId)
+                  return
+                }
+                void confirmShipment(pendingAction.orderId)
+              }}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MarketplacePageShell>
   )
 }

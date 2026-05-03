@@ -1,5 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { db } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
@@ -10,6 +20,8 @@ type AllOrder = any
 function AllOrdersPage() {
   const [orders, setOrders] = useState<AllOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'payment' | 'shipment' | 'delete' } | null>(null)
   const user = useAuthStore((s) => s.auth.user as any | null)
   const myId = (user?.id as number | undefined) ?? undefined
 
@@ -35,9 +47,34 @@ function AllOrdersPage() {
     )
   }
 
+  async function runPendingAction() {
+    if (!pendingAction) return
+    try {
+      if (pendingAction.kind === 'payment') {
+        const updated = db.markOrderPaid ? await db.markOrderPaid(pendingAction.orderId) : null
+        if (updated) setOrders((cur) => cur.map((x) => (x.id === pendingAction.orderId ? updated : x)))
+      } else if (pendingAction.kind === 'shipment') {
+        const updated = await db.shipOrder?.(pendingAction.orderId, true)
+        if (updated) setOrders((cur) => cur.map((x) => (x.id === pendingAction.orderId ? updated : x)))
+      } else {
+        await db.adminDeleteOrder?.(pendingAction.orderId)
+        setOrders((cur) => cur.filter((x) => x.id !== pendingAction.orderId))
+      }
+      window.dispatchEvent(new CustomEvent('orders:changed'))
+      setActionError(null)
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Unable to update order.')
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
   return (
     <MarketplacePageShell width='default'>
       <h1 className='text-2xl font-bold'>All Orders</h1>
+      {actionError ? (
+        <div className='mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>{actionError}</div>
+      ) : null}
       <div className='mt-4 w-full overflow-x-auto rounded-2xl border'>
         <table className='w-full text-sm'>
           <thead>
@@ -67,16 +104,7 @@ function AllOrdersPage() {
                     {(['pending', 'scheduled'].includes(o.status) && myId && (o.sellerId === myId)) ? (
                       <button
                         className='w-full rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100'
-                        onClick={async () => {
-                          const ok = window.confirm('Mark this order as paid? Only continue after verifying funds.')
-                          if (!ok) return
-                          try {
-                            const updated = db.markOrderPaid ? await db.markOrderPaid(o.id) : null
-                            if (!updated) return
-                            setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
-                            window.dispatchEvent(new CustomEvent('orders:changed'))
-                          } catch {}
-                        }}
+                        onClick={() => setPendingAction({ orderId: o.id, kind: 'payment' })}
                       >
                         Confirm Payment
                       </button>
@@ -84,16 +112,7 @@ function AllOrdersPage() {
                     {(o.status === 'paid' && myId && (o.sellerId === myId)) ? (
                       <button
                         className='w-full rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white'
-                        onClick={async () => {
-                          const ok = window.confirm('Acknowledge payment and mark this order as shipped?')
-                          if (!ok) return
-                          try {
-                            const updated = await db.shipOrder?.(o.id, true)
-                            if (!updated) return
-                            setOrders((cur) => cur.map((x) => (x.id === o.id ? updated : x)))
-                            window.dispatchEvent(new CustomEvent('orders:changed'))
-                          } catch {}
-                        }}
+                        onClick={() => setPendingAction({ orderId: o.id, kind: 'shipment' })}
                       >
                         Mark Shipped
                       </button>
@@ -162,15 +181,7 @@ function AllOrdersPage() {
                     )}
                     <button
                       className='rounded-md border px-2 py-1 text-xs text-red-600'
-                      onClick={async () => {
-                        const ok = window.confirm('Delete this order?')
-                        if (!ok) return
-                        try {
-                          await db.adminDeleteOrder?.(o.id)
-                          setOrders((cur) => cur.filter((x) => x.id !== o.id))
-                          window.dispatchEvent(new CustomEvent('orders:changed'))
-                        } catch {}
-                      }}
+                      onClick={() => setPendingAction({ orderId: o.id, kind: 'delete' })}
                     >
                       Delete
                     </button>
@@ -186,6 +197,35 @@ function AllOrdersPage() {
           </tbody>
         </table>
       </div>
+      <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open) => { if (!open) setPendingAction(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAction?.kind === 'payment'
+                ? 'Confirm payment received'
+                : pendingAction?.kind === 'shipment'
+                  ? 'Mark order as shipped'
+                  : 'Delete order'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.kind === 'payment'
+                ? 'Only continue after verifying funds for this order.'
+                : pendingAction?.kind === 'shipment'
+                  ? 'Use this after the seller has dispatched the order.'
+                  : 'This permanently removes the order record from the dashboard.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={pendingAction?.kind === 'delete' ? 'bg-red-600 hover:bg-red-500' : undefined}
+              onClick={() => void runPendingAction()}
+            >
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MarketplacePageShell>
   )
 }

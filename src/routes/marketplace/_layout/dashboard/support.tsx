@@ -4,6 +4,16 @@ import { format } from 'date-fns'
 import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { db, type RefundRequest, type SupportMessage, type SupportTicket, type SupportTicketStatus } from '@/lib/data'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { listSellerApplications, reviewSellerApplication, type SellerApplication } from '@/features/sellers/verification'
@@ -43,11 +53,11 @@ function sellerStatusClasses(status: SellerApplication['status']) {
   }
 }
 
-async function refreshSupportData() {
+async function refreshSupportData(includeSellerApps: boolean) {
   const [ticketList, refundList, sellerList] = await Promise.all([
     typeof db.listSupportTickets === 'function' ? db.listSupportTickets() : Promise.resolve([]),
     typeof db.listRefundRequests === 'function' ? db.listRefundRequests('seller') : Promise.resolve([]),
-    listSellerApplications(),
+    includeSellerApps ? listSellerApplications() : Promise.resolve([]),
   ])
   return { tickets: ticketList, refunds: refundList, sellerApps: sellerList }
 }
@@ -125,17 +135,30 @@ async function createLocalTicket(subject: string, body: string) {
 
 function SupportConsolePage() {
   const { user } = useAuthStore((s) => s.auth)
-  const isAdmin = Boolean((user as any)?.isAdmin)
+  const isAdmin = Boolean((user as any)?.isAdmin) || String((user as any)?.role ?? '').toLowerCase() === 'admin'
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [sellerApps, setSellerApps] = useState<SellerApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [ticketDraft, setTicketDraft] = useState({ open: false, subject: '', body: '' })
+  const [replyDraft, setReplyDraft] = useState<{ ticket: SupportTicket | null; body: string }>({ ticket: null, body: '' })
+  const [refundDecision, setRefundDecision] = useState<{ refund: RefundRequest | null; action: 'accept' | 'reject' | 'refund'; notes: string }>({
+    refund: null,
+    action: 'accept',
+    notes: '',
+  })
+  const [sellerDecision, setSellerDecision] = useState<{ app: SellerApplication | null; action: 'approve' | 'reject'; notes: string }>({
+    app: null,
+    action: 'approve',
+    notes: '',
+  })
 
   async function load() {
     setLoading(true)
     try {
-      const { tickets: ticketList, refunds: refundList, sellerApps: appList } = await refreshSupportData()
+      const { tickets: ticketList, refunds: refundList, sellerApps: appList } = await refreshSupportData(isAdmin)
       setTickets(ticketList)
       setRefunds(refundList)
       setSellerApps(appList)
@@ -149,7 +172,7 @@ function SupportConsolePage() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [isAdmin])
 
   const openTicketCount = useMemo(() => tickets.filter((ticket) => ticket.status !== 'resolved' && ticket.status !== 'closed').length, [tickets])
   const activeRefundCount = useMemo(
@@ -164,46 +187,86 @@ function SupportConsolePage() {
   const pendingSellerApps = useMemo(() => sellerApps.filter((app) => app.status !== 'approved'), [sellerApps])
 
   async function handleCreateTicket() {
-    const subject = window.prompt('Ticket subject')
-    if (!subject) return
-    const body = window.prompt('Describe the issue')
-    if (!body) return
-    const created = await createLocalTicket(subject, body)
-    setTickets((prev) => [created, ...prev])
+    if (!ticketDraft.subject.trim() || !ticketDraft.body.trim()) return
+    setActionBusy(true)
+    try {
+      const created = await createLocalTicket(ticketDraft.subject.trim(), ticketDraft.body.trim())
+      setTickets((prev) => [created, ...prev])
+      setTicketDraft({ open: false, subject: '', body: '' })
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to create support ticket')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  async function handleTicketReply(ticket: SupportTicket) {
-    const body = window.prompt('Reply to customer', '')
-    if (!body) return
-    const message = await appendLocalMessage(ticket.id, body)
-    setTickets((prev) =>
-      prev.map((item) =>
-        item.id === ticket.id
-          ? {
-              ...item,
-              messages: [...(item.messages ?? []), message],
-              updatedAt: message.createdAt,
-            }
-          : item
+  async function handleTicketReply() {
+    if (!replyDraft.ticket || !replyDraft.body.trim()) return
+    setActionBusy(true)
+    try {
+      const message = await appendLocalMessage(replyDraft.ticket.id, replyDraft.body.trim())
+      setTickets((prev) =>
+        prev.map((item) =>
+          item.id === replyDraft.ticket?.id
+            ? {
+                ...item,
+                messages: [...(item.messages ?? []), message],
+                updatedAt: message.createdAt,
+              }
+            : item
+        )
       )
-    )
+      setReplyDraft({ ticket: null, body: '' })
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to send reply')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   async function handleTicketStatus(ticket: SupportTicket, status: SupportTicketStatus) {
-    const updated = await updateLocalTicketStatus(ticket.id, status)
-    setTickets((prev) => prev.map((item) => (item.id === ticket.id ? updated : item)))
+    setActionBusy(true)
+    try {
+      const updated = await updateLocalTicketStatus(ticket.id, status)
+      setTickets((prev) => prev.map((item) => (item.id === ticket.id ? updated : item)))
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to update ticket status')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  async function handleRefundAction(refund: RefundRequest, action: 'accept' | 'reject' | 'refund') {
-    const notes = window.prompt('Add an optional resolution note', refund.resolution ?? '')
-    const updated = await updateLocalRefund(refund.id, action, notes ?? undefined)
-    setRefunds((prev) => prev.map((item) => (item.id === refund.id ? updated : item)))
+  async function handleRefundAction() {
+    if (!refundDecision.refund) return
+    setActionBusy(true)
+    try {
+      const updated = await updateLocalRefund(refundDecision.refund.id, refundDecision.action, refundDecision.notes.trim() || undefined)
+      setRefunds((prev) => prev.map((item) => (item.id === refundDecision.refund?.id ? updated : item)))
+      setRefundDecision({ refund: null, action: 'accept', notes: '' })
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to update refund request')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
-  async function handleSellerReviewAction(app: SellerApplication, action: 'approve' | 'reject') {
-    const notes = window.prompt('Add reviewer notes', app.reviewerNotes ?? '')
-    const updated = await reviewSellerApplication(app.id, action, notes ?? undefined)
-    setSellerApps((prev) => prev.map((item) => (item.id === app.id ? updated : item)))
+  async function handleSellerReviewAction() {
+    if (!sellerDecision.app) return
+    setActionBusy(true)
+    try {
+      const updated = await reviewSellerApplication(sellerDecision.app.id, sellerDecision.action, sellerDecision.notes.trim() || undefined)
+      setSellerApps((prev) => prev.map((item) => (item.id === sellerDecision.app?.id ? updated : item)))
+      setSellerDecision({ app: null, action: 'approve', notes: '' })
+      setError(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to review seller application')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   if (!isAdmin) {
@@ -220,7 +283,9 @@ function SupportConsolePage() {
           <p className='text-sm text-slate-600'>You can still open a support conversation from the buyer dashboard or track your seller verification progress.</p>
           <div className='mt-4 flex flex-wrap gap-3 text-sm'>
             <Button asChild className='rounded-full'>
-              <Link to='/marketplace/dashboard/verification'>View seller verification</Link>
+              <Link to='/marketplace/dashboard/verification' search={{ redirect: '' }}>
+                View seller verification
+              </Link>
             </Button>
             <Button asChild variant='outline' className='rounded-full'>
               <Link to='/marketplace/my-orders'>Open buyer support</Link>
@@ -242,7 +307,7 @@ function SupportConsolePage() {
           <Button variant='outline' size='sm' onClick={load} className='rounded-full'>
             <RefreshCw className='mr-2 h-4 w-4' />Refresh
           </Button>
-          <Button size='sm' onClick={handleCreateTicket} className='rounded-full'>
+          <Button size='sm' onClick={() => setTicketDraft({ open: true, subject: '', body: '' })} className='rounded-full'>
             <MessageCircle className='mr-2 h-4 w-4' />New ticket
           </Button>
         </div>
@@ -310,7 +375,7 @@ function SupportConsolePage() {
                 </div>
                 <p className='mt-3 text-xs text-slate-600'>{lastMessagePreview(ticket)}</p>
                 <div className='mt-4 flex flex-wrap gap-2 text-xs'>
-                  <Button size='sm' variant='secondary' onClick={() => handleTicketReply(ticket)}>
+                  <Button size='sm' variant='secondary' onClick={() => setReplyDraft({ ticket, body: '' })}>
                     Reply
                   </Button>
                   {ticket.status !== 'resolved' ? (
@@ -361,13 +426,25 @@ function SupportConsolePage() {
                   <div className='mt-4 flex flex-wrap gap-2 text-xs'>
                     {refund.status === 'requested' || refund.status === 'reviewing' ? (
                       <>
-                        <Button size='sm' variant='secondary' onClick={() => handleRefundAction(refund, 'accept')}>
+                        <Button
+                          size='sm'
+                          variant='secondary'
+                          onClick={() => setRefundDecision({ refund, action: 'accept', notes: refund.resolution ?? '' })}
+                        >
                           Accept
                         </Button>
-                        <Button size='sm' variant='outline' onClick={() => handleRefundAction(refund, 'reject')}>
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          onClick={() => setRefundDecision({ refund, action: 'reject', notes: refund.resolution ?? '' })}
+                        >
                           Reject
                         </Button>
-                        <Button size='sm' variant='ghost' onClick={() => handleRefundAction(refund, 'refund')}>
+                        <Button
+                          size='sm'
+                          variant='ghost'
+                          onClick={() => setRefundDecision({ refund, action: 'refund', notes: refund.resolution ?? '' })}
+                        >
                           Mark refunded
                         </Button>
                       </>
@@ -409,10 +486,18 @@ function SupportConsolePage() {
                   <p className='mt-2 text-xs text-slate-500'>Docs: {app.documents.join(' • ')}</p>
                 ) : null}
                 <div className='mt-4 flex flex-wrap gap-2 text-xs'>
-                  <Button size='sm' variant='secondary' onClick={() => handleSellerReviewAction(app, 'approve')}>
+                  <Button
+                    size='sm'
+                    variant='secondary'
+                    onClick={() => setSellerDecision({ app, action: 'approve', notes: app.reviewerNotes ?? '' })}
+                  >
                     Approve
                   </Button>
-                  <Button size='sm' variant='outline' onClick={() => handleSellerReviewAction(app, 'reject')}>
+                  <Button
+                    size='sm'
+                    variant='outline'
+                    onClick={() => setSellerDecision({ app, action: 'reject', notes: app.reviewerNotes ?? '' })}
+                  >
                     Request changes
                   </Button>
                 </div>
@@ -421,6 +506,111 @@ function SupportConsolePage() {
           )}
         </div>
       </section>
+      <Dialog open={ticketDraft.open} onOpenChange={(open) => setTicketDraft((current) => ({ ...current, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open a support ticket</DialogTitle>
+            <DialogDescription>Create an internal support issue for operations follow-up.</DialogDescription>
+          </DialogHeader>
+          <div className='space-y-4'>
+            <Input
+              placeholder='Subject'
+              value={ticketDraft.subject}
+              onChange={(event) => setTicketDraft((current) => ({ ...current, subject: event.target.value }))}
+            />
+            <Textarea
+              placeholder='Describe the issue or next step'
+              rows={5}
+              value={ticketDraft.body}
+              onChange={(event) => setTicketDraft((current) => ({ ...current, body: event.target.value }))}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setTicketDraft({ open: false, subject: '', body: '' })}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTicket} disabled={actionBusy || !ticketDraft.subject.trim() || !ticketDraft.body.trim()}>
+              {actionBusy ? 'Saving…' : 'Create ticket'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(replyDraft.ticket)} onOpenChange={(open) => { if (!open) setReplyDraft({ ticket: null, body: '' }) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reply to ticket</DialogTitle>
+            <DialogDescription>{replyDraft.ticket ? `Add a reply to ${replyDraft.ticket.subject}.` : 'Add a reply to this ticket.'}</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder='Type your response'
+            rows={5}
+            value={replyDraft.body}
+            onChange={(event) => setReplyDraft((current) => ({ ...current, body: event.target.value }))}
+          />
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setReplyDraft({ ticket: null, body: '' })}>
+              Cancel
+            </Button>
+            <Button onClick={handleTicketReply} disabled={actionBusy || !replyDraft.body.trim()}>
+              {actionBusy ? 'Sending…' : 'Send reply'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(refundDecision.refund)} onOpenChange={(open) => { if (!open) setRefundDecision({ refund: null, action: 'accept', notes: '' }) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {refundDecision.action === 'accept'
+                ? 'Accept refund request'
+                : refundDecision.action === 'reject'
+                  ? 'Reject refund request'
+                  : 'Mark refund as paid'}
+            </DialogTitle>
+            <DialogDescription>
+              {refundDecision.refund ? `Update order ${refundDecision.refund.orderId} with a clear decision note.` : 'Update this refund request.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder='Resolution note shown to internal teams and the buyer'
+            rows={4}
+            value={refundDecision.notes}
+            onChange={(event) => setRefundDecision((current) => ({ ...current, notes: event.target.value }))}
+          />
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setRefundDecision({ refund: null, action: 'accept', notes: '' })}>
+              Cancel
+            </Button>
+            <Button onClick={handleRefundAction} disabled={actionBusy}>
+              {actionBusy ? 'Saving…' : 'Save decision'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(sellerDecision.app)} onOpenChange={(open) => { if (!open) setSellerDecision({ app: null, action: 'approve', notes: '' }) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{sellerDecision.action === 'approve' ? 'Approve seller' : 'Request seller changes'}</DialogTitle>
+            <DialogDescription>
+              {sellerDecision.app ? `Review ${sellerDecision.app.companyName} and capture the decision note.` : 'Review this seller application.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder={sellerDecision.action === 'approve' ? 'Optional approval note' : 'Explain what the seller needs to update'}
+            rows={4}
+            value={sellerDecision.notes}
+            onChange={(event) => setSellerDecision((current) => ({ ...current, notes: event.target.value }))}
+          />
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setSellerDecision({ app: null, action: 'approve', notes: '' })}>
+              Cancel
+            </Button>
+            <Button onClick={handleSellerReviewAction} disabled={actionBusy}>
+              {actionBusy ? 'Saving…' : sellerDecision.action === 'approve' ? 'Approve seller' : 'Request changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MarketplacePageShell>
   )
 }

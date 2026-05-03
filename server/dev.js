@@ -5,9 +5,11 @@ import express from 'express'
 import { createServer as createViteServer } from 'vite'
 import { createApiRouter } from './api.js'
 import { authMiddleware, createAuthRouter } from './auth.js'
+import { assertRuntimeEnv } from './env.js'
 
 async function start() {
   const port = Number(process.env.PORT || 5173)
+  assertRuntimeEnv()
   const app = express()
 
   app.use(express.json())

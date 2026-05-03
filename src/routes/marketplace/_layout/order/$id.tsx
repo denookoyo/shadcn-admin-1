@@ -125,6 +125,8 @@ function OrderDetail() {
   const [selectedRefundItem, setSelectedRefundItem] = useState<string>('order')
   const [submittingRefund, setSubmittingRefund] = useState(false)
   const [markingPaid, setMarkingPaid] = useState(false)
+  const [refundFeedback, setRefundFeedback] = useState<string | null>(null)
+  const [paymentFeedback, setPaymentFeedback] = useState<string | null>(null)
   useEffect(() => {
     // Preload proposals from current order once data arrives
     try {
@@ -151,6 +153,12 @@ function OrderDetail() {
       mounted = false
     }
   }, [id, isBuyer])
+
+  const refundableItems = useMemo(() => data?.items ?? [], [data])
+  const hasPendingRefund = useMemo(
+    () => refundRequests.some((item) => item.status === 'requested' || item.status === 'reviewing'),
+    [refundRequests]
+  )
 
   if (error) {
     if (status === 401 || status === 403) {
@@ -196,12 +204,6 @@ function OrderDetail() {
     setLocalProposals((cur) => Array.from(new Set([isoLike, ...cur])))
   }
 
-  const refundableItems = useMemo(() => data?.items ?? [], [data])
-  const hasPendingRefund = useMemo(
-    () => refundRequests.some((item) => item.status === 'requested' || item.status === 'reviewing'),
-    [refundRequests]
-  )
-
   function refundStatusLabel(status: RefundRequest['status']) {
     return status.replace('_', ' ')
   }
@@ -225,11 +227,11 @@ function OrderDetail() {
   async function submitRefundRequest() {
     if (!isBuyer || typeof db.createRefundRequest !== 'function') return
     if (hasPendingRefund) {
-      window.alert('You already have a refund request awaiting review.')
+      setRefundFeedback('You already have a refund request awaiting review.')
       return
     }
     if (!refundReason.trim()) {
-      window.alert('Please describe the issue before submitting a refund request.')
+      setRefundFeedback('Please describe the issue before submitting a refund request.')
       return
     }
     setSubmittingRefund(true)
@@ -249,9 +251,10 @@ function OrderDetail() {
         setRefundReason('')
         setRefundAmount('')
         setSelectedRefundItem('order')
+        setRefundFeedback('Refund request submitted. Support will review it shortly.')
       }
     } catch (err) {
-      window.alert((err as Error)?.message ?? 'Unable to submit refund request right now.')
+      setRefundFeedback((err as Error)?.message ?? 'Unable to submit refund request right now.')
     } finally {
       setSubmittingRefund(false)
     }
@@ -272,6 +275,11 @@ function OrderDetail() {
       <div className='mt-3 text-sm text-gray-600'>
         Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : 'Not paid'}</span>
       </div>
+      {paymentFeedback ? (
+        <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm ${paymentFeedback.toLowerCase().includes('unable') ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+          {paymentFeedback}
+        </div>
+      ) : null}
       {isSeller && !paymentMade && ['pending', 'scheduled'].includes(data.status) ? (
         <button
           type='button'
@@ -280,9 +288,12 @@ function OrderDetail() {
             setMarkingPaid(true)
             try {
               const updated = db.markOrderPaid ? await db.markOrderPaid(id) : null
-              if (updated) setData(updated)
+              if (updated) {
+                setData(updated)
+                setPaymentFeedback('Order marked as paid.')
+              }
             } catch (err) {
-              window.alert((err as Error)?.message ?? 'Unable to mark as paid.')
+              setPaymentFeedback((err as Error)?.message ?? 'Unable to mark as paid.')
             } finally {
               setMarkingPaid(false)
             }
@@ -344,6 +355,11 @@ function OrderDetail() {
           <span>A${data.total}</span>
         </div>
       </div>
+      {refundFeedback ? (
+        <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${refundFeedback.toLowerCase().includes('unable') || refundFeedback.toLowerCase().includes('already') || refundFeedback.toLowerCase().includes('please') ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+          {refundFeedback}
+        </div>
+      ) : null}
 
       {/* Buyer: Accept seller's proposed alternates */}
   {isBuyer && hasService && proposals.length > 0 && data.status === 'pending' && (

@@ -1,70 +1,23 @@
-import { HTMLAttributes, useState } from 'react'
-import { z } from 'zod'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
+import { HTMLAttributes } from 'react'
+import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 
-type ForgotFormProps = HTMLAttributes<HTMLFormElement>
-
-const formSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Please enter your email' })
-    .email({ message: 'Invalid email address' }),
-})
+type ForgotFormProps = HTMLAttributes<HTMLDivElement>
 
 export function ForgotPasswordForm({ className, ...props }: ForgotFormProps) {
-  const [isLoading, setIsLoading] = useState(false)
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: { email: '' },
-  })
-
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true)
-    // eslint-disable-next-line no-console
-    console.log(data)
-
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 3000)
-  }
-
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className={cn('grid gap-2', className)}
-        {...props}
-      >
-        <FormField
-          control={form.control}
-          name='email'
-          render={({ field }) => (
-            <FormItem className='space-y-1'>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder='name@example.com' {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button className='mt-2' disabled={isLoading}>
-          Continue
-        </Button>
-      </form>
-    </Form>
+    <div className={cn('grid gap-4', className)} {...props}>
+      <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600'>
+        Password reset is unavailable because email/password authentication is not enabled on this marketplace.
+      </div>
+      <div className='flex flex-wrap gap-3'>
+        <Link to='/sign-in' className='rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500'>
+          Return to sign in
+        </Link>
+        <Link to='/contact' className='rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100'>
+          Contact support
+        </Link>
+      </div>
+    </div>
   )
 }

@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import AuthLayout from '../auth-layout'
-import { SignUpForm } from './components/sign-up-form'
+import { GoogleSignInButton } from '../google-signin'
 
 export default function SignUp() {
   return (
@@ -19,7 +19,7 @@ export default function SignUp() {
             Create an account
           </CardTitle>
           <CardDescription>
-            Enter your email and password to create an account. <br />
+            Use Google sign-in to create your marketplace account. <br />
             Already have an account?{' '}
             <Link
               to='/sign-in'
@@ -30,24 +30,29 @@ export default function SignUp() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SignUpForm />
+          <div className='space-y-4'>
+            <GoogleSignInButton />
+            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
+              Direct email/password registration is not enabled for the live marketplace. Google sign-in creates your account automatically on first access.
+            </div>
+          </div>
         </CardContent>
         <CardFooter>
           <p className='text-muted-foreground px-8 text-center text-sm'>
             By creating an account, you agree to our{' '}
-            <a
-              href='/terms'
+            <Link
+              to='/terms'
               className='hover:text-primary underline underline-offset-4'
             >
               Terms of Service
-            </a>{' '}
+            </Link>{' '}
             and{' '}
-            <a
-              href='/privacy'
+            <Link
+              to='/privacy'
               className='hover:text-primary underline underline-offset-4'
             >
               Privacy Policy
-            </a>
+            </Link>
             .
           </p>
         </CardFooter>

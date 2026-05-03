@@ -7,8 +7,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import AuthLayout from '../auth-layout'
-import { UserAuthForm } from './components/user-auth-form'
 import { GoogleSignInButton } from '../google-signin'
+import { Link } from '@tanstack/react-router'
 
 export default function SignIn() {
   return (
@@ -17,32 +17,33 @@ export default function SignIn() {
         <CardHeader>
           <CardTitle className='text-lg tracking-tight text-slate-900'>Sign in to Hedgetech</CardTitle>
           <CardDescription>
-            Use your marketplace credentials or continue with Google to access your seller workspace.
+            Continue with Google to access your buyer account, seller workspace, and marketplace orders.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className='space-y-4'>
             <GoogleSignInButton />
-            <div className='text-center text-xs text-muted-foreground'>or continue with email</div>
-            <UserAuthForm />
+            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
+              Email/password sign-in is not enabled on this live marketplace. Use Google sign-in or contact support if your workspace needs access help.
+            </div>
           </div>
         </CardContent>
         <CardFooter>
           <p className='text-muted-foreground px-8 text-center text-sm'>
             By signing in, you agree to the{' '}
-            <a
-              href='/terms'
+            <Link
+              to='/terms'
               className='hover:text-primary underline underline-offset-4'
             >
               Terms of Service
-            </a>{' '}
+            </Link>{' '}
             and{' '}
-            <a
-              href='/privacy'
+            <Link
+              to='/privacy'
               className='hover:text-primary underline underline-offset-4'
             >
               Privacy Policy
-            </a>
+            </Link>
             .
           </p>
         </CardFooter>

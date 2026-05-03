@@ -4,6 +4,16 @@ import { TrendingUp, PackageCheck, PackageOpen, PackageSearch, ScanLine, ArrowUp
 import { db, type Product, type Order } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { StageBadge } from '@/components/stage-badge'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
@@ -36,6 +46,7 @@ function SellerDashboard() {
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -68,17 +79,18 @@ function SellerDashboard() {
   const pendingOrders = useMemo(() => orders.filter((order: any) => ['pending', 'scheduled'].includes(order.status)), [orders])
   const completedOrders = useMemo(() => orders.filter((order: any) => ['completed', 'paid'].includes(order.status)), [orders])
   const shippedOrders = useMemo(() => orders.filter((order) => order.status === 'shipped'), [orders])
+  const productToDelete = deleteId ? mine.find((item) => item.id === deleteId) ?? null : null
 
   const highlights: Highlight[] = [
     {
-      heading: 'Analyse performance',
-      body: 'Visualise conversion, repeat buyers, and channel contribution across time periods.',
-      href: '/marketplace/dashboard/analytics',
+      heading: 'Publish your next listing',
+      body: 'Add new inventory quickly and keep your live catalogue current.',
+      href: '/marketplace/dashboard/listings/new',
     },
     {
-      heading: 'Generate reports',
-      body: 'Export settlement-ready CSVs and automate weekly digests for your finance stack.',
-      href: '/marketplace/dashboard/reports',
+      heading: 'Review active orders',
+      body: 'Confirm payments, dispatch shipments, and close buyer actions from one queue.',
+      href: '/marketplace/dashboard/orders',
     },
     {
       heading: 'Resolve support tickets',
@@ -88,10 +100,9 @@ function SellerDashboard() {
   ]
 
   async function handleDelete(id: string) {
-    const confirmed = window.confirm('Delete this listing? You can’t undo this action.')
-    if (!confirmed) return
     await db.deleteProduct(id)
     setProducts((list) => list.filter((product) => product.id !== id))
+    setDeleteId(null)
   }
 
   return (
@@ -138,8 +149,8 @@ function SellerDashboard() {
             </div>
             <div className='rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm'>
               <div className='font-semibold text-slate-900'>Need onboarding help?</div>
-              <p className='mt-1 text-xs text-slate-500'>Join the Hedgetech seller academy or book a white-glove setup session.</p>
-              <a href='#' className='mt-3 inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline'>Browse playbooks →</a>
+              <p className='mt-1 text-xs text-slate-500'>Review your seller verification status or contact marketplace operations for setup help.</p>
+              <Link to='/marketplace/dashboard/verification' search={{ redirect: '' }} className='mt-3 inline-flex items-center text-xs font-semibold text-emerald-700 hover:underline'>Open verification →</Link>
             </div>
           </div>
         </div>
@@ -200,7 +211,7 @@ function SellerDashboard() {
                           >
                             Edit
                           </Link>
-                          <Button variant='destructive' size='sm' className='rounded-full px-3 text-xs' onClick={() => handleDelete(product.id)}>
+                          <Button variant='destructive' size='sm' className='rounded-full px-3 text-xs' onClick={() => setDeleteId(product.id)}>
                             Delete
                           </Button>
                         </div>
@@ -281,8 +292,8 @@ function SellerDashboard() {
             <h2 className='text-lg font-semibold text-slate-900'>Momentum</h2>
             <p className='text-xs text-slate-500'>Snapshot of week-over-week velocity pulled from your marketplace data.</p>
           </div>
-          <Link to='/marketplace/dashboard/analytics' className='inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline'>
-            Dive into analytics →
+          <Link to='/marketplace/dashboard/orders' className='inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline'>
+            Open fulfilment board →
           </Link>
         </div>
         <div className='mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
@@ -310,6 +321,24 @@ function SellerDashboard() {
           </div>
         </div>
       </section>
+      <AlertDialog open={Boolean(deleteId)} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete listing</AlertDialogTitle>
+            <AlertDialogDescription>
+              {productToDelete
+                ? `Delete "${productToDelete.title}" from the marketplace catalogue? This action cannot be undone.`
+                : 'Delete this listing from the marketplace catalogue?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className='bg-red-600 hover:bg-red-500' onClick={() => (deleteId ? handleDelete(deleteId) : undefined)}>
+              Delete listing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MarketplacePageShell>
   )
 }

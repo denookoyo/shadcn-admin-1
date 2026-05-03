@@ -6,11 +6,220 @@ import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
 
 function imageForServer(query, w = 640, h = 640) {
-  const provider = process.env.VITE_IMAGE_PROVIDER || 'picsum'
+  const provider = process.env.VITE_IMAGE_PROVIDER || 'brand'
+  if (provider === 'brand') {
+    const safeLabel = String(query || 'Hedgetech Marketplace').slice(0, 42)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${safeLabel}">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0f766e"/>
+          <stop offset="100%" stop-color="#102534"/>
+        </linearGradient>
+      </defs>
+      <rect width="${w}" height="${h}" fill="url(#g)"/>
+      <circle cx="${Math.round(w * 0.78)}" cy="${Math.round(h * 0.22)}" r="${Math.round(Math.min(w, h) * 0.12)}" fill="rgba(255,255,255,0.08)"/>
+      <circle cx="${Math.round(w * 0.16)}" cy="${Math.round(h * 0.82)}" r="${Math.round(Math.min(w, h) * 0.18)}" fill="rgba(255,255,255,0.06)"/>
+      <text x="50%" y="46%" text-anchor="middle" fill="#ecfeff" font-family="Arial, Helvetica, sans-serif" font-size="${Math.max(20, Math.round(w / 18))}" font-weight="700">Hedgetech</text>
+      <text x="50%" y="58%" text-anchor="middle" fill="#d1fae5" font-family="Arial, Helvetica, sans-serif" font-size="${Math.max(12, Math.round(w / 34))}">${safeLabel}</text>
+    </svg>`
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+  }
   if (provider === 'picsum') return `https://picsum.photos/seed/${encodeURIComponent(query)}/${w}/${h}`
   if (provider === 'placeholder') return `https://placehold.co/${w}x${h}?text=${encodeURIComponent(query)}`
   return `https://source.unsplash.com/${w}x${h}/?${encodeURIComponent(query)}`
 }
+
+function landSlug(title = '', town = '') {
+  return `${title}-${town}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
+const LAND_LISTING_SEEDS = [
+  {
+    slug: 'lanet-plains-signature-acreage',
+    title: '5-acre serviced enclave in Lanet Plains',
+    county: 'Nakuru',
+    town: 'Lanet Plains',
+    assetType: 'land',
+    acreage: 5,
+    priceKes: 42500000,
+    pricePerAcreKes: 8500000,
+    zoning: 'mixed-use',
+    listingType: 'freehold',
+    description:
+      'Corner parcel touching the new Lanet bypass with red soil, piped water, and Kenya Power transformer at the gate. Perfect for a gated estate or hospitality build.',
+    highlights: ['Beaconed & fenced', 'Clean freehold title', '2 min to bypass'],
+    documents: ['Original title deed', 'Mutation map (2025)', 'Official search (Oct 2025)'],
+    utilities: [
+      { label: 'Kenya Power 3-phase', available: true, notes: 'Transformer installed on boundary' },
+      { label: 'Piped water', available: true, notes: 'NAWASSCO line along boundary' },
+      { label: 'Fiber internet', available: false, notes: 'Safaricom fiber terminating 1.2km away' },
+    ],
+    water: 'Piped + community borehole',
+    roadAccess: '600m off tarmac via compacted murram road',
+    coordinates: { lat: -0.2449, lng: 36.1504 },
+    seller: { name: 'Mwangi Realty', company: 'Mwangi Realty', phone: '+254719555010', email: 'mwangi@mwrealty.co.ke', whatsapp: '+254719555010' },
+    gallery: [
+      imageForServer('Nakuru Lanet Plains aerial farmland', 1200, 800),
+      imageForServer('Kenya gated community land beacons', 1200, 800),
+      imageForServer('Nakuru bypass road infrastructure', 1200, 800),
+    ],
+    status: 'available',
+  },
+  {
+    slug: 'kitengela-ridges-2-5ac',
+    title: '2.5 acres along the Kitengela plains',
+    county: 'Kajiado',
+    town: 'Kitengela - Yukos',
+    assetType: 'land',
+    acreage: 2.5,
+    priceKes: 27500000,
+    pricePerAcreKes: 11000000,
+    zoning: 'residential',
+    listingType: 'freehold',
+    description:
+      'Flat, red soil land 1.8km off the Namanga Highway behind Yukos. Ideal for townhouses or a senior school campus with nearby borehole water.',
+    highlights: ['Namanga highway frontage', 'Perimeter mesh fence', 'Neighbors developed estates'],
+    documents: ['Freehold title', 'Stamped mutation', 'Approved change of user'],
+    utilities: [
+      { label: 'Borehole on site', available: true },
+      { label: 'Power nearby', available: true, notes: 'Kenya Power line 200m away' },
+      { label: 'Security patrols', available: true, notes: 'Controlled estate watch' },
+    ],
+    water: 'On-site borehole + community storage tank',
+    roadAccess: 'All-weather murram road, 1.8km from Namanga highway',
+    coordinates: { lat: -1.4506, lng: 36.9602 },
+    seller: { name: 'Nalepo Holdings', company: 'Nalepo Holdings', phone: '+254733886644', email: 'hello@nalepo.co.ke', whatsapp: '+254733886644' },
+    gallery: [
+      imageForServer('Kitengela land sale aerial view', 1200, 800),
+      imageForServer('Kitengela Namanga highway access road', 1200, 800),
+      imageForServer('Kenya real estate development plots', 1200, 800),
+    ],
+    status: 'offer_received',
+  },
+  {
+    slug: 'vipingo-ridge-ten-acres',
+    title: '10 acres ocean-view ridge in Vipingo',
+    county: 'Kilifi',
+    town: 'Vipingo Ridge',
+    assetType: 'land',
+    acreage: 10,
+    priceKes: 120000000,
+    pricePerAcreKes: 12000000,
+    zoning: 'commercial',
+    listingType: 'leasehold',
+    description:
+      'Undulating ridge line bordering Vipingo Ridge Phase 2, overlooking the Indian Ocean and golf course. Best suited for villas or a boutique resort.',
+    highlights: ['Titled + rent paid to 2098', 'Gated golf estate services', 'Unrestricted ocean views'],
+    documents: ['Leasehold title (2098)', 'Survey map', 'County rates clearance (2025)'],
+    utilities: [
+      { label: 'Paved access', available: true },
+      { label: 'Mains power', available: true, notes: 'Vipingo Ridge power network' },
+      { label: 'Fiber internet', available: true, notes: 'POA fibre along inside road' },
+    ],
+    water: 'Vipingo Ridge desalination plant connection',
+    roadAccess: 'Cabro internal roads connected to Malindi highway via paved entry',
+    coordinates: { lat: -3.7836, lng: 39.8494 },
+    seller: { name: 'Kahindi + Partners', company: 'Kahindi + Partners', phone: '+254720402040', email: 'sales@kahindipartners.com', whatsapp: '+254720402040' },
+    gallery: [
+      imageForServer('Vipingo ridge aerial land view indian ocean', 1200, 800),
+      imageForServer('Vipingo ridge golf course view', 1200, 800),
+      imageForServer('Kenya coast resort land plots', 1200, 800),
+    ],
+    status: 'available',
+  },
+  {
+    slug: 'kiambu-garden-villas',
+    title: '4-bedroom garden villas in Kiambu Road',
+    county: 'Kiambu',
+    town: 'Kiambu Road',
+    assetType: 'house',
+    acreage: 0.18,
+    priceKes: 48500000,
+    pricePerAcreKes: 269444444,
+    zoning: 'residential',
+    listingType: 'freehold',
+    description:
+      'Move-in-ready gated villas with private gardens, ensuite bedrooms, borehole backup, and quick access to Ridgeways plus the Northern Bypass.',
+    highlights: ['4 beds all ensuite', 'Gated compound', 'Backup borehole + inverter'],
+    documents: ['Mother title', 'Subdivision plan', 'Occupation certificate'],
+    utilities: [
+      { label: 'Borehole water', available: true },
+      { label: 'Full-time security', available: true },
+      { label: 'Fiber internet', available: true, notes: 'Safaricom and Zuku ready' },
+    ],
+    water: 'Borehole + county water backup',
+    roadAccess: '150m off Kiambu Road on cabro access',
+    coordinates: { lat: -1.2119, lng: 36.8427 },
+    seller: { name: 'Karibu Homes', company: 'Karibu Homes', phone: '+254711002299', email: 'sales@karibuhomes.ke', whatsapp: '+254711002299' },
+    gallery: [
+      imageForServer('Kiambu road gated villas kenya', 1200, 800),
+      imageForServer('Kenya modern family villa exterior', 1200, 800),
+      imageForServer('Nairobi suburban property driveway', 1200, 800),
+    ],
+    status: 'available',
+  },
+  {
+    slug: 'westlands-income-apartments',
+    title: 'Serviced investment apartments in Westlands',
+    county: 'Nairobi',
+    town: 'Westlands',
+    assetType: 'apartment',
+    acreage: 0.05,
+    priceKes: 18500000,
+    pricePerAcreKes: 370000000,
+    zoning: 'mixed-use',
+    listingType: 'leasehold',
+    description:
+      'Furnished one and two-bedroom apartments positioned for short-stay income, within walking distance of major offices, malls, and nightlife in Westlands.',
+    highlights: ['Serviced apartment block', 'High occupancy location', 'Rooftop gym + pool'],
+    documents: ['Leasehold title', 'Management agreement template', 'Rates clearance'],
+    utilities: [
+      { label: 'Backup generator', available: true },
+      { label: 'High-speed lifts', available: true },
+      { label: 'Parking bay', available: true, notes: 'One per unit' },
+    ],
+    water: 'County water + 120,000L storage',
+    roadAccess: 'Paved dual-access entry from Westlands Road',
+    coordinates: { lat: -1.2678, lng: 36.8044 },
+    seller: { name: 'Apex Residences', company: 'Apex Residences', phone: '+254722113355', email: 'invest@apexresidences.ke', whatsapp: '+254722113355' },
+    gallery: [
+      imageForServer('Westlands serviced apartments Nairobi', 1200, 800),
+      imageForServer('Nairobi apartment lobby luxury', 1200, 800),
+      imageForServer('Kenya rooftop pool residence', 1200, 800),
+    ],
+    status: 'offer_received',
+  },
+]
+
+const SELLER_APPLICATION_SEEDS = [
+  {
+    email: 'kitengela@hedgetech.market',
+    companyName: 'Kitengela Plains Estates',
+    contactName: 'Grace Naliaka',
+    phone: '+254 711 222333',
+    location: 'Kitengela, Kajiado County',
+    documents: ['Certificate of Incorporation', 'Tax compliance 2025'],
+    pitch: 'Townhouse developer handling Namanga road projects.',
+    status: 'pending',
+    submittedAt: '2026-02-05T07:30:00.000Z',
+  },
+  {
+    email: 'vipingo@hedgetech.market',
+    companyName: 'Vipingo Ridge Holdings',
+    contactName: 'Diana Kahindi',
+    phone: '+254 721 000555',
+    location: 'Vipingo, Kilifi County',
+    documents: ['Title deeds portfolio', 'Bank letter of good standing'],
+    pitch: 'Premium coastal developer with audited sales.',
+    status: 'approved',
+    submittedAt: '2025-12-12T10:00:00.000Z',
+    reviewedAt: '2025-12-15T14:00:00.000Z',
+    reviewerNotes: 'Documents verified by ops team.',
+  },
+]
 
 // No seeding in API
 
@@ -166,212 +375,285 @@ export function createApiRouter() {
     return date
   }
 
+  const LAND_STATUS_VALUES = ['available', 'offer_received', 'reserved']
+  const LAND_ZONING_VALUES = ['agricultural', 'mixed-use', 'residential', 'commercial']
+  const LAND_LISTING_TYPES = ['freehold', 'leasehold']
+  const LAND_ASSET_TYPE_VALUES = ['land', 'house', 'apartment', 'commercial', 'office']
+  const SELLER_APPLICATION_ACTIONS = ['approve', 'reject']
+
+  const landUtilitySchema = z.object({
+    label: z.string().min(1),
+    available: z.boolean(),
+    notes: z.string().max(200).optional().nullable(),
+  })
+
+  const landSellerSchema = z.object({
+    name: z.string().min(1),
+    company: z.string().optional().nullable(),
+    phone: z.string().min(6),
+    email: z.string().email().optional().nullable(),
+    whatsapp: z.string().optional().nullable(),
+  })
+
+  const landListingInputSchema = z.object({
+    title: z.string().min(3),
+    county: z.string().min(2),
+    town: z.string().min(2),
+    assetType: z.enum(LAND_ASSET_TYPE_VALUES).default('land'),
+    acreage: z.number().positive(),
+    priceKes: z.number().int().nonnegative(),
+    pricePerAcreKes: z.number().int().nonnegative().optional(),
+    zoning: z.enum(LAND_ZONING_VALUES),
+    listingType: z.enum(LAND_LISTING_TYPES).default('freehold'),
+    description: z.string().min(10),
+    highlights: z.array(z.string().min(1)).optional(),
+    documents: z.array(z.string().min(1)).optional(),
+    utilities: z.array(landUtilitySchema).optional(),
+    water: z.string().optional(),
+    roadAccess: z.string().optional(),
+    coordinates: z
+      .object({
+        lat: z.number(),
+        lng: z.number(),
+      })
+      .optional(),
+    seller: landSellerSchema,
+    gallery: z.array(z.string().url()).optional(),
+    status: z.enum(LAND_STATUS_VALUES).optional(),
+  })
+
+  const sellerApplicationInputSchema = z.object({
+    companyName: z.string().min(2),
+    contactName: z.string().min(1),
+    phone: z.string().min(6),
+    location: z.string().max(200).optional(),
+    documents: z.array(z.string().min(1)).max(20).optional(),
+    pitch: z.string().max(4000).optional(),
+    resubmitForReview: z.boolean().optional(),
+  })
+
+  const sellerApplicationReviewSchema = z.object({
+    action: z.enum(SELLER_APPLICATION_ACTIONS),
+    reviewerNotes: z.string().max(4000).optional(),
+  })
+
+  function mapZoningToDb(value) {
+    if (value === 'mixed-use') return 'mixed_use'
+    return value
+  }
+
+  function mapZoningToApi(value) {
+    if (value === 'mixed_use') return 'mixed-use'
+    return value
+  }
+
+  function mapGallery(values, fallbackLabel) {
+    const cleaned = Array.isArray(values) ? values.map((val) => String(val || '').trim()).filter(Boolean) : []
+    if (cleaned.length) return cleaned
+    return [imageForServer(`${fallbackLabel} real estate`, 1200, 800)]
+  }
+
+  function mapArrayField(values, defaultValues) {
+    if (Array.isArray(values) && values.length) {
+      return values.map((val) => String(val || '').trim()).filter(Boolean)
+    }
+    return [...defaultValues]
+  }
+
+  function mapUtilities(values) {
+    if (!Array.isArray(values) || !values.length) return [{ label: 'Power nearby', available: true }]
+    return values
+      .map((util) => ({
+        label: String(util.label || '').trim(),
+        available: Boolean(util.available),
+        notes: util.notes ? String(util.notes).trim() : null,
+      }))
+      .filter((util) => Boolean(util.label))
+  }
+
+  function mapSeller(input) {
+    const placeholder = { name: 'Owner', phone: '+254700000000', whatsapp: '+254700000000' }
+    if (!input || typeof input !== 'object') return placeholder
+    const name = String(input.name || '').trim() || placeholder.name
+    const phone = String(input.phone || '').trim() || placeholder.phone
+    const whatsapp = String(input.whatsapp || '').trim() || phone
+    return {
+      name,
+      company: input.company ? String(input.company).trim() || null : null,
+      phone,
+      email: input.email ? String(input.email).trim() || null : null,
+      whatsapp,
+    }
+  }
+
+  function mapCoordinates(coords) {
+    if (!coords || typeof coords !== 'object') return null
+    const lat = Number(coords.lat)
+    const lng = Number(coords.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    return { lat, lng }
+  }
+
+  function buildLandListingData(input, { slug } = {}) {
+    const acreage = Number(input.acreage) || 1
+    const priceKes = Math.max(0, Math.round(Number(input.priceKes) || 0))
+    const pricePerAcre =
+      input.pricePerAcreKes && input.pricePerAcreKes > 0 ? Math.round(input.pricePerAcreKes) : Math.round(priceKes / Math.max(acreage, 1))
+    return {
+      slug,
+      title: String(input.title || '').trim(),
+      county: String(input.county || '').trim(),
+      town: String(input.town || '').trim(),
+      assetType: input.assetType || 'land',
+      acreage: acreage.toFixed(2),
+      priceKes,
+      pricePerAcreKes: pricePerAcre,
+      zoning: mapZoningToDb(input.zoning),
+      listingType: input.listingType || 'freehold',
+      description: String(input.description || '').trim(),
+      highlights: mapArrayField(input.highlights, ['Fresh listing']),
+      documents: mapArrayField(input.documents, ['Title ready']),
+      utilities: mapUtilities(input.utilities),
+      water: input.water ? String(input.water).trim() : null,
+      roadAccess: input.roadAccess ? String(input.roadAccess).trim() : null,
+      coordinates: mapCoordinates(input.coordinates),
+      seller: mapSeller(input.seller),
+      gallery: mapGallery(input.gallery, input.county || input.town || 'Kenya'),
+      status: input.status || 'available',
+    }
+  }
+
+  function landRecordToResponse(record) {
+    const utilities = Array.isArray(record.utilities) ? record.utilities : []
+    const seller = (record.seller && typeof record.seller === 'object' ? record.seller : mapSeller(null))
+    return {
+      id: record.id,
+      slug: record.slug,
+      title: record.title,
+      county: record.county,
+      town: record.town,
+      assetType: record.assetType,
+      acreage: Number(record.acreage),
+      priceKes: record.priceKes,
+      pricePerAcreKes: record.pricePerAcreKes ?? record.priceKes,
+      zoning: mapZoningToApi(record.zoning),
+      listingType: record.listingType,
+      description: record.description,
+      highlights: record.highlights || [],
+      documents: record.documents || [],
+      utilities,
+      water: record.water || undefined,
+      roadAccess: record.roadAccess || undefined,
+      coordinates: record.coordinates || undefined,
+      seller,
+      gallery: record.gallery || [],
+      status: record.status,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+    }
+  }
+
+  async function generateLandSlug(title, town, preferredSlug) {
+    const base = (preferredSlug && preferredSlug.trim()) || landSlug(title, town) || `land-${Date.now()}`
+    let candidate = base
+    let counter = 2
+    // eslint-disable-next-line no-await-in-loop
+    while (await prisma.landListing.findUnique({ where: { slug: candidate } })) {
+      candidate = `${base}-${counter}`
+      counter += 1
+    }
+    return candidate
+  }
+
+  async function ensureLandListingsSeeded() {
+    for (const seed of LAND_LISTING_SEEDS) {
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await prisma.landListing.findUnique({ where: { slug: seed.slug } })
+      if (existing) continue
+      const slug = await generateLandSlug(seed.title, seed.town, seed.slug)
+      const data = buildLandListingData(seed, { slug })
+      // eslint-disable-next-line no-await-in-loop
+      await prisma.landListing.create({ data })
+    }
+  }
+
+  function normalizeSellerDocuments(values) {
+    if (!Array.isArray(values)) return []
+    return values.map((entry) => String(entry || '').trim()).filter(Boolean)
+  }
+
+  function sellerApplicationToResponse(record) {
+    if (!record) return null
+    return {
+      id: record.id,
+      email: record.email,
+      companyName: record.companyName,
+      contactName: record.contactName,
+      phone: record.phone,
+      location: record.location || undefined,
+      documents: Array.isArray(record.documents) ? record.documents : [],
+      pitch: record.pitch || undefined,
+      status: record.status,
+      submittedAt: record.submittedAt.toISOString(),
+      reviewedAt: record.reviewedAt ? record.reviewedAt.toISOString() : undefined,
+      reviewerNotes: record.reviewerNotes || undefined,
+      createdAt: record.createdAt ? record.createdAt.toISOString() : undefined,
+      updatedAt: record.updatedAt ? record.updatedAt.toISOString() : undefined,
+    }
+  }
+
+  async function ensureSellerApplicationsSeeded() {
+    for (const seed of SELLER_APPLICATION_SEEDS) {
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await prisma.sellerApplication.findUnique({ where: { email: seed.email.toLowerCase() } })
+      if (existing) continue
+      // eslint-disable-next-line no-await-in-loop
+      const user = await prisma.user.findUnique({ where: { email: seed.email.toLowerCase() }, select: { id: true } }).catch(() => null)
+      // eslint-disable-next-line no-await-in-loop
+      await prisma.sellerApplication.create({
+        data: {
+          userId: user?.id ?? null,
+          email: seed.email.toLowerCase(),
+          companyName: seed.companyName,
+          contactName: seed.contactName,
+          phone: seed.phone,
+          location: seed.location || null,
+          documents: normalizeSellerDocuments(seed.documents),
+          pitch: seed.pitch || null,
+          status: seed.status,
+          submittedAt: new Date(seed.submittedAt),
+          reviewedAt: seed.reviewedAt ? new Date(seed.reviewedAt) : null,
+          reviewerNotes: seed.reviewerNotes || null,
+        },
+      })
+    }
+  }
+
+  async function resolveSellerActor(req) {
+    const email = typeof req.user?.email === 'string' ? String(req.user.email).trim().toLowerCase() : ''
+    const uid = Number.isFinite(Number(req.user?.uid)) ? Number(req.user.uid) : null
+    let userId = uid
+    if (!userId && email) {
+      const user = await prisma.user.findUnique({ where: { email }, select: { id: true } }).catch(() => null)
+      userId = user?.id ?? null
+    }
+    return { email, userId }
+  }
+
+  async function findSellerApplicationForActor({ email, userId }) {
+    if (userId && email) {
+      return prisma.sellerApplication.findFirst({
+        where: {
+          OR: [{ userId }, { email }],
+        },
+      })
+    }
+    if (userId) return prisma.sellerApplication.findFirst({ where: { userId } })
+    if (email) return prisma.sellerApplication.findUnique({ where: { email } })
+    return null
+  }
+
   router.get('/health', (_req, res) => res.json({ ok: true }))
-
-  // ---------------- Amazing Freight (Drivers) ----------------
-  // Create a docket
-  router.post('/driver/dockets', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const { date, truckId, project, startTime, endTime, hours, details, files } = req.body || {}
-      const created = await prisma.docket.create({
-        data: {
-          driverId,
-          date: new Date(date || Date.now()),
-          truckId: truckId || null,
-          project: project || null,
-          startTime: startTime || null,
-          endTime: endTime || null,
-          hours: Number.isFinite(Number(hours)) ? Number(hours) : null,
-          details: details || null,
-          files: Array.isArray(files) ? files : [],
-        },
-      })
-      res.status(201).json(created)
-    } catch (e) {
-      console.error('POST /api/driver/dockets error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // List my dockets
-  router.get('/driver/dockets', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.docket.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/dockets error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // Submit hours (shift)
-  router.post('/driver/shifts', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const { date, truckId, startTime, endTime, breakMin = 0 } = req.body || {}
-      // compute total hours naive (expects HH:mm)
-      function parseHM(s) { const [h, m] = String(s||'').split(':').map((x) => Number(x)||0); return h*60+m }
-      const startM = parseHM(startTime)
-      const endM = parseHM(endTime)
-      let mins = Math.max(0, endM - startM - Number(breakMin||0))
-      const totalHours = Math.round((mins/60) * 100) / 100
-      const created = await prisma.shift.create({
-        data: {
-          driverId,
-          date: new Date(date || Date.now()),
-          truckId: truckId || null,
-          startTime: startTime || '00:00',
-          endTime: endTime || '00:00',
-          breakMin: Number(breakMin || 0),
-          totalHours,
-        },
-      })
-      res.status(201).json(created)
-    } catch (e) {
-      console.error('POST /api/driver/shifts error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // List my shifts
-  router.get('/driver/shifts', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.shift.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/shifts error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // Maintenance request
-  router.post('/driver/maintenance', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const { date, truckId, category, severity, description, files } = req.body || {}
-      const created = await prisma.maintenanceRequest.create({
-        data: {
-          driverId,
-          date: date ? new Date(date) : new Date(),
-          truckId: truckId || null,
-          category: String(category || 'general'),
-          severity: severity || null,
-          description: String(description || ''),
-          files: Array.isArray(files) ? files : [],
-        },
-      })
-      res.status(201).json(created)
-    } catch (e) {
-      console.error('POST /api/driver/maintenance error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/driver/maintenance', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.maintenanceRequest.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/maintenance error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // Accident report
-  router.post('/driver/accidents', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const { occurredAt, truckId, location, description, injuries, policeReport, files } = req.body || {}
-      const created = await prisma.accidentReport.create({
-        data: {
-          driverId,
-          occurredAt: occurredAt ? new Date(occurredAt) : new Date(),
-          truckId: truckId || null,
-          location: location || null,
-          description: String(description || ''),
-          injuries: Boolean(injuries),
-          policeReport: Boolean(policeReport),
-          files: Array.isArray(files) ? files : [],
-        },
-      })
-      res.status(201).json(created)
-    } catch (e) {
-      console.error('POST /api/driver/accidents error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/driver/accidents', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.accidentReport.findMany({ where: { driverId }, orderBy: { occurredAt: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/accidents error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // Fuel receipts
-  router.post('/driver/receipts', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const { date, truckId, liters, amount, odometer, fileUrl } = req.body || {}
-      const created = await prisma.fuelReceipt.create({
-        data: {
-          driverId,
-          date: date ? new Date(date) : new Date(),
-          truckId: truckId || null,
-          liters: Number(liters || 0),
-          amount: Number(amount || 0),
-          odometer: odometer ? Number(odometer) : null,
-          fileUrl: fileUrl || null,
-        },
-      })
-      res.status(201).json(created)
-    } catch (e) {
-      console.error('POST /api/driver/receipts error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/driver/receipts', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.fuelReceipt.findMany({ where: { driverId }, orderBy: { date: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/receipts error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  // Payments
-  router.get('/driver/payments', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const list = await prisma.payment.findMany({ where: { driverId }, orderBy: { periodStart: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/driver/payments error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/driver/payslips', ensureAuth, async (req, res) => {
-    try {
-      const driverId = Number(req.user.uid)
-      const payslips = await prisma.payslip.findMany({ where: { payment: { driverId } }, orderBy: { createdAt: 'desc' } })
-      res.json(payslips)
-    } catch (e) {
-      console.error('GET /api/driver/payslips error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
 
   // ---------------- Amazing Freight (Admin) ----------------
   // Simple role gate: requires req.user.role === 'admin' (tokens include role)
@@ -380,80 +662,117 @@ export function createApiRouter() {
     return res.status(403).json({ error: 'Forbidden' })
   }
 
+  router.get('/seller/application', ensureAuth, async (req, res) => {
+    try {
+      await ensureSellerApplicationsSeeded()
+      const actor = await resolveSellerActor(req)
+      if (!actor.email && !actor.userId) {
+        return res.status(400).json({ error: 'Unable to resolve seller profile' })
+      }
+      const application = await findSellerApplicationForActor(actor)
+      if (!application) {
+        return res.json({ application: null, status: 'not_submitted' })
+      }
+      if (!application.userId && actor.userId) {
+        await prisma.sellerApplication.update({ where: { id: application.id }, data: { userId: actor.userId } })
+        application.userId = actor.userId
+      }
+      return res.json({ application: sellerApplicationToResponse(application), status: application.status })
+    } catch (e) {
+      console.error('GET /api/seller/application error:', e)
+      return res.status(500).json({ error: 'Unable to load seller verification right now.' })
+    }
+  })
+
+  router.post('/seller/application', ensureAuth, async (req, res) => {
+    try {
+      const parsed = sellerApplicationInputSchema.safeParse(req.body || {})
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid seller verification payload', details: parsed.error.flatten() })
+      }
+      const actor = await resolveSellerActor(req)
+      if (!actor.email) return res.status(400).json({ error: 'Signed-in email is required for seller verification.' })
+
+      const existing = await findSellerApplicationForActor(actor)
+      const preserveApproved = existing?.status === 'approved' && !parsed.data.resubmitForReview
+      const nextStatus = preserveApproved ? 'approved' : 'pending'
+      const payload = {
+        userId: actor.userId ?? existing?.userId ?? null,
+        email: actor.email,
+        companyName: String(parsed.data.companyName || '').trim(),
+        contactName: String(parsed.data.contactName || '').trim(),
+        phone: String(parsed.data.phone || '').trim(),
+        location: parsed.data.location ? String(parsed.data.location).trim() : null,
+        documents: normalizeSellerDocuments(parsed.data.documents),
+        pitch: parsed.data.pitch ? String(parsed.data.pitch).trim() : null,
+        status: nextStatus,
+        submittedAt: new Date(),
+        reviewedAt: preserveApproved ? existing?.reviewedAt ?? null : null,
+        reviewerNotes: preserveApproved ? existing?.reviewerNotes ?? null : null,
+      }
+
+      const application = existing
+        ? await prisma.sellerApplication.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await prisma.sellerApplication.create({
+            data: payload,
+          })
+
+      return res.status(existing ? 200 : 201).json({
+        application: sellerApplicationToResponse(application),
+        status: application.status,
+      })
+    } catch (e) {
+      console.error('POST /api/seller/application error:', e)
+      return res.status(500).json({ error: 'Unable to submit seller verification right now.' })
+    }
+  })
+
+  router.get('/seller/applications', ensureAuth, ensureAdmin, async (_req, res) => {
+    try {
+      await ensureSellerApplicationsSeeded()
+      const applications = await prisma.sellerApplication.findMany({ orderBy: [{ submittedAt: 'desc' }] })
+      return res.json({ applications: applications.map(sellerApplicationToResponse) })
+    } catch (e) {
+      console.error('GET /api/seller/applications error:', e)
+      return res.status(500).json({ error: 'Unable to load seller applications right now.' })
+    }
+  })
+
+  router.post('/seller/applications/:id/review', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      const applicationId = String(req.params.id || '').trim()
+      if (!applicationId) return res.status(400).json({ error: 'Missing seller application id' })
+      const parsed = sellerApplicationReviewSchema.safeParse(req.body || {})
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid seller review payload', details: parsed.error.flatten() })
+      }
+      const application = await prisma.sellerApplication.findUnique({ where: { id: applicationId } })
+      if (!application) return res.status(404).json({ error: 'Seller application not found' })
+      const status = parsed.data.action === 'approve' ? 'approved' : 'rejected'
+      const updated = await prisma.sellerApplication.update({
+        where: { id: applicationId },
+        data: {
+          status,
+          reviewedAt: new Date(),
+          reviewerNotes: parsed.data.reviewerNotes ? String(parsed.data.reviewerNotes).trim() : null,
+        },
+      })
+      return res.json({ application: sellerApplicationToResponse(updated), status: updated.status })
+    } catch (e) {
+      console.error('POST /api/seller/applications/:id/review error:', e)
+      return res.status(500).json({ error: 'Unable to review seller application right now.' })
+    }
+  })
+
   router.get('/admin/drivers', ensureAuth, ensureAdmin, async (_req, res) => {
     try {
       const drivers = await prisma.user.findMany({ select: { id: true, email: true, name: true, image: true, role: true }, orderBy: { id: 'asc' } })
       res.json(drivers)
     } catch (e) {
       console.error('GET /api/admin/drivers error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/admin/dockets', ensureAuth, ensureAdmin, async (_req, res) => {
-    try {
-      const list = await prisma.docket.findMany({ orderBy: { date: 'desc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/admin/dockets error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/admin/shifts', ensureAuth, ensureAdmin, async (req, res) => {
-    try {
-      const group = String(req.query.group || 'day')
-      const shifts = await prisma.shift.findMany({})
-      if (group === 'week') {
-        // naive weekly grouping by ISO week number
-        function weekKey(d) {
-          const dt = new Date(d)
-          const target = new Date(dt.valueOf())
-          const dayNr = (dt.getDay() + 6) % 7
-          target.setDate(target.getDate() - dayNr + 3)
-          const jan4 = new Date(target.getFullYear(), 0, 4)
-          const dayDiff = (target.valueOf() - jan4.valueOf()) / 86400000
-          const week = 1 + Math.floor(dayDiff / 7)
-          return `${target.getFullYear()}-W${String(week).padStart(2, '0')}`
-        }
-        const agg = {}
-        for (const s of shifts) {
-          const k = weekKey(s.date)
-          agg[k] = (agg[k] || 0) + (s.totalHours || 0)
-        }
-        return res.json({ group: 'week', data: agg })
-      }
-      // default: by day
-      const agg = {}
-      for (const s of shifts) {
-        const k = new Date(s.date).toISOString().slice(0, 10)
-        agg[k] = (agg[k] || 0) + (s.totalHours || 0)
-      }
-      res.json({ group: 'day', data: agg })
-    } catch (e) {
-      console.error('GET /api/admin/shifts error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.get('/admin/trucks', ensureAuth, ensureAdmin, async (_req, res) => {
-    try {
-      const list = await prisma.truck.findMany({ orderBy: { name: 'asc' } })
-      res.json(list)
-    } catch (e) {
-      console.error('GET /api/admin/trucks error:', e)
-      res.status(500).json({ error: e?.message || 'Internal Error' })
-    }
-  })
-
-  router.post('/admin/trucks', ensureAuth, ensureAdmin, async (req, res) => {
-    try {
-      const { rego, name, active = true } = req.body || {}
-      const t = await prisma.truck.create({ data: { rego, name, active: Boolean(active) } })
-      res.status(201).json(t)
-    } catch (e) {
-      console.error('POST /api/admin/trucks error:', e)
-      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate rego' })
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })
@@ -588,6 +907,46 @@ export function createApiRouter() {
     } catch (e) {
       console.error('GET /api/external/categories error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/land/listings', async (_req, res) => {
+    try {
+      await ensureLandListingsSeeded()
+      const listings = await prisma.landListing.findMany({ orderBy: { createdAt: 'desc' } })
+      res.json({ listings: listings.map(landRecordToResponse) })
+    } catch (e) {
+      console.error('GET /api/land/listings error:', e)
+      res.status(500).json({ error: 'Unable to load real estate listings right now.' })
+    }
+  })
+
+  router.get('/land/listings/:slug', async (req, res) => {
+    try {
+      const slug = String(req.params.slug || '').trim()
+      if (!slug) return res.status(400).json({ error: 'Missing real estate listing slug' })
+      const listing = await prisma.landListing.findUnique({ where: { slug } })
+      if (!listing) return res.status(404).json({ error: 'Real estate listing not found' })
+      res.json({ listing: landRecordToResponse(listing) })
+    } catch (e) {
+      console.error('GET /api/land/listings/:slug error:', e)
+      res.status(500).json({ error: 'Unable to fetch real estate listing yet.' })
+    }
+  })
+
+  router.post('/land/listings', ensureAuth, async (req, res) => {
+    try {
+      const parsed = landListingInputSchema.safeParse(req.body || {})
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid real estate listing payload', details: parsed.error.flatten() })
+      }
+      const slug = await generateLandSlug(parsed.data.title, parsed.data.town)
+      const data = buildLandListingData(parsed.data, { slug })
+      const created = await prisma.landListing.create({ data })
+      return res.status(201).json({ listing: landRecordToResponse(created) })
+    } catch (e) {
+      console.error('POST /api/land/listings error:', e)
+      return res.status(500).json({ error: 'Unable to save real estate listing yet.' })
     }
   })
 
@@ -1039,7 +1398,7 @@ export function createApiRouter() {
   }
 
   function randomAssistantAccessCode() {
-    return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)
+    return randomBytes(12).toString('hex')
   }
 
   const assistantFallbackCatalog = [
@@ -1187,11 +1546,7 @@ export function createApiRouter() {
       include: { category: { select: { name: true } } },
     })
     if (!products.length) {
-      const map = new Map()
-      for (const item of assistantFallbackCatalog) {
-        map.set(item.id, item)
-      }
-      return { list: assistantFallbackCatalog, map }
+      return { list: [], map: new Map() }
     }
 
     const ownerIds = [...new Set(products.map((p) => p.ownerId).filter((v) => v != null))]
@@ -2666,7 +3021,7 @@ Rules:
             customerEmail,
             address,
             customerPhone,
-            accessCode: uid == null ? (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)) : null,
+            accessCode: uid == null ? randomBytes(12).toString('hex') : null,
             items: {
               create: groupItems.map((i) => ({
                 productId: i.productId,

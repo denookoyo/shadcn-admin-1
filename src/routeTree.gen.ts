@@ -13,6 +13,10 @@ import { createFileRoute } from '@tanstack/react-router'
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TermsImport } from './routes/terms'
+import { Route as RefundPolicyImport } from './routes/refund-policy'
+import { Route as PrivacyImport } from './routes/privacy'
+import { Route as ContactImport } from './routes/contact'
 import { Route as ClerkRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as BlogIndexImport } from './routes/blog/index'
@@ -108,6 +112,30 @@ const MarketplaceLayoutDashboardImport = createFileRoute(
 const MarketplaceRoute = MarketplaceImport.update({
   id: '/marketplace',
   path: '/marketplace',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const TermsRoute = TermsImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const RefundPolicyRoute = RefundPolicyImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PrivacyRoute = PrivacyImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ContactRoute = ContactImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -670,6 +698,34 @@ declare module '@tanstack/react-router' {
       path: '/clerk'
       fullPath: '/clerk'
       preLoaderRoute: typeof ClerkRouteImport
+      parentRoute: typeof rootRoute
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactImport
+      parentRoute: typeof rootRoute
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyImport
+      parentRoute: typeof rootRoute
+    }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyImport
+      parentRoute: typeof rootRoute
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsImport
       parentRoute: typeof rootRoute
     }
     '/_authenticated/settings': {
@@ -1490,6 +1546,10 @@ const MarketplaceRouteWithChildren = MarketplaceRoute._addFileChildren(
 export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/clerk/': typeof ClerkauthRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
@@ -1572,6 +1632,10 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/clerk': typeof ClerkAuthenticatedRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/otp': typeof authOtpRoute
@@ -1654,6 +1718,10 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/clerk': typeof ClerkRouteRouteWithChildren
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteRouteWithChildren
   '/clerk/(auth)': typeof ClerkauthRouteRouteWithChildren
   '/clerk/_authenticated': typeof ClerkAuthenticatedRouteRouteWithChildren
@@ -1743,6 +1811,10 @@ export interface FileRouteTypes {
   fullPaths:
     | ''
     | '/clerk'
+    | '/contact'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/settings'
     | '/clerk/'
     | '/forgot-password'
@@ -1824,6 +1896,10 @@ export interface FileRouteTypes {
     | '/marketplace/merchant/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/contact'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/clerk'
     | '/forgot-password'
     | '/otp'
@@ -1904,6 +1980,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/clerk'
+    | '/contact'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/_authenticated/settings'
     | '/clerk/(auth)'
     | '/clerk/_authenticated'
@@ -1992,6 +2072,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ClerkRouteRoute: typeof ClerkRouteRouteWithChildren
+  ContactRoute: typeof ContactRoute
+  PrivacyRoute: typeof PrivacyRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
+  TermsRoute: typeof TermsRoute
   authForgotPasswordRoute: typeof authForgotPasswordRoute
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
@@ -2013,6 +2097,10 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ClerkRouteRoute: ClerkRouteRouteWithChildren,
+  ContactRoute: ContactRoute,
+  PrivacyRoute: PrivacyRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
+  TermsRoute: TermsRoute,
   authForgotPasswordRoute: authForgotPasswordRoute,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
@@ -2043,6 +2131,10 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated",
         "/clerk",
+        "/contact",
+        "/privacy",
+        "/refund-policy",
+        "/terms",
         "/(auth)/forgot-password",
         "/(auth)/otp",
         "/(auth)/sign-in",
@@ -2095,6 +2187,18 @@ export const routeTree = rootRoute
         "/clerk/(auth)",
         "/clerk/_authenticated"
       ]
+    },
+    "/contact": {
+      "filePath": "contact.tsx"
+    },
+    "/privacy": {
+      "filePath": "privacy.tsx"
+    },
+    "/refund-policy": {
+      "filePath": "refund-policy.tsx"
+    },
+    "/terms": {
+      "filePath": "terms.tsx"
     },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings/route.tsx",
