@@ -16,11 +16,11 @@ export default function ForgotPassword() {
       <Card className='gap-4'>
         <CardHeader>
           <CardTitle className='text-lg tracking-tight'>
-            Forgot Password
+            Password sign-in disabled
           </CardTitle>
           <CardDescription>
-            Enter your registered email and <br /> we will send you a link to
-            reset your password.
+            Personal Finance uses Google sign-in, so there is no password to
+            reset.
           </CardDescription>
         </CardHeader>
         <CardContent>

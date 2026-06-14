@@ -19,7 +19,7 @@ export default function SignUp() {
             Create an account
           </CardTitle>
           <CardDescription>
-            Use Google sign-in to create your marketplace account. <br />
+            Use Google sign-in to create your Personal Finance account. <br />
             Already have an account?{' '}
             <Link
               to='/sign-in'
@@ -33,7 +33,8 @@ export default function SignUp() {
           <div className='space-y-4'>
             <GoogleSignInButton />
             <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
-              Direct email/password registration is not enabled for the live marketplace. Google sign-in creates your account automatically on first access.
+              Direct password registration is disabled for Personal Finance.
+              Google sign-in creates your account automatically on first access.
             </div>
           </div>
         </CardContent>
