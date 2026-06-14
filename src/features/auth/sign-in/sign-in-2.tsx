@@ -1,5 +1,5 @@
 import { HedgetechLogo } from '@/components/hedgetech-logo'
-import { UserAuthForm } from './components/user-auth-form'
+import { GoogleSignInButton } from '../google-signin'
 
 export default function SignIn2() {
   return (
@@ -11,7 +11,8 @@ export default function SignIn2() {
         </div>
 
         <div className='relative z-20 m-auto max-w-[320px] text-center text-sm text-slate-200'>
-          Hedgetech Marketplace gives modern sellers a unified cockpit for listings, orders, and buyer relationships.
+          Personal Finance keeps budgets, goals, and spending insights in one
+          secure workspace.
         </div>
 
         <div className='relative z-20 mt-auto'>
@@ -28,12 +29,21 @@ export default function SignIn2() {
       <div className='lg:p-8'>
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
           <div className='flex flex-col space-y-2 text-left'>
-            <h1 className='text-2xl font-semibold tracking-tight text-slate-900'>Sign in to Hedgetech</h1>
+            <h1 className='text-2xl font-semibold tracking-tight text-slate-900'>
+              Sign in to Personal Finance
+            </h1>
             <p className='text-muted-foreground text-sm'>
-              Enter your credentials to manage your storefront, fulfil orders, and engage buyers.
+              Continue without a password to review budgets, track spending, and
+              manage your money goals.
             </p>
           </div>
-          <UserAuthForm />
+          <div className='space-y-4'>
+            <GoogleSignInButton />
+            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
+              Password sign-in is disabled for Personal Finance. Use Google
+              sign-in to access your workspace.
+            </div>
+          </div>
           <p className='text-muted-foreground px-8 text-center text-sm'>
             By signing in, you agree to the{' '}
             <a

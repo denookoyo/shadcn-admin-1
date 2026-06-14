@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import {
   Card,
   CardContent,
@@ -8,23 +9,26 @@ import {
 } from '@/components/ui/card'
 import AuthLayout from '../auth-layout'
 import { GoogleSignInButton } from '../google-signin'
-import { Link } from '@tanstack/react-router'
 
 export default function SignIn() {
   return (
     <AuthLayout>
       <Card className='gap-4'>
         <CardHeader>
-          <CardTitle className='text-lg tracking-tight text-slate-900'>Sign in to Hedgetech</CardTitle>
+          <CardTitle className='text-lg tracking-tight text-slate-900'>
+            Sign in to Personal Finance
+          </CardTitle>
           <CardDescription>
-            Continue with Google to access your buyer account, seller workspace, and marketplace orders.
+            Continue with Google to access your budget dashboard, spending
+            history, and money goals.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className='space-y-4'>
             <GoogleSignInButton />
             <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
-              Email/password sign-in is not enabled on this live marketplace. Use Google sign-in or contact support if your workspace needs access help.
+              Password sign-in is disabled for Personal Finance. Use Google
+              sign-in or contact support if your workspace needs access help.
             </div>
           </div>
         </CardContent>
