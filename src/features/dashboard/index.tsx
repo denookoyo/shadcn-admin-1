@@ -39,9 +39,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 
-import { db, type Product, type Order, type Category, type Announcement, type AnnouncementAudience } from '@/lib/data'
+import { db, type Product, type Order, type Category, type Announcement, type AnnouncementAudience, uploadMarketplaceAsset } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
-import { getSellerStatus, SELLER_VERIFICATION_EVENT, type SellerVerificationStatus } from '@/features/sellers/verification'
+import { useSellerVerification } from '@/features/sellers/verification'
 
 function slugify(value: string) {
   return value
@@ -204,18 +204,19 @@ export default function Dashboard() {
   const { user } = useAuthStore((state) => state.auth)
   const userId = (user as any)?.id as number | undefined
   const userEmail = user?.email
+  const { sellerStatus } = useSellerVerification(userEmail)
 
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const creatingFlatmatesRef = useRef(false)
-  const [sellerStatus, setSellerStatus] = useState<SellerVerificationStatus>(() => getSellerStatus(userEmail))
 
   const [productDialogOpen, setProductDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [productForm, setProductForm] = useState<ProductFormState>(() => createEmptyProductForm())
   const [generatingCopy, setGeneratingCopy] = useState(false)
+  const [uploadingProductImages, setUploadingProductImages] = useState(false)
 
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false)
   const [categoryForm, setCategoryForm] = useState({ name: '', slug: '' })
@@ -267,18 +268,6 @@ export default function Dashboard() {
       mounted = false
     }
   }, [userId])
-
-  useEffect(() => {
-    setSellerStatus(getSellerStatus(userEmail))
-  }, [userEmail])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handler = () => setSellerStatus(getSellerStatus(userEmail))
-    window.addEventListener(SELLER_VERIFICATION_EVENT, handler)
-    return () => window.removeEventListener(SELLER_VERIFICATION_EVENT, handler)
-  }, [userEmail])
-
 
   useEffect(() => {
     let mounted = true
@@ -334,15 +323,19 @@ export default function Dashboard() {
 
   const visibleAnnouncements = useMemo(() => announcements.slice(0, 3), [announcements])
   const role = String(user?.role ?? '').toLowerCase()
-  const canManageListings = sellerStatus === 'approved' || role === 'admin'
+  const marketplaceEligible =
+    Boolean((user as any)?.marketplaceEligible) || Boolean((user as any)?.marketplaceCatalog) || Boolean((user as any)?.marketplaceApi) || role === 'admin'
+  const canManageListings = marketplaceEligible || sellerStatus === 'approved' || role === 'admin'
   const verificationBannerDescription =
-    sellerStatus === 'pending'
+    marketplaceEligible
+      ? 'Your Gang Ledger subscription already unlocks seller tooling. Use this page to keep your seller profile and contact details current.'
+      : sellerStatus === 'pending'
       ? 'Support is reviewing your documents. We will notify you once the cockpit unlocks.'
       : sellerStatus === 'rejected'
         ? 'Your previous submission needs updates. Refresh your documents and resubmit.'
-        : 'Submit your compliance pack so support can enable payouts, listings, and land brokerage.'
+        : 'Submit your compliance pack so support can enable payouts, listings, and real estate operations.'
   const verificationCtaLabel =
-    sellerStatus === 'pending' ? 'View submission' : sellerStatus === 'rejected' ? 'Resubmit' : 'Submit verification'
+    marketplaceEligible ? 'Open seller profile' : sellerStatus === 'pending' ? 'View submission' : sellerStatus === 'rejected' ? 'Resubmit' : 'Submit verification'
 
   const totalRevenue = useMemo(
     () => orders.reduce((sum, order) => sum + order.total, 0),
@@ -417,7 +410,7 @@ export default function Dashboard() {
 
   function startSharedSpaceFlow() {
     if (!canManageListings) {
-      toast.error('Complete seller verification to add shared stays.')
+      toast.error('An eligible Gang Ledger marketplace plan is required before adding shared stays.')
       return
     }
     resetProductForm({
@@ -431,6 +424,41 @@ export default function Dashboard() {
       },
     })
     setProductDialogOpen(true)
+  }
+
+  async function uploadProductImages(fileList: FileList | null, target: 'hero' | 'gallery') {
+    if (!fileList?.length) return
+    setUploadingProductImages(true)
+    try {
+      const uploads = await Promise.all(Array.from(fileList).map((file) => uploadMarketplaceAsset(file)))
+      const urls = uploads.map((upload) => upload.blobUrl)
+
+      setProductForm((prev) => {
+        if (target === 'hero') {
+          return {
+            ...prev,
+            img: urls[0] || prev.img,
+          }
+        }
+
+        const existing = prev.images
+          .split(/\n|,/)
+          .map((value) => value.trim())
+          .filter(Boolean)
+        const merged = Array.from(new Set([...existing, ...urls]))
+        return {
+          ...prev,
+          images: merged.join('\n'),
+          img: prev.img || urls[0] || '',
+        }
+      })
+
+      toast.success('Images uploaded to Gang Ledger.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to upload images right now.')
+    } finally {
+      setUploadingProductImages(false)
+    }
   }
 
   async function saveProduct() {
@@ -665,7 +693,9 @@ export default function Dashboard() {
                       Add shared stay
                     </Button>
                     <Button variant='outline' className='rounded-full border-white/40 text-white hover:bg-white/10' asChild>
-                      <Link to='/marketplace/dashboard/verification'>Seller verification</Link>
+                      <Link to='/marketplace/dashboard/verification' search={{ redirect: '' }}>
+                        {marketplaceEligible ? 'Seller profile' : 'Seller verification'}
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -713,7 +743,7 @@ export default function Dashboard() {
                       disabled={!canManageListings}
                       onClick={() => {
                         if (!canManageListings) {
-                          toast.error('Seller verification required before adding listings.')
+                          toast.error('An eligible Gang Ledger marketplace plan is required before adding listings.')
                           return
                         }
                         resetProductForm()
@@ -1062,14 +1092,16 @@ export default function Dashboard() {
                 <p className='text-sm text-amber-800'>{verificationBannerDescription}</p>
               </div>
               <ul className='space-y-2 rounded-2xl border border-amber-200 bg-white/80 p-4 text-sm text-amber-900'>
-                <li>• Open the “Seller verification” page (left nav → Organization) to submit your pack.</li>
+                <li>• Open the “Seller profile” page (left nav → Organization) to confirm your support and payout details.</li>
                 <li>• Upload your business details, documents, and acreage track record.</li>
                 <li>• Ops reviews submissions within one business day.</li>
                 <li>• Once approved, product, land, and POS tools will unlock instantly.</li>
               </ul>
               <div className='flex flex-wrap gap-3 text-sm'>
                 <Button className='rounded-full bg-amber-600 text-white hover:bg-amber-500' asChild>
-                  <Link to='/marketplace/dashboard/verification'>{verificationCtaLabel}</Link>
+                  <Link to='/marketplace/dashboard/verification' search={{ redirect: '' }}>
+                    {verificationCtaLabel}
+                  </Link>
                 </Button>
                 <Button variant='outline' className='rounded-full border-amber-300 text-amber-900 hover:bg-amber-100' asChild>
                   <Link to='/marketplace/dashboard/support'>Contact support</Link>
@@ -1349,6 +1381,17 @@ export default function Dashboard() {
                     <img key={index} src={url} alt={`preview-${index}`} className='h-16 w-16 rounded-md object-cover' />
                   ))}
               </div>
+              <Input
+                className='mt-2'
+                type='file'
+                accept='image/*'
+                multiple
+                disabled={uploadingProductImages}
+                onChange={(event) => {
+                  void uploadProductImages(event.target.files, 'gallery')
+                  event.currentTarget.value = ''
+                }}
+              />
             </div>
             <div className='grid items-end gap-3 md:grid-cols-[2fr_auto]'>
               <div>
@@ -1379,6 +1422,17 @@ export default function Dashboard() {
                 onChange={(event) => setProductForm({ ...productForm, img: event.target.value })}
                 placeholder='https://images…'
               />
+              <Input
+                className='mt-2'
+                type='file'
+                accept='image/*'
+                disabled={uploadingProductImages}
+                onChange={(event) => {
+                  void uploadProductImages(event.target.files, 'hero')
+                  event.currentTarget.value = ''
+                }}
+              />
+              {uploadingProductImages ? <p className='mt-2 text-xs text-slate-500'>Uploading to Gang Ledger...</p> : null}
             </div>
             <div>
               <Label htmlFor='product-description'>Description</Label>

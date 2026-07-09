@@ -54,7 +54,7 @@ function Nav() {
     }
   }, [])
 
-  const { sellerStatus, canAccessSellerTools } = useSellerAccess()
+  const { sellerStatus, canAccessSellerTools, isAdmin } = useSellerAccess()
   const primaryLinks = [
     { href: '/marketplace', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
@@ -64,6 +64,7 @@ function Nav() {
   ] as const
   const sellerLinks = canAccessSellerTools
     ? ([
+        ...(isAdmin ? [{ href: '/marketplace/dashboard/admin', label: 'Admin dashboard' }] as const : []),
         { href: '/marketplace/dashboard', label: 'Seller cockpit' },
         { href: '/marketplace/dashboard/orders', label: 'Orders' },
         { href: '/marketplace/dashboard/support', label: 'Support' },
@@ -236,7 +237,7 @@ function Footer() {
       items: [
         { label: 'Seller cockpit', href: '/marketplace/dashboard' },
         { label: 'Manage orders', href: '/marketplace/dashboard/orders' },
-        { label: 'Seller verification', href: '/marketplace/dashboard/verification' },
+        { label: 'Seller profile', href: '/marketplace/dashboard/verification' },
       ],
     },
     {

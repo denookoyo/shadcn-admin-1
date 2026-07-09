@@ -12,8 +12,8 @@ const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
 export default function handler(req: any, res: any) {
   if (MARKETPLACE_CONSUMER_MODE) {
     return proxyGangLedgerJson(req, res, '/api/integrations/marketplace/products', {
-      allowMethods: ['GET'],
-      notSupportedMessage: 'Product edits must be completed in Gang Ledger.',
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
+      notSupportedMessage: 'Product edits are synchronized through Gang Ledger.',
     })
   }
 

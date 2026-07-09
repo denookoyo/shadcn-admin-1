@@ -1,11 +1,21 @@
 import { db as localdb, seedProducts, categories as localCategories, type Product, type Order, type CartItem, type Category } from './localdb'
 import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
+import { CATALOG } from '@/features/marketplace/catalog'
 import { useStageStore } from '@/stores/stageStore'
 import { fetchJson } from './http'
 
 const useApi = typeof window !== 'undefined' && (import.meta as any).env?.VITE_USE_API === 'true'
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+const DEFAULT_LOCAL_CATEGORIES: Array<Omit<Category, 'id'>> = [
+  { name: 'Audio & electronics', slug: 'audio-electronics' },
+  { name: 'Home services', slug: 'home-services' },
+  { name: 'Creative services', slug: 'creative-services' },
+  { name: 'Fashion & lifestyle', slug: 'fashion-lifestyle' },
+  { name: 'Business support', slug: 'business-support' },
+  { name: 'Repairs & trades', slug: 'repairs-trades' },
+]
 
 function startOfDay(date: Date | string | number) {
   const d = new Date(date)
@@ -231,6 +241,28 @@ async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   })
 }
 
+export async function uploadMarketplaceAsset(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+
+  const response = await fetch('/api/uploads/blob', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload?.blobUrl) {
+    throw new Error(payload?.error || 'Upload failed.')
+  }
+
+  return {
+    blobUrl: String(payload.blobUrl),
+    filename: typeof payload.filename === 'string' ? payload.filename : file.name,
+    contentType: typeof payload.contentType === 'string' ? payload.contentType : file.type,
+  }
+}
+
 function localRead<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
   try {
@@ -250,6 +282,40 @@ function localWrite<T>(key: string, value: T) {
 
 function localId(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function catalogItemToProduct(item: (typeof CATALOG)[number]): Omit<Product, 'id'> {
+  const isService = item.type === 'service'
+  return {
+    ...item,
+    description: isService
+      ? `${item.seller} offers ${item.title.toLowerCase()} with verified availability, clear pricing, and marketplace support.`
+      : `${item.title} from ${item.seller}, available through Hedgetech with tracked checkout and seller support.`,
+    images: [item.img],
+    stockCount: isService ? 0 : 12,
+    serviceDurationMinutes: isService ? 60 : undefined,
+    serviceOpenTime: isService ? '09:00' : undefined,
+    serviceCloseTime: isService ? '17:00' : undefined,
+    serviceOpenDays: isService ? ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] : undefined,
+    serviceDailyCapacity: isService ? 6 : undefined,
+    vertical: 'commerce',
+  }
+}
+
+async function ensureLocalProducts() {
+  const existing = await localdb.listProducts()
+  if (existing.length > 0) return existing
+  return seedProducts(CATALOG.map(catalogItemToProduct))
+}
+
+async function ensureLocalCategories() {
+  const existing = await localCategories.list()
+  if (existing.length > 0) return existing
+  const created: Category[] = []
+  for (const category of DEFAULT_LOCAL_CATEGORIES) {
+    created.push(await localCategories.create(category))
+  }
+  return created
 }
 
 const api: DataAPI = {
@@ -528,11 +594,17 @@ const localWrapper: DataAPI = {
     })
     return filtered
   },
-  async listProducts() { return localdb.listProducts() },
-  async getProductBySlug(slug: string) { return localdb.getProductBySlug(slug) },
-  async getProductById(id: string) { return localdb.getProductById(id) },
+  async listProducts() { return ensureLocalProducts() },
+  async getProductBySlug(slug: string) {
+    const products = await ensureLocalProducts()
+    return products.find((product) => product.slug === slug)
+  },
+  async getProductById(id: string) {
+    const products = await ensureLocalProducts()
+    return products.find((product) => product.id === id)
+  },
   async getProductAvailability(id: string, options) {
-    const product = await localdb.getProductById(id)
+    const product = await localWrapper.getProductById(id)
     if (!product) throw new Error('Product not found')
     if (product.type !== 'service') throw new Error('Availability only applies to services')
     const startDate = options?.start ? new Date(options.start) : new Date()
@@ -593,7 +665,7 @@ const localWrapper: DataAPI = {
     }
   },
   async getProductByBarcode(code: string) {
-    const list = await localdb.listProducts()
+    const list = await ensureLocalProducts()
     const p = list.find((x: any) => String(x.barcode || '').trim() === String(code).trim())
     return p || null
   },
@@ -756,7 +828,7 @@ const localWrapper: DataAPI = {
     return next
   },
   // Categories (map to local storage categories helper)
-  async listCategories() { return localCategories.list() },
+  async listCategories() { return ensureLocalCategories() },
   async createCategory(input: Omit<Category, 'id'>) { return localCategories.create(input) },
   async updateCategory(id: string, patch: Partial<Category>) { const r = await localCategories.update(id, patch); return r as unknown as Category },
   async deleteCategory(id: string) { return localCategories.remove(id) },

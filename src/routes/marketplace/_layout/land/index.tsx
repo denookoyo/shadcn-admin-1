@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { MapPin, Droplets, ShieldCheck, Sparkles, PhoneCall, MessageCircle, Images } from 'lucide-react'
+import { MapPin, Droplets, ShieldCheck, Sparkles, PhoneCall, MessageCircle, Images, SlidersHorizontal } from 'lucide-react'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { listLandListings, createLandListing, formatKes, formatAcreage, type LandListing } from '@/features/land/data'
@@ -12,11 +12,11 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { SafeImg } from '@/components/safe-img'
-import { useAuthStore } from '@/stores/authStore'
-import { getSellerStatus, SELLER_VERIFICATION_EVENT } from '@/features/sellers/verification'
+import { useSellerAccess } from '@/features/sellers/access'
 
-const counties = ['Kajiado', 'Nakuru', 'Kilifi', 'Laikipia', 'Narok', 'Machakos', 'Nyeri', 'Kiambu', 'Elgeyo-Marakwet']
+const counties = ['Kajiado', 'Nakuru', 'Kilifi', 'Laikipia', 'Narok', 'Machakos', 'Nyeri', 'Kiambu', 'Elgeyo-Marakwet', 'Nairobi']
 const zoningOptions = ['residential', 'mixed-use', 'agricultural', 'commercial'] as const
+const assetTypeOptions = ['land', 'house', 'apartment', 'commercial', 'office'] as const
 
 const statusLabel: Record<LandListing['status'], { label: string; classes: string }> = {
   available: { label: 'Open to offers', classes: 'bg-emerald-50 text-emerald-700' },
@@ -28,6 +28,7 @@ type SubmissionFormState = {
   title: string
   county: string
   town: string
+  assetType: LandListing['assetType']
   acreage: string
   priceKes: string
   pricePerAcreKes: string
@@ -49,6 +50,7 @@ const emptySubmission: SubmissionFormState = {
   title: '',
   county: 'Kajiado',
   town: '',
+  assetType: 'land',
   acreage: '1',
   priceKes: '1500000',
   pricePerAcreKes: '1500000',
@@ -82,15 +84,14 @@ const emptyRequest: ViewingRequest = {
   notes: '',
 }
 
-const DEFAULT_LAND_CONCIERGE_INTRO = "Hi! I'm evaluating Kenyan acreage on Hedgetech. Could you shortlist viable parcels, share due diligence packs, and arrange escorted viewings?"
+const DEFAULT_LAND_CONCIERGE_INTRO = "Hi! I'm evaluating Kenyan real estate on Hedgetech. Could you shortlist viable land and property options, share due diligence packs, and arrange escorted viewings?"
 
 export const Route = createFileRoute('/marketplace/_layout/land/')({
   component: KenyaLandPage,
 })
 
 function KenyaLandPage() {
-  const user = useAuthStore((s) => s.auth.user as any | null)
-  const userEmail = user?.email as string | undefined
+  const { user, sellerStatus, isAdmin } = useSellerAccess()
   const [listings, setListings] = useState<LandListing[]>([])
   const [loadingListings, setLoadingListings] = useState(true)
   const [form, setForm] = useState<SubmissionFormState>(emptySubmission)
@@ -98,20 +99,18 @@ function KenyaLandPage() {
   const [activeListing, setActiveListing] = useState<LandListing | null>(null)
   const [viewingRequest, setViewingRequest] = useState<ViewingRequest>(emptyRequest)
   const [sendingRequest, setSendingRequest] = useState(false)
-  const [verificationVersion, setVerificationVersion] = useState(0)
+  const [locationFilter, setLocationFilter] = useState('')
+  const [countyFilter, setCountyFilter] = useState('all')
+  const [assetTypeFilter, setAssetTypeFilter] = useState<'all' | LandListing['assetType']>('all')
+  const [tenureFilter, setTenureFilter] = useState<'all' | LandListing['listingType']>('all')
+  const [zoningFilter, setZoningFilter] = useState<'all' | LandListing['zoning']>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | LandListing['status']>('all')
+  const [minPriceFilter, setMinPriceFilter] = useState('')
+  const [maxPriceFilter, setMaxPriceFilter] = useState('')
   const isSignedIn = Boolean(user)
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const handler = () => setVerificationVersion((prev) => prev + 1)
-    window.addEventListener(SELLER_VERIFICATION_EVENT, handler)
-    return () => window.removeEventListener(SELLER_VERIFICATION_EVENT, handler)
-  }, [])
-  const sellerStatus = useMemo(() => getSellerStatus(userEmail), [userEmail, verificationVersion])
-  const isPrivileged = useMemo(() => {
-    const role = String(user?.role ?? '').toLowerCase()
-    return role === 'admin' || role === 'manager'
-  }, [user])
-  const isActiveSeller = sellerStatus === 'approved' || isPrivileged
+  const marketplaceEligible =
+    Boolean((user as any)?.marketplaceEligible) || Boolean((user as any)?.marketplaceCatalog) || Boolean((user as any)?.marketplaceApi) || isAdmin
+  const isActiveSeller = marketplaceEligible || sellerStatus === 'approved' || isAdmin
 
   useEffect(() => {
     let mounted = true
@@ -142,11 +141,31 @@ function KenyaLandPage() {
 
   const totalAcreage = useMemo(() => listings.reduce((acc, item) => acc + (Number(item.acreage) || 0), 0), [listings])
   const totalValue = useMemo(() => listings.reduce((acc, item) => acc + (Number(item.priceKes) || 0), 0), [listings])
+  const propertyCount = useMemo(() => listings.filter((item) => item.assetType !== 'land').length, [listings])
+  const countyCoverage = useMemo(() => new Set(listings.map((item) => item.county)).size, [listings])
+  const filteredListings = useMemo(() => {
+    const query = locationFilter.trim().toLowerCase()
+    const minPrice = Number(minPriceFilter) || 0
+    const maxPrice = Number(maxPriceFilter) || Number.POSITIVE_INFINITY
+
+    return listings.filter((item) => {
+      const locationMatch = !query
+        || `${item.county} ${item.town} ${item.title}`.toLowerCase().includes(query)
+      if (!locationMatch) return false
+      if (countyFilter !== 'all' && item.county !== countyFilter) return false
+      if (assetTypeFilter !== 'all' && item.assetType !== assetTypeFilter) return false
+      if (tenureFilter !== 'all' && item.listingType !== tenureFilter) return false
+      if (zoningFilter !== 'all' && item.zoning !== zoningFilter) return false
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (item.priceKes < minPrice || item.priceKes > maxPrice) return false
+      return true
+    })
+  }, [assetTypeFilter, countyFilter, listings, locationFilter, maxPriceFilter, minPriceFilter, statusFilter, tenureFilter, zoningFilter])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!isActiveSeller) {
-      toast.error('Only signed-in, operations-approved sellers can post land. Head to the seller cockpit to finish onboarding.')
+      toast.error('An eligible Gang Ledger marketplace plan is required before posting real estate.')
       return
     }
     setSubmitting(true)
@@ -165,12 +184,13 @@ function KenyaLandPage() {
         title: form.title,
         county: form.county,
         town: form.town,
+        assetType: form.assetType,
         acreage: Number(form.acreage) || 1,
         priceKes: Number(form.priceKes) || 0,
         pricePerAcreKes: Number(form.pricePerAcreKes) || undefined,
         zoning: form.zoning,
         listingType: form.listingType,
-        description: form.description || 'Prime parcel ready for immediate sale.',
+        description: form.description || 'Well-positioned Kenyan real estate listing ready for buyer outreach.',
         highlights,
         documents,
         utilities: [
@@ -189,9 +209,9 @@ function KenyaLandPage() {
       })
       setListings((prev) => [payload, ...prev])
       setForm(emptySubmission)
-      toast.success('Land listing saved in your browser ledger.')
+      toast.success('Listing saved to Kenyan real estate.')
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to save land listing yet.')
+      toast.error(error instanceof Error ? error.message : 'Unable to save real estate listing yet.')
     } finally {
       setSubmitting(false)
     }
@@ -217,23 +237,25 @@ function KenyaLandPage() {
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div className='max-w-2xl space-y-2'>
             <span className='inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide'>
-              <Sparkles className='h-3.5 w-3.5' /> Kenya land exchange
+              <Sparkles className='h-3.5 w-3.5' /> Kenyan real estate
             </span>
-            <h1 className='text-3xl font-semibold'>List Kenyan land, share photos, and invite qualified buyers</h1>
-            <p className='text-sm text-emerald-50'>Centralise acreage across counties, keep documentation in one place, and let buyers request guided visits without leaving Hedgetech.</p>
+            <h1 className='text-3xl font-semibold'>List Kenyan land and properties, share media, and invite qualified buyers</h1>
+            <p className='text-sm text-emerald-50'>Run one board for plots, villas, apartments, offices, and income assets across counties, with viewing requests and concierge support built in.</p>
             <Link
               to='/marketplace/assistant'
               search={{ preset: 'land-general', intro: DEFAULT_LAND_CONCIERGE_INTRO }}
               className='inline-flex items-center gap-2 rounded-full border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10'
             >
               <Sparkles className='h-4 w-4 text-white' />
-              Ask AI concierge to prep diligence
+              Ask AI concierge to shortlist deals
             </Link>
           </div>
           <div className='rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-emerald-50'>
             <div>Total inventory: <span className='font-semibold'>{formatAcreage(totalAcreage)}</span></div>
             <div>Value on platform: <span className='font-semibold'>{formatKes(totalValue)}</span></div>
-            <div>Active mandates: <span className='font-semibold'>{listings.length}</span></div>
+            <div>Live listings: <span className='font-semibold'>{listings.length}</span></div>
+            <div>Properties listed: <span className='font-semibold'>{propertyCount}</span></div>
+            <div>Counties covered: <span className='font-semibold'>{countyCoverage}</span></div>
           </div>
         </div>
       </header>
@@ -241,16 +263,86 @@ function KenyaLandPage() {
       <div className='grid gap-8 lg:grid-cols-[1.2fr_0.8fr]'>
         <section className='space-y-4'>
           <div className='flex items-center justify-between'>
-            <h2 className='text-lg font-semibold text-slate-900'>Available Kenyan parcels</h2>
-            <Badge variant='outline' className='border-emerald-200 text-emerald-700'>Buyer ready</Badge>
+            <h2 className='text-lg font-semibold text-slate-900'>Available Kenyan real estate</h2>
+            <Badge variant='outline' className='border-emerald-200 text-emerald-700'>Land + properties</Badge>
+          </div>
+          <div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm'>
+            <div className='flex items-center gap-2 text-sm font-semibold text-slate-900'>
+              <SlidersHorizontal className='h-4 w-4 text-emerald-600' />
+              Filter inventory
+            </div>
+            <div className='mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Location</label>
+                <Input value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)} placeholder='County, town, estate...' />
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>County</label>
+                <select className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm' value={countyFilter} onChange={(event) => setCountyFilter(event.target.value)}>
+                  <option value='all'>All counties</option>
+                  {counties.map((county) => (
+                    <option key={county} value={county}>
+                      {county}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Type</label>
+                <select className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize' value={assetTypeFilter} onChange={(event) => setAssetTypeFilter(event.target.value as typeof assetTypeFilter)}>
+                  <option value='all'>All types</option>
+                  {assetTypeOptions.map((assetType) => (
+                    <option key={assetType} value={assetType}>
+                      {formatAssetType(assetType)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Lease / tenure</label>
+                <select className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize' value={tenureFilter} onChange={(event) => setTenureFilter(event.target.value as typeof tenureFilter)}>
+                  <option value='all'>All tenure types</option>
+                  <option value='freehold'>Freehold</option>
+                  <option value='leasehold'>Leasehold</option>
+                </select>
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Min amount (KES)</label>
+                <Input type='number' value={minPriceFilter} onChange={(event) => setMinPriceFilter(event.target.value)} placeholder='0' />
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Max amount (KES)</label>
+                <Input type='number' value={maxPriceFilter} onChange={(event) => setMaxPriceFilter(event.target.value)} placeholder='100000000' />
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Zoning</label>
+                <select className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize' value={zoningFilter} onChange={(event) => setZoningFilter(event.target.value as typeof zoningFilter)}>
+                  <option value='all'>All zoning</option>
+                  {zoningOptions.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {formatZoning(zone)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className='space-y-1'>
+                <label className='text-xs font-semibold text-slate-500'>Availability</label>
+                <select className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm' value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+                  <option value='all'>Any status</option>
+                  <option value='available'>Open to offers</option>
+                  <option value='offer_received'>Offer received</option>
+                  <option value='reserved'>Reserved</option>
+                </select>
+              </div>
+            </div>
           </div>
           {loadingListings ? (
             <div className='rounded-3xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500'>Refreshing inventory...</div>
-          ) : listings.length === 0 ? (
-            <div className='rounded-3xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500'>No land uploaded yet. Start with the form to the right.</div>
+          ) : filteredListings.length === 0 ? (
+            <div className='rounded-3xl border border-dashed border-slate-200 p-10 text-center text-sm text-slate-500'>No real estate listings match those filters yet. Broaden the search or post a new listing.</div>
           ) : (
             <div className='grid gap-4 md:grid-cols-2'>
-              {listings.map((parcel) => (
+              {filteredListings.map((parcel) => (
                 <Card key={parcel.id} className='flex h-full flex-col overflow-hidden border-slate-200'>
                   <CardContent className='flex flex-1 flex-col gap-4 p-0'>
                     <SafeImg src={parcel.gallery[0]} alt={parcel.title} className='h-52 w-full object-cover' />
@@ -258,14 +350,14 @@ function KenyaLandPage() {
                       <div className='flex flex-wrap items-start justify-between gap-3'>
                         <div>
                           <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
-                            {parcel.county} • {parcel.zoning.replace('-', ' ')}
+                            {parcel.county} • {formatAssetType(parcel.assetType)} • {formatZoning(parcel.zoning)}
                           </div>
                           <h3 className='text-base font-semibold text-slate-900'>{parcel.title}</h3>
                         </div>
                         <div className='text-right'>
                           <div className='text-xs text-slate-500'>Total ask</div>
                           <div className='text-xl font-semibold text-emerald-700'>{formatKes(parcel.priceKes)}</div>
-                          <div className='text-xs text-slate-500'>{formatAcreage(parcel.acreage)} • {formatKes(parcel.pricePerAcreKes)}/ac</div>
+                          <div className='text-xs text-slate-500'>{formatAcreage(parcel.acreage)} site size • {formatListingType(parcel.listingType)}</div>
                         </div>
                       </div>
                       <p className='text-sm text-slate-600 line-clamp-3'>{parcel.description}</p>
@@ -280,6 +372,9 @@ function KenyaLandPage() {
                         <span className='inline-flex items-center gap-1 text-emerald-700'>
                           <MapPin className='h-3.5 w-3.5' />
                           {parcel.town}
+                        </span>
+                        <span className='rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700'>
+                          {formatListingType(parcel.listingType)}
                         </span>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusLabel[parcel.status].classes}`}>
                           {statusLabel[parcel.status].label}
@@ -298,13 +393,13 @@ function KenyaLandPage() {
 
         <section className='space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div>
-            <h2 className='text-lg font-semibold text-slate-900'>Post your parcel</h2>
-            <p className='text-sm text-slate-500'>Share verified details. Add-ons sit under Account → Seller operations so only approved teams can post.</p>
+            <h2 className='text-lg font-semibold text-slate-900'>Post your real estate listing</h2>
+            <p className='text-sm text-slate-500'>Share verified details for land, homes, apartments, commercial units, and offices. Seller operations approval still applies.</p>
           </div>
           {!isSignedIn ? (
             <div className='rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600'>
               <p className='text-base font-semibold text-slate-900'>Sign in to continue</p>
-              <p className='mt-1 text-xs text-slate-500'>Land intake belongs to seller account operations. Sign in so we can confirm your workspace and permissions.</p>
+              <p className='mt-1 text-xs text-slate-500'>Real estate intake belongs to seller account operations. Sign in so we can confirm your workspace and permissions.</p>
               <div className='mt-4 flex flex-wrap gap-3 text-sm'>
                 <Link
                   to='/sign-in'
@@ -328,14 +423,14 @@ function KenyaLandPage() {
                   ? 'Your seller verification is under review'
                   : sellerStatus === 'rejected'
                     ? 'Seller verification needs attention'
-                    : 'Submit seller verification to unlock land posting'}
+                    : 'Submit seller verification to unlock real estate posting'}
               </p>
               <p className='mt-1 text-xs text-amber-800'>
                 {sellerStatus === 'pending'
                   ? 'Support has your documents. We will notify you once the review is complete.'
                   : sellerStatus === 'rejected'
                     ? 'Support flagged your last submission. Update your details or contact operations for next steps.'
-                    : 'Head to the seller cockpit → Account operations to upload compliance docs. Land listings stay locked until approval.'}
+                    : 'Head to the seller cockpit → Account operations to upload compliance docs. Real estate listings stay locked until approval.'}
               </p>
               <div className='mt-4 flex flex-wrap gap-3 text-sm'>
                 <Link
@@ -357,9 +452,9 @@ function KenyaLandPage() {
               <form className='space-y-4' onSubmit={handleSubmit}>
                 <div>
                   <label className='text-xs font-semibold text-slate-500'>Listing title</label>
-                  <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder='e.g. 2 acres touching Namanga Highway' required />
+                  <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder='e.g. 4-bedroom villa off Kiambu Road' required />
                 </div>
-                <div className='grid gap-3 sm:grid-cols-3'>
+                <div className='grid gap-3 sm:grid-cols-4'>
                   <div>
                     <label className='text-xs font-semibold text-slate-500'>County</label>
                     <select
@@ -379,6 +474,20 @@ function KenyaLandPage() {
                     <Input value={form.town} onChange={(event) => setForm({ ...form, town: event.target.value })} required />
                   </div>
                   <div>
+                    <label className='text-xs font-semibold text-slate-500'>Property type</label>
+                    <select
+                      className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize'
+                      value={form.assetType}
+                      onChange={(event) => setForm({ ...form, assetType: event.target.value as SubmissionFormState['assetType'] })}
+                    >
+                      {assetTypeOptions.map((assetType) => (
+                        <option key={assetType} value={assetType}>
+                          {formatAssetType(assetType)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className='text-xs font-semibold text-slate-500'>Zoning</label>
                     <select
                       className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize'
@@ -393,9 +502,20 @@ function KenyaLandPage() {
                     </select>
                   </div>
                 </div>
-                <div className='grid gap-3 sm:grid-cols-3'>
+                <div className='grid gap-3 sm:grid-cols-4'>
                   <div>
-                    <label className='text-xs font-semibold text-slate-500'>Acreage</label>
+                    <label className='text-xs font-semibold text-slate-500'>Lease / tenure</label>
+                    <select
+                      className='w-full rounded-md border border-slate-200 px-3 py-2 text-sm capitalize'
+                      value={form.listingType}
+                      onChange={(event) => setForm({ ...form, listingType: event.target.value as SubmissionFormState['listingType'] })}
+                    >
+                      <option value='freehold'>Freehold</option>
+                      <option value='leasehold'>Leasehold</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className='text-xs font-semibold text-slate-500'>Site size (acres)</label>
                     <Input type='number' min='0.125' step='0.125' value={form.acreage} onChange={(event) => setForm({ ...form, acreage: event.target.value })} required />
                   </div>
                   <div>
@@ -403,13 +523,13 @@ function KenyaLandPage() {
                     <Input type='number' value={form.priceKes} onChange={(event) => setForm({ ...form, priceKes: event.target.value })} required />
                   </div>
                   <div>
-                    <label className='text-xs font-semibold text-slate-500'>Price per acre (KES)</label>
+                    <label className='text-xs font-semibold text-slate-500'>{form.assetType === 'land' ? 'Price per acre (KES)' : 'Benchmark price note (KES)'}</label>
                     <Input type='number' value={form.pricePerAcreKes} onChange={(event) => setForm({ ...form, pricePerAcreKes: event.target.value })} />
                   </div>
                 </div>
                 <div>
                   <label className='text-xs font-semibold text-slate-500'>Description</label>
-                  <Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={4} placeholder='Summarise soil, road access, water, and best use case.' />
+                  <Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={4} placeholder='Summarise the asset, neighbourhood, utilities, and best buyer profile.' />
                 </div>
                 <div className='grid gap-3 sm:grid-cols-2'>
                   <div>
@@ -423,12 +543,12 @@ function KenyaLandPage() {
                 </div>
                 <div className='grid gap-3 sm:grid-cols-2'>
                   <div>
-                    <label className='text-xs font-semibold text-slate-500'>Road access</label>
-                    <Input value={form.roadAccess} onChange={(event) => setForm({ ...form, roadAccess: event.target.value })} placeholder='e.g. 800m off Mombasa Road on all-weather murram' />
+                    <label className='text-xs font-semibold text-slate-500'>Access / frontage</label>
+                    <Input value={form.roadAccess} onChange={(event) => setForm({ ...form, roadAccess: event.target.value })} placeholder='e.g. Cabro road, highway frontage, lift lobby access' />
                   </div>
                   <div>
-                    <label className='text-xs font-semibold text-slate-500'>Water source</label>
-                    <Input value={form.water} onChange={(event) => setForm({ ...form, water: event.target.value })} placeholder='e.g. Borehole + county water line' />
+                    <label className='text-xs font-semibold text-slate-500'>Utilities / water</label>
+                    <Input value={form.water} onChange={(event) => setForm({ ...form, water: event.target.value })} placeholder='e.g. Borehole, county water, generator, fiber' />
                   </div>
                 </div>
                 <div>
@@ -454,15 +574,15 @@ function KenyaLandPage() {
                   </div>
                 </div>
                 <Button type='submit' className='w-full rounded-full' disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Publish to land board'}
+                  {submitting ? 'Saving...' : 'Publish to Kenyan real estate'}
                 </Button>
               </form>
               <div className='rounded-2xl border border-slate-100 bg-slate-50 p-4 text-xs text-slate-500'>
                 <p className='font-semibold text-slate-700'>What happens next?</p>
                 <ul className='mt-2 list-disc space-y-1 pl-4'>
-                  <li>Listings stay in your browser until an API backend is connected.</li>
-                  <li>Buyers can request escorted site visits via the Arrange Viewing button.</li>
-                  <li>Use clear photos and highlight existing beacons to build trust.</li>
+                  <li>Listings are stored centrally so every connected site sees the same inventory.</li>
+                  <li>Buyers can request guided inspections through the viewing flow.</li>
+                  <li>Use clear media, utilities, and document notes to improve buyer confidence.</li>
                 </ul>
               </div>
             </>
@@ -477,7 +597,7 @@ function KenyaLandPage() {
               <SheetHeader>
                 <SheetTitle>{activeListing.title}</SheetTitle>
                 <SheetDescription>
-                  {activeListing.county} • {formatAcreage(activeListing.acreage)} • {formatKes(activeListing.priceKes)}
+                  {activeListing.county} • {formatAssetType(activeListing.assetType)} • {formatKes(activeListing.priceKes)}
                 </SheetDescription>
               </SheetHeader>
               <div className='space-y-4 px-4'>
@@ -493,10 +613,14 @@ function KenyaLandPage() {
                 </div>
                 <div className='grid gap-3 rounded-2xl border border-slate-100 bg-white p-3 text-sm text-slate-600'>
                   <div className='inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500'>
-                    <Droplets className='h-3.5 w-3.5 text-emerald-600' /> Site notes
+                    <Droplets className='h-3.5 w-3.5 text-emerald-600' /> Listing notes
                   </div>
+                  <div>Type: {formatAssetType(activeListing.assetType)}</div>
+                  <div>Tenure: {formatListingType(activeListing.listingType)}</div>
+                  <div>Zoning: {formatZoning(activeListing.zoning)}</div>
+                  <div>Site size: {formatAcreage(activeListing.acreage)}</div>
                   {activeListing.water ? <div>Water: {activeListing.water}</div> : null}
-                  {activeListing.roadAccess ? <div>Road access: {activeListing.roadAccess}</div> : null}
+                  {activeListing.roadAccess ? <div>Access: {activeListing.roadAccess}</div> : null}
                   <div>Documents: {activeListing.documents.join(' • ')}</div>
                 </div>
                 <div className='rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 text-sm text-emerald-900'>
@@ -529,7 +653,7 @@ function KenyaLandPage() {
                   <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-white/80'>
                     <Sparkles className='h-3.5 w-3.5' /> AI concierge
                   </div>
-                  <p className='mt-2 text-white/90'>Loop in Hedgetech to pull due diligence docs, comps, and coordinate escrow-ready viewing slots.</p>
+                  <p className='mt-2 text-white/90'>Loop in Hedgetech to pull due diligence docs, neighbourhood comps, and coordinate escrow-ready inspections.</p>
                   <Button asChild className='mt-3 w-full rounded-full bg-white text-emerald-700 hover:bg-emerald-50'>
                     <Link to='/marketplace/assistant' search={{ preset: `land:${activeListing.slug}`, intro: createLandConciergeIntro(activeListing) }}>
                       Ask AI concierge
@@ -537,7 +661,7 @@ function KenyaLandPage() {
                   </Button>
                 </div>
                 <form className='space-y-3 rounded-2xl border border-slate-200 bg-white p-4' onSubmit={handleViewingRequest}>
-                  <p className='text-sm font-semibold text-slate-900'>Arrange a guided viewing</p>
+                  <p className='text-sm font-semibold text-slate-900'>Arrange a guided viewing or inspection</p>
                   <Input placeholder='Your full name' value={viewingRequest.fullName} onChange={(event) => setViewingRequest({ ...viewingRequest, fullName: event.target.value })} required />
                   <Input type='email' placeholder='Email' value={viewingRequest.email} onChange={(event) => setViewingRequest({ ...viewingRequest, email: event.target.value })} required />
                   <Input placeholder='Phone or WhatsApp' value={viewingRequest.phone} onChange={(event) => setViewingRequest({ ...viewingRequest, phone: event.target.value })} required />
@@ -547,7 +671,7 @@ function KenyaLandPage() {
                     {sendingRequest ? 'Submitting...' : 'Send request'}
                   </Button>
                 </form>
-                <div className='text-xs text-slate-500'>We email + SMS the seller profile above and loop in operations for escrow if you enable payouts.</div>
+                <div className='text-xs text-slate-500'>We email + SMS the seller profile above and loop in operations for escrow support if required.</div>
               </div>
               <SheetFooter />
             </>
@@ -575,10 +699,33 @@ function ensureUrl(url: string) {
   return `https://${url}`
 }
 
+function formatAssetType(assetType: LandListing['assetType']) {
+  switch (assetType) {
+    case 'house':
+      return 'House'
+    case 'apartment':
+      return 'Apartment'
+    case 'commercial':
+      return 'Commercial'
+    case 'office':
+      return 'Office'
+    default:
+      return 'Land'
+  }
+}
+
+function formatListingType(listingType: LandListing['listingType']) {
+  return listingType === 'leasehold' ? 'Leasehold' : 'Freehold'
+}
+
+function formatZoning(zoning: LandListing['zoning']) {
+  return zoning === 'mixed-use' ? 'Mixed use' : zoning[0].toUpperCase() + zoning.slice(1)
+}
+
 function createLandConciergeIntro(listing: LandListing) {
   const location = [listing.town, listing.county].filter(Boolean).join(', ')
   const locationText = location ? ` near ${location}` : ''
-  return `Hi! I'm interested in ${listing.title}${locationText} from Hedgetech's land exchange. Please share due diligence files and coordinate an escorted viewing.`
+  return `Hi! I'm interested in the ${formatAssetType(listing.assetType).toLowerCase()} listing ${listing.title}${locationText} from Hedgetech's Kenyan real estate board. Please share due diligence files and coordinate an escorted viewing.`
 }
 
 function telHref(phone: string) {

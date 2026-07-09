@@ -4,12 +4,13 @@ import { ShieldAlert, Clock, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { useAuthStore } from '@/stores/authStore'
-import { getSellerStatus, SELLER_VERIFICATION_EVENT, type SellerVerificationStatus } from '@/features/sellers/verification'
+import { getSellerStatus, refreshSellerApplication, SELLER_VERIFICATION_EVENT, type SellerVerificationStatus } from '@/features/sellers/verification'
 
 type SellerAccessState = {
   user: any | null
   sellerStatus: SellerVerificationStatus
   isAdmin: boolean
+  marketplaceEligible: boolean
   canAccessSellerTools: boolean
 }
 
@@ -20,8 +21,10 @@ function computeSellerAccess(user: any | null): SellerAccessState {
   const roleAdmin = ['admin', 'manager', 'superadmin'].includes(role)
   const sellerStatus = getSellerStatus(email)
   const isAdmin = explicitAdmin || roleAdmin
-  const canAccessSellerTools = isAdmin || sellerStatus === 'approved'
-  return { user, sellerStatus, isAdmin, canAccessSellerTools }
+  const marketplaceEligible =
+    Boolean(user?.marketplaceEligible) || Boolean(user?.marketplaceCatalog) || Boolean(user?.marketplaceApi) || isAdmin
+  const canAccessSellerTools = isAdmin || marketplaceEligible || sellerStatus === 'approved'
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools }
 }
 
 export function getSellerAccessState(): SellerAccessState {
@@ -41,6 +44,14 @@ export async function ensureSellerRouteAccess(location?: { href?: string; pathna
       // ignore
     }
   }
+  if (access.user && !access.isAdmin) {
+    try {
+      await refreshSellerApplication()
+      access = getSellerAccessState()
+    } catch {
+      // ignore verification refresh failures and fall back to cached state
+    }
+  }
   if (!access.canAccessSellerTools) {
     const redirectTarget = location?.href || location?.pathname || '/marketplace/dashboard'
     throw redirect({ to: '/marketplace/dashboard/verification', search: { redirect: redirectTarget } })
@@ -51,6 +62,7 @@ export async function ensureSellerRouteAccess(location?: { href?: string; pathna
 export function useSellerAccess() {
   const { user } = useAuthStore((s) => s.auth)
   const [version, setVersion] = useState(0)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -59,12 +71,37 @@ export function useSellerAccess() {
     return () => window.removeEventListener(SELLER_VERIFICATION_EVENT, handler)
   }, [])
 
-  const { sellerStatus, isAdmin, canAccessSellerTools } = useMemo(
+  useEffect(() => {
+    let active = true
+    if (!user) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
+    if (computeSellerAccess(user).isAdmin) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
+    setLoading(true)
+    refreshSellerApplication()
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  const { sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools } = useMemo(
     () => computeSellerAccess(user),
     [user, version],
   )
 
-  return { user, sellerStatus, isAdmin, canAccessSellerTools }
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, loading }
 }
 
 const statusCopy: Record<
@@ -74,7 +111,7 @@ const statusCopy: Record<
   not_submitted: {
     badge: 'Buyer profile',
     heading: 'Become a Hedgetech seller',
-    description: 'Access to seller cockpit, POS, and land intake is limited to verified seller teams. Submit your company profile so operations can approve your workspace.',
+    description: 'Access to seller cockpit, POS, and real estate intake is limited to verified seller teams. Submit your company profile so operations can approve your workspace.',
     cta: 'Become a seller',
     tone: 'amber',
   },
@@ -110,7 +147,7 @@ const toneClasses: Record<typeof statusCopy[keyof typeof statusCopy]['tone'], { 
 const steps = [
   { label: 'Become a seller', description: 'Share company, contacts, and compliance pack.' },
   { label: 'Ops verification', description: 'Support reviews docs and schedules onboarding.' },
-  { label: 'Start selling', description: 'Cockpit, POS, and land marketplace unlock automatically.' },
+  { label: 'Start selling', description: 'Cockpit, POS, and real estate posting unlock automatically.' },
 ]
 
 export function SellerAccessNotice({
@@ -145,7 +182,9 @@ export function SellerAccessNotice({
         <div className='mt-6 flex flex-wrap gap-3'>
           {isSignedIn ? (
             <Button asChild className={`rounded-full ${tone.pill}`}>
-              <Link to='/marketplace/dashboard/verification'>{config.cta}</Link>
+              <Link to='/marketplace/dashboard/verification' search={{ redirect }}>
+                {config.cta}
+              </Link>
             </Button>
           ) : (
             <Button asChild className='rounded-full bg-emerald-600 text-white hover:bg-emerald-500'>
@@ -162,7 +201,7 @@ export function SellerAccessNotice({
           <div className='flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700'>
             <Clock className='h-3.5 w-3.5' /> Current status: {config.badge}
           </div>
-          <span>Verification must be approved before seller cockpit, POS, payouts, and land posting unlock.</span>
+          <span>Verification must be approved before seller cockpit, POS, payouts, and real estate posting unlock.</span>
         </div>
       </section>
 

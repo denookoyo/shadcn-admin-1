@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2, Eye, CheckCircle2, AlertCircle } from 'lucide-react'
-import { db, type Product } from '@/lib/data'
+import { db, type Product, uploadMarketplaceAsset } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -103,6 +103,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
   })
   const [imageDraft, setImageDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [published, setPublished] = useState(false)
 
@@ -227,6 +228,39 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
 
   function removeImage(url: string) {
     setForm((state) => ({ ...state, gallery: state.gallery.filter((img) => img !== url) }))
+  }
+
+  async function uploadPrimaryImage(file?: File | null) {
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      const uploaded = await uploadMarketplaceAsset(file)
+      setForm((state) => ({ ...state, img: uploaded.blobUrl }))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to upload image')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function uploadGalleryImages(fileList: FileList | null) {
+    if (!fileList?.length) return
+    setUploading(true)
+    setError(null)
+    try {
+      const uploads = await Promise.all(Array.from(fileList).map((file) => uploadMarketplaceAsset(file)))
+      const urls = uploads.map((item) => item.blobUrl)
+      setForm((state) => ({
+        ...state,
+        img: state.img || urls[0] || '',
+        gallery: Array.from(new Set([...state.gallery, ...urls])),
+      }))
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Unable to upload images')
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -355,6 +389,15 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
                 value={form.img}
                 onChange={(event) => setForm((state) => ({ ...state, img: event.target.value }))}
               />
+              <Input
+                type='file'
+                accept='image/*'
+                disabled={uploading}
+                onChange={(event) => {
+                  void uploadPrimaryImage(event.target.files?.[0] ?? null)
+                  event.currentTarget.value = ''
+                }}
+              />
               <p className='text-xs text-slate-500'>Use a 1200 x 1200 px image for best results.</p>
             </div>
             <div className='space-y-2'>
@@ -368,6 +411,16 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
                 />
                 <Button type='button' variant='outline' onClick={addImage}>Add</Button>
               </div>
+              <Input
+                type='file'
+                accept='image/*'
+                multiple
+                disabled={uploading}
+                onChange={(event) => {
+                  void uploadGalleryImages(event.target.files)
+                  event.currentTarget.value = ''
+                }}
+              />
               {form.gallery.length ? (
                 <ul className='space-y-1 text-xs text-slate-600'>
                   {form.gallery.map((url) => (
@@ -380,6 +433,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
                   ))}
                 </ul>
               ) : null}
+              {uploading ? <p className='text-xs text-slate-500'>Uploading to Gang Ledger...</p> : null}
             </div>
           </div>
 

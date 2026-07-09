@@ -35,6 +35,9 @@ function consumerSessionUser(req) {
     image: req.user?.image || null,
     role,
     isAdmin,
+    marketplaceEligible: Boolean(req.user?.marketplaceEligible) || Boolean(req.user?.marketplaceCatalog) || Boolean(req.user?.marketplaceApi) || isAdmin,
+    marketplaceCatalog: Boolean(req.user?.marketplaceCatalog) || isAdmin,
+    marketplaceApi: Boolean(req.user?.marketplaceApi) || isAdmin,
     source: req.user?.source || 'gangledger',
   }
 }
@@ -172,6 +175,9 @@ export function createAuthRouter() {
         image: payload.image || null,
         role,
         isAdmin,
+        marketplaceEligible: Boolean(payload.marketplaceEligible) || Boolean(payload.marketplaceCatalog) || Boolean(payload.marketplaceApi) || isAdmin,
+        marketplaceCatalog: Boolean(payload.marketplaceCatalog) || isAdmin,
+        marketplaceApi: Boolean(payload.marketplaceApi) || isAdmin,
         source: 'gangledger',
       }
 
