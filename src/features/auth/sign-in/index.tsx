@@ -9,6 +9,7 @@ import {
 import AuthLayout from '../auth-layout'
 import { GoogleSignInButton } from '../google-signin'
 import { Link } from '@tanstack/react-router'
+import { marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 export default function SignIn() {
   return (
@@ -17,14 +18,18 @@ export default function SignIn() {
         <CardHeader>
           <CardTitle className='text-lg tracking-tight text-slate-900'>Sign in to Hedgetech</CardTitle>
           <CardDescription>
-            Continue with Google to access your buyer account, seller workspace, and marketplace orders.
+            {marketplaceConsumerMode
+              ? 'Continue through Gang Ledger to access your buyer account, seller workspace, and marketplace orders.'
+              : 'Continue with Google to access your buyer account, seller workspace, and marketplace orders.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className='space-y-4'>
             <GoogleSignInButton />
             <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600'>
-              Email/password sign-in is not enabled on this live marketplace. Use Google sign-in or contact support if your workspace needs access help.
+              {marketplaceConsumerMode
+                ? 'Marketplace accounts are issued and managed in Gang Ledger. Sign-in here only establishes a trusted app session from your Gang Ledger identity.'
+                : 'Email/password sign-in is not enabled on this live marketplace. Use Google sign-in or contact support if your workspace needs access help.'}
             </div>
           </div>
         </CardContent>

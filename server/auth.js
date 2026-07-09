@@ -6,12 +6,38 @@ import express from 'express'
 import { Prisma } from '@prisma/client'
 import { getPrisma } from './prisma.js'
 import { authenticator } from 'otplib'
+import {
+  buildGangLedgerSsoStartUrl,
+  getMarketplaceBridgeSecret,
+  isMarketplaceConsumerMode,
+  normalizeMarketplaceRedirectTarget,
+  notSupportedInConsumerMode,
+} from './consumer.js'
 
 const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID
 const client = new OAuth2Client(GOOGLE_CLIENT_ID)
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'devsecret'
 const ALLOWED_DOMAINS = (process.env.ALLOWED_GOOGLE_DOMAINS || '').split(',').map((s) => s.trim()).filter(Boolean)
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
+const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
+const MARKETPLACE_BRIDGE_SECRET = getMarketplaceBridgeSecret()
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+function consumerSessionUser(req) {
+  if (!req.user?.email && !req.user?.uid) return null
+  const role = String(req.user?.role || 'buyer').toLowerCase()
+  const isAdmin = Boolean(req.user?.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
+  const id = Number(req.user?.uid || req.user?.sub || 0)
+  return {
+    id: Number.isFinite(id) && id > 0 ? id : null,
+    email: req.user?.email || null,
+    name: req.user?.name || null,
+    image: req.user?.image || null,
+    role,
+    isAdmin,
+    source: req.user?.source || 'gangledger',
+  }
+}
 
 export function authMiddleware(app) {
   app.use(cookieParser())
@@ -37,6 +63,13 @@ export function createAuthRouter() {
   const prisma = getPrisma()
 
   router.post('/google', async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return res.status(409).json({
+        error: 'Authentication is managed by Gang Ledger.',
+        signInUrl: buildGangLedgerSsoStartUrl(req.body?.redirect || '/'),
+      })
+    }
+
     try {
       const { credential } = req.body || {}
       if (!credential) return res.status(400).send('Missing credential')
@@ -97,7 +130,7 @@ export function createAuthRouter() {
       }
 
       const token = jwt.sign({ uid: user.id, email: user.email, role: normalizedRole, isAdmin }, JWT_SECRET, { expiresIn: '7d' })
-      res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
+      res.cookie('session', token, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: SESSION_MAX_AGE_MS })
       res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: normalizedRole, paymentInstructions: user.paymentInstructions || null, isAdmin })
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -111,7 +144,52 @@ export function createAuthRouter() {
     res.status(204).end()
   })
 
+  router.get('/exchange', async (req, res) => {
+    if (!MARKETPLACE_CONSUMER_MODE) {
+      return res.status(404).json({ error: 'Not found' })
+    }
+
+    try {
+      const token = String(req.query?.token || '').trim()
+      if (!token) return res.status(400).json({ error: 'Missing token' })
+
+      const payload = jwt.verify(token, MARKETPLACE_BRIDGE_SECRET, {
+        algorithms: ['HS256'],
+        issuer: 'gangledger',
+        audience: 'marketplace',
+      })
+
+      if (!payload || typeof payload === 'string' || !payload.email) {
+        return res.status(400).json({ error: 'Invalid token payload' })
+      }
+
+      const role = String(payload.role || 'buyer').toLowerCase()
+      const isAdmin = Boolean(payload.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
+      const sessionPayload = {
+        uid: Number(payload.sub || payload.uid || 0) || undefined,
+        email: payload.email,
+        name: payload.name || null,
+        image: payload.image || null,
+        role,
+        isAdmin,
+        source: 'gangledger',
+      }
+
+      const session = jwt.sign(sessionPayload, JWT_SECRET, { expiresIn: '7d' })
+      res.cookie('session', session, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: SESSION_MAX_AGE_MS })
+
+      return res.redirect(302, normalizeMarketplaceRedirectTarget(req.query?.redirect))
+    } catch (e) {
+      console.error('GET /api/auth/exchange error:', e)
+      return res.status(401).json({ error: 'Invalid exchange token' })
+    }
+  })
+
   router.get('/me', async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return res.status(200).json(consumerSessionUser(req))
+    }
+
     if (!req.user?.email && !req.user?.uid) return res.status(200).json(null)
     try {
       const where = req.user?.email ? { email: req.user.email } : undefined
@@ -150,6 +228,10 @@ export function createAuthRouter() {
 
   // Update current user profile
   router.put('/me', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Profile edits must be completed in Gang Ledger.')
+    }
+
     try {
       const { name, image, phoneNo, ABN, bio, paymentInstructions } = req.body || {}
       const hasEmail = !!req.user?.email
@@ -184,6 +266,10 @@ export function createAuthRouter() {
 
   // Fallback for clients that use POST instead of PUT
   router.post('/me', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Profile edits must be completed in Gang Ledger.')
+    }
+
     try {
       const { name, image, phoneNo, ABN, bio, paymentInstructions } = req.body || {}
       const hasEmail = !!req.user?.email
@@ -217,6 +303,10 @@ export function createAuthRouter() {
 
   // 2FA: Get status for current user
   router.get('/mfa/status', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Authentication factors are managed by Gang Ledger.')
+    }
+
     try {
       const where = req.user?.email ? { email: req.user.email } : { id: Number(req.user.uid) }
       const user = await prisma.user.findUnique({ where })
@@ -229,6 +319,10 @@ export function createAuthRouter() {
 
   // 2FA: Begin setup, generate secret & otpauth URL
   router.post('/mfa/setup', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Authentication factors are managed by Gang Ledger.')
+    }
+
     try {
       const where = req.user?.email ? { email: req.user.email } : { id: Number(req.user.uid) }
       const user = await prisma.user.findUnique({ where })
@@ -247,6 +341,10 @@ export function createAuthRouter() {
 
   // 2FA: Enable with verification token
   router.post('/mfa/enable', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Authentication factors are managed by Gang Ledger.')
+    }
+
     try {
       const { token } = req.body || {}
       if (!token) return res.status(400).json({ error: 'Missing token' })
@@ -266,6 +364,10 @@ export function createAuthRouter() {
 
   // 2FA: Disable (requires valid current token)
   router.post('/mfa/disable', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Authentication factors are managed by Gang Ledger.')
+    }
+
     try {
       const { token } = req.body || {}
       if (!token) return res.status(400).json({ error: 'Missing token' })
@@ -285,6 +387,10 @@ export function createAuthRouter() {
 
   // 2FA: Verify during login (uses temporary cookie)
   router.post('/mfa/verify', async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return notSupportedInConsumerMode(res, 'Authentication factors are managed by Gang Ledger.')
+    }
+
     try {
       const { token } = req.body || {}
       if (!token) return res.status(400).json({ error: 'Missing token' })
@@ -306,7 +412,7 @@ export function createAuthRouter() {
       // Issue a full session and clear pending MFA
       const session = jwt.sign({ uid: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
       res.clearCookie('mfa')
-      res.cookie('session', session, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 })
+      res.cookie('session', session, { httpOnly: true, sameSite: 'lax', secure: false, maxAge: SESSION_MAX_AGE_MS })
       res.json({ id: user.id, email: user.email, name: user.name, image: user.image, role: user.role })
     } catch (e) {
       console.error('POST /api/auth/mfa/verify error:', e)

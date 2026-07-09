@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useAuthStore } from '@/stores/authStore'
+import {
+  buildGangLedgerSignInUrl,
+  marketplaceConsumerMode,
+  normalizeMarketplaceRedirectTarget,
+} from '@/lib/marketplace-consumer'
 
 declare global {
   interface Window {
@@ -13,8 +18,13 @@ export function GoogleSignInButton() {
   const [loaded, setLoaded] = useState(false)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   const router = useRouter()
+  const redirect =
+    typeof window === 'undefined'
+      ? '/'
+      : normalizeMarketplaceRedirectTarget(new URL(window.location.href).searchParams.get('redirect'))
 
   useEffect(() => {
+    if (marketplaceConsumerMode) return
     if (!clientId) return
     const existing = document.getElementById('google-client-script') as HTMLScriptElement | null
     if (existing) {
@@ -51,7 +61,7 @@ export function GoogleSignInButton() {
           useAuthStore.getState().auth.setUser(data as any)
           // Redirect to requested page or dashboard
           const params = new URL(window.location.href).searchParams
-          const redirect = params.get('redirect')
+          const redirect = normalizeMarketplaceRedirectTarget(params.get('redirect'))
           if (redirect && redirect.startsWith('/')) {
             router.navigate({ to: redirect as any })
           } else {
@@ -67,6 +77,17 @@ export function GoogleSignInButton() {
       window.google.accounts.id.renderButton(divRef.current, { theme: 'outline', size: 'large', width: '100%' })
       setLoaded(true)
     }
+  }
+
+  if (marketplaceConsumerMode) {
+    return (
+      <a
+        href={buildGangLedgerSignInUrl(redirect)}
+        className='inline-flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800'
+      >
+        Continue with Gang Ledger
+      </a>
+    )
   }
 
   if (!clientId) return <div className='text-sm text-red-600'>Missing VITE_GOOGLE_CLIENT_ID</div>
