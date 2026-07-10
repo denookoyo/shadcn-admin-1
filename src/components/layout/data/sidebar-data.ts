@@ -9,6 +9,7 @@ import {
   Receipt,
   Search,
   Settings,
+  Shield,
   ShoppingBag,
   Store,
   Users,
@@ -79,6 +80,11 @@ export const sidebarData: SidebarData = {
           title: 'Seller cockpit',
           url: '/marketplace/dashboard',
           icon: Store,
+        },
+        {
+          title: 'Admin dashboard',
+          url: '/marketplace/dashboard/admin',
+          icon: Shield,
         },
         {
           title: 'AI concierge',

@@ -242,8 +242,8 @@ function MarketplaceHome() {
     },
     {
       icon: Home,
-      title: 'Kenya land exchange',
-      body: 'Upload acreage, photos, and let Nairobi ops arrange escorted viewings.',
+      title: 'Kenyan real estate',
+      body: 'List land, villas, apartments, and offices with guided viewings from one shared inventory.',
       href: '/marketplace/land',
       tone: 'emerald',
     },
@@ -439,27 +439,27 @@ function MarketplaceHome() {
       <section className='grid gap-6 rounded-3xl border border-emerald-100/50 bg-gradient-to-br from-[#022c22] via-[#065f46] to-[#0f766e] p-6 text-white shadow-lg lg:grid-cols-[1fr_1fr]'>
         <div className='space-y-4'>
           <div className='inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-100'>
-            Kenya land exchange
+            Kenyan real estate
           </div>
-          <h2 className='text-2xl font-semibold leading-tight'>Post serviced acreage and let buyers arrange escorted viewings</h2>
-          <p className='text-sm text-emerald-50/80'>Purpose-built for Kenyan parcels — attach photos, note utilities, and capture interested buyers directly inside Hedgetech.</p>
+          <h2 className='text-2xl font-semibold leading-tight'>List plots and properties, then let buyers arrange guided inspections</h2>
+          <p className='text-sm text-emerald-50/80'>Built for Kenyan real estate inventory, from raw land to finished apartments and offices, with media, utilities, and document notes in one place.</p>
           <ul className='space-y-1 text-sm text-emerald-50/80'>
-            <li>• Showcase road access, soil, and beacons per county.</li>
-            <li>• Upload document checklists (title, mutation, search).</li>
-            <li>• Buyers tap Arrange Viewing for escrow-ready site visits.</li>
+            <li>• Showcase location, asset type, frontage, and utilities by county.</li>
+            <li>• Upload document checklists for titles, leases, searches, and approvals.</li>
+            <li>• Buyers tap Arrange Viewing for escrow-ready inspections.</li>
           </ul>
           <Link
             to='/marketplace/land'
             className='inline-flex w-max items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/20'
           >
-            Open land board
+            Open Kenyan real estate
           </Link>
         </div>
         <div className='grid gap-3'>
           {landLoading ? (
-            <div className='rounded-2xl border border-white/20 bg-white/10 p-6 text-sm text-emerald-50/70'>Loading featured parcels...</div>
+            <div className='rounded-2xl border border-white/20 bg-white/10 p-6 text-sm text-emerald-50/70'>Loading featured real estate...</div>
           ) : landHighlights.length === 0 ? (
-            <div className='rounded-2xl border border-dashed border-white/30 p-6 text-sm text-emerald-50/80'>Bring your first Kenyan land listing to unlock this showcase.</div>
+            <div className='rounded-2xl border border-dashed border-white/30 p-6 text-sm text-emerald-50/80'>Bring your first Kenyan real estate listing to unlock this showcase.</div>
           ) : (
             landHighlights.map((land) => (
               <Link
@@ -472,7 +472,7 @@ function MarketplaceHome() {
                 </div>
                 <div className='space-y-1 text-sm'>
                   <div className='text-xs uppercase tracking-wide text-emerald-100/80'>
-                    {land.county} • {formatLandAcreage(land.acreage)}
+                    {land.county} • {land.assetType === 'land' ? formatLandAcreage(land.acreage) : 'Property'}
                   </div>
                   <div className='font-semibold text-white'>{land.title}</div>
                   <div className='text-xs text-emerald-50/80'>{formatLandKes(land.priceKes)}</div>

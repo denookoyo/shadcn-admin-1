@@ -16,6 +16,7 @@ const allowedUrlSet = new Set<string>([
   '/',
   '/marketplace',
   '/marketplace/dashboard',
+  '/marketplace/dashboard/admin',
   '/marketplace/dashboard/listings',
   '/marketplace/dashboard/listings/new',
   '/marketplace/dashboard/analytics',

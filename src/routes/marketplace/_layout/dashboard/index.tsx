@@ -66,6 +66,8 @@ function SellerDashboard() {
   }, [ns])
 
   const myNumericId = (user as any)?.id ?? (user as any)?.uid
+  const role = String((user as any)?.role ?? '').toLowerCase()
+  const isAdmin = Boolean((user as any)?.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
 
   const mine = useMemo(() => {
     return products.filter((product: any) => {
@@ -117,6 +119,11 @@ function SellerDashboard() {
             <h1 className='text-3xl font-semibold text-slate-900'>Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}</h1>
             <p className='max-w-xl text-sm text-slate-600'>Monitor trading health, coordinate fulfilment, and launch new listings with workflow blocks tailored for Hedgetech merchants.</p>
             <div className='flex flex-wrap gap-2 text-xs'>
+              {isAdmin ? (
+                <Link to='/marketplace/dashboard/admin' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
+                  Admin dashboard
+                </Link>
+              ) : null}
               <Link to='/marketplace/dashboard/pos' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
                 <ScanLine className='h-3.5 w-3.5' /> Open POS
               </Link>
