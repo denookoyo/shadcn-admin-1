@@ -21,6 +21,7 @@ import { Route as ClerkRouteImport } from './routes/clerk/route'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as BlogIndexImport } from './routes/blog/index'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
+import { Route as OauthAuthorizeImport } from './routes/oauth/authorize'
 import { Route as MarketplaceLayoutImport } from './routes/marketplace/_layout'
 import { Route as BlogNewImport } from './routes/blog/new'
 import { Route as BlogManageImport } from './routes/blog/manage'
@@ -87,6 +88,7 @@ import { Route as MarketplaceLayoutDashboardLabelsImport } from './routes/market
 import { Route as MarketplaceLayoutDashboardImportImport } from './routes/marketplace/_layout/dashboard/import'
 import { Route as MarketplaceLayoutDashboardApprovalsImport } from './routes/marketplace/_layout/dashboard/approvals'
 import { Route as MarketplaceLayoutDashboardAnalyticsImport } from './routes/marketplace/_layout/dashboard/analytics'
+import { Route as MarketplaceLayoutDashboardAdminImport } from './routes/marketplace/_layout/dashboard/admin'
 import { Route as MarketplaceLayoutDashboardLayoutImport } from './routes/marketplace/_layout/dashboard/_layout'
 import { Route as MarketplaceLayoutMerchantIdIndexImport } from './routes/marketplace/_layout/merchant/$id/index'
 import { Route as MarketplaceLayoutListingSlugIndexImport } from './routes/marketplace/_layout/listing/$slug/index'
@@ -160,6 +162,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const OauthAuthorizeRoute = OauthAuthorizeImport.update({
+  id: '/oauth/authorize',
+  path: '/oauth/authorize',
+  getParentRoute: () => rootRoute,
 } as any)
 
 const MarketplaceLayoutRoute = MarketplaceLayoutImport.update({
@@ -599,6 +607,13 @@ const MarketplaceLayoutDashboardAnalyticsRoute =
     getParentRoute: () => MarketplaceLayoutDashboardRoute,
   } as any)
 
+const MarketplaceLayoutDashboardAdminRoute =
+  MarketplaceLayoutDashboardAdminImport.update({
+    id: '/admin',
+    path: '/admin',
+    getParentRoute: () => MarketplaceLayoutDashboardRoute,
+  } as any)
+
 const MarketplaceLayoutDashboardLayoutRoute =
   MarketplaceLayoutDashboardLayoutImport.update({
     id: '/_layout',
@@ -846,6 +861,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/marketplace'
       preLoaderRoute: typeof MarketplaceLayoutImport
       parentRoute: typeof MarketplaceRoute
+    }
+    '/oauth/authorize': {
+      id: '/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof OauthAuthorizeImport
+      parentRoute: typeof rootRoute
     }
     '/_authenticated/': {
       id: '/_authenticated/'
@@ -1105,6 +1127,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/marketplace/dashboard'
       preLoaderRoute: typeof MarketplaceLayoutDashboardLayoutImport
       parentRoute: typeof MarketplaceLayoutDashboardRoute
+    }
+    '/marketplace/_layout/dashboard/admin': {
+      id: '/marketplace/_layout/dashboard/admin'
+      path: '/admin'
+      fullPath: '/marketplace/dashboard/admin'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardAdminImport
+      parentRoute: typeof MarketplaceLayoutDashboardImport
     }
     '/marketplace/_layout/dashboard/analytics': {
       id: '/marketplace/_layout/dashboard/analytics'
@@ -1430,6 +1459,7 @@ const ClerkRouteRouteWithChildren = ClerkRouteRoute._addFileChildren(
 
 interface MarketplaceLayoutDashboardRouteChildren {
   MarketplaceLayoutDashboardLayoutRoute: typeof MarketplaceLayoutDashboardLayoutRoute
+  MarketplaceLayoutDashboardAdminRoute: typeof MarketplaceLayoutDashboardAdminRoute
   MarketplaceLayoutDashboardAnalyticsRoute: typeof MarketplaceLayoutDashboardAnalyticsRoute
   MarketplaceLayoutDashboardApprovalsRoute: typeof MarketplaceLayoutDashboardApprovalsRoute
   MarketplaceLayoutDashboardImportRoute: typeof MarketplaceLayoutDashboardImportRoute
@@ -1453,6 +1483,7 @@ const MarketplaceLayoutDashboardRouteChildren: MarketplaceLayoutDashboardRouteCh
   {
     MarketplaceLayoutDashboardLayoutRoute:
       MarketplaceLayoutDashboardLayoutRoute,
+    MarketplaceLayoutDashboardAdminRoute: MarketplaceLayoutDashboardAdminRoute,
     MarketplaceLayoutDashboardAnalyticsRoute:
       MarketplaceLayoutDashboardAnalyticsRoute,
     MarketplaceLayoutDashboardApprovalsRoute:
@@ -1565,6 +1596,7 @@ export interface FileRoutesByFullPath {
   '/blog/manage': typeof BlogManageRoute
   '/blog/new': typeof BlogNewRoute
   '/marketplace': typeof MarketplaceLayoutRouteWithChildren
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/': typeof AuthenticatedIndexRoute
   '/blog': typeof BlogIndexRoute
   '/admin/dockets': typeof AuthenticatedAdminDocketsRoute
@@ -1601,6 +1633,7 @@ export interface FileRoutesByFullPath {
   '/blog/$slug': typeof BlogSlugIndexRoute
   '/marketplace/': typeof MarketplaceLayoutIndexRoute
   '/marketplace/dashboard': typeof MarketplaceLayoutDashboardLayoutRoute
+  '/marketplace/dashboard/admin': typeof MarketplaceLayoutDashboardAdminRoute
   '/marketplace/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
   '/marketplace/dashboard/approvals': typeof MarketplaceLayoutDashboardApprovalsRoute
   '/marketplace/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
@@ -1650,6 +1683,7 @@ export interface FileRoutesByTo {
   '/blog/manage': typeof BlogManageRoute
   '/blog/new': typeof BlogNewRoute
   '/marketplace': typeof MarketplaceLayoutIndexRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/': typeof AuthenticatedIndexRoute
   '/blog': typeof BlogIndexRoute
   '/admin/dockets': typeof AuthenticatedAdminDocketsRoute
@@ -1685,6 +1719,7 @@ export interface FileRoutesByTo {
   '/warehouse': typeof AuthenticatedWarehouseIndexRoute
   '/blog/$slug': typeof BlogSlugIndexRoute
   '/marketplace/dashboard': typeof MarketplaceLayoutDashboardIndexRoute
+  '/marketplace/dashboard/admin': typeof MarketplaceLayoutDashboardAdminRoute
   '/marketplace/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
   '/marketplace/dashboard/approvals': typeof MarketplaceLayoutDashboardApprovalsRoute
   '/marketplace/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
@@ -1739,6 +1774,7 @@ export interface FileRoutesById {
   '/blog/new': typeof BlogNewRoute
   '/marketplace': typeof MarketplaceRouteWithChildren
   '/marketplace/_layout': typeof MarketplaceLayoutRouteWithChildren
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/blog/': typeof BlogIndexRoute
   '/_authenticated/admin/dockets': typeof AuthenticatedAdminDocketsRoute
@@ -1776,6 +1812,7 @@ export interface FileRoutesById {
   '/marketplace/_layout/': typeof MarketplaceLayoutIndexRoute
   '/marketplace/_layout/dashboard': typeof MarketplaceLayoutDashboardRouteWithChildren
   '/marketplace/_layout/dashboard/_layout': typeof MarketplaceLayoutDashboardLayoutRoute
+  '/marketplace/_layout/dashboard/admin': typeof MarketplaceLayoutDashboardAdminRoute
   '/marketplace/_layout/dashboard/analytics': typeof MarketplaceLayoutDashboardAnalyticsRoute
   '/marketplace/_layout/dashboard/approvals': typeof MarketplaceLayoutDashboardApprovalsRoute
   '/marketplace/_layout/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
@@ -1830,6 +1867,7 @@ export interface FileRouteTypes {
     | '/blog/manage'
     | '/blog/new'
     | '/marketplace'
+    | '/oauth/authorize'
     | '/'
     | '/blog'
     | '/admin/dockets'
@@ -1866,6 +1904,7 @@ export interface FileRouteTypes {
     | '/blog/$slug'
     | '/marketplace/'
     | '/marketplace/dashboard'
+    | '/marketplace/dashboard/admin'
     | '/marketplace/dashboard/analytics'
     | '/marketplace/dashboard/approvals'
     | '/marketplace/dashboard/import'
@@ -1914,6 +1953,7 @@ export interface FileRouteTypes {
     | '/blog/manage'
     | '/blog/new'
     | '/marketplace'
+    | '/oauth/authorize'
     | '/'
     | '/blog'
     | '/admin/dockets'
@@ -1949,6 +1989,7 @@ export interface FileRouteTypes {
     | '/warehouse'
     | '/blog/$slug'
     | '/marketplace/dashboard'
+    | '/marketplace/dashboard/admin'
     | '/marketplace/dashboard/analytics'
     | '/marketplace/dashboard/approvals'
     | '/marketplace/dashboard/import'
@@ -2001,6 +2042,7 @@ export interface FileRouteTypes {
     | '/blog/new'
     | '/marketplace'
     | '/marketplace/_layout'
+    | '/oauth/authorize'
     | '/_authenticated/'
     | '/blog/'
     | '/_authenticated/admin/dockets'
@@ -2038,6 +2080,7 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/'
     | '/marketplace/_layout/dashboard'
     | '/marketplace/_layout/dashboard/_layout'
+    | '/marketplace/_layout/dashboard/admin'
     | '/marketplace/_layout/dashboard/analytics'
     | '/marketplace/_layout/dashboard/approvals'
     | '/marketplace/_layout/dashboard/import'
@@ -2089,6 +2132,7 @@ export interface RootRouteChildren {
   BlogManageRoute: typeof BlogManageRoute
   BlogNewRoute: typeof BlogNewRoute
   MarketplaceRoute: typeof MarketplaceRouteWithChildren
+  OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   BlogIndexRoute: typeof BlogIndexRoute
   BlogSlugEditRoute: typeof BlogSlugEditRoute
   BlogSlugIndexRoute: typeof BlogSlugIndexRoute
@@ -2114,6 +2158,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlogManageRoute: BlogManageRoute,
   BlogNewRoute: BlogNewRoute,
   MarketplaceRoute: MarketplaceRouteWithChildren,
+  OauthAuthorizeRoute: OauthAuthorizeRoute,
   BlogIndexRoute: BlogIndexRoute,
   BlogSlugEditRoute: BlogSlugEditRoute,
   BlogSlugIndexRoute: BlogSlugIndexRoute,
@@ -2148,6 +2193,7 @@ export const routeTree = rootRoute
         "/blog/manage",
         "/blog/new",
         "/marketplace",
+        "/oauth/authorize",
         "/blog/",
         "/blog/$slug/edit",
         "/blog/$slug/"
@@ -2287,6 +2333,9 @@ export const routeTree = rootRoute
         "/marketplace/_layout/listing/$slug/",
         "/marketplace/_layout/merchant/$id/"
       ]
+    },
+    "/oauth/authorize": {
+      "filePath": "oauth/authorize.tsx"
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
@@ -2430,6 +2479,7 @@ export const routeTree = rootRoute
       "parent": "/marketplace/_layout",
       "children": [
         "/marketplace/_layout/dashboard/_layout",
+        "/marketplace/_layout/dashboard/admin",
         "/marketplace/_layout/dashboard/analytics",
         "/marketplace/_layout/dashboard/approvals",
         "/marketplace/_layout/dashboard/import",
@@ -2451,6 +2501,10 @@ export const routeTree = rootRoute
     },
     "/marketplace/_layout/dashboard/_layout": {
       "filePath": "marketplace/_layout/dashboard/_layout.tsx",
+      "parent": "/marketplace/_layout/dashboard"
+    },
+    "/marketplace/_layout/dashboard/admin": {
+      "filePath": "marketplace/_layout/dashboard/admin.tsx",
       "parent": "/marketplace/_layout/dashboard"
     },
     "/marketplace/_layout/dashboard/analytics": {
