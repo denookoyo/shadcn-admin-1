@@ -1,10 +1,12 @@
 import { createHmac } from 'node:crypto'
+import jwt from 'jsonwebtoken'
 
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on'])
 const FALLBACK_GANGLEDGER_BASE_URL = 'http://localhost:3000'
 const MARKETPLACE_API_TOKEN_ISSUER = 'marketplace'
 const MARKETPLACE_API_TOKEN_AUDIENCE = 'gangledger-marketplace-api'
 const MARKETPLACE_API_TOKEN_TTL_SECONDS = 5 * 60
+const SESSION_COOKIE_NAME = 'session'
 
 function normalizeFlag(value) {
   return TRUE_VALUES.has(String(value || '').trim().toLowerCase())
@@ -30,6 +32,43 @@ export function getMarketplaceBridgeSecret() {
   )
 }
 
+function getSessionSecret() {
+  return String(process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'devsecret').trim()
+}
+
+function parseCookieHeader(cookieHeader) {
+  if (!cookieHeader) return {}
+  return String(cookieHeader)
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((cookies, entry) => {
+      const separatorIndex = entry.indexOf('=')
+      if (separatorIndex <= 0) return cookies
+      const key = entry.slice(0, separatorIndex).trim()
+      const value = entry.slice(separatorIndex + 1).trim()
+      cookies[key] = decodeURIComponent(value)
+      return cookies
+    }, {})
+}
+
+function ensureRequestUser(req) {
+  if (req?.user?.email || req?.user?.uid || req?.user?.sub) return req.user
+  const cookies = parseCookieHeader(req?.headers?.cookie)
+  const sessionToken = cookies[SESSION_COOKIE_NAME]
+  if (!sessionToken) return null
+  try {
+    const payload = jwt.verify(sessionToken, getSessionSecret())
+    if (payload && typeof payload === 'object') {
+      req.user = payload
+      return req.user
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 function toBase64Url(input) {
   return Buffer.from(input)
     .toString('base64')
@@ -39,6 +78,7 @@ function toBase64Url(input) {
 }
 
 function signGangLedgerBridgeToken(req, audience = MARKETPLACE_API_TOKEN_AUDIENCE) {
+  ensureRequestUser(req)
   if (!req.user?.email && !req.user?.uid && !req.user?.sub) {
     return null
   }

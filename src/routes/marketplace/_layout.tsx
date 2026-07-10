@@ -115,11 +115,11 @@ function Nav() {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <StageBadge className="hidden md:inline-flex" />
             <Link
               to="/marketplace/cart"
-              className="group relative flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-500"
+              className="group relative flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-600 px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-emerald-500 sm:px-4 sm:text-sm"
             >
               Cart
               <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white/90">
@@ -205,12 +205,12 @@ function Nav() {
           </div>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 text-xs text-slate-500 lg:hidden">
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 text-xs text-slate-500 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {[...primaryLinks, ...sellerLinks, ...supportLinks].map((item) => (
             <Link
               key={item.href}
               to={item.href}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-600 shadow-sm"
+              className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 shadow-sm"
             >
               {item.label}
             </Link>

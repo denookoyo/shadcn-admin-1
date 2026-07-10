@@ -264,23 +264,23 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
   }
 
   return (
-    <MarketplacePageShell width='xl' className='grid gap-8 lg:grid-cols-[1.1fr_0.9fr]'>
+    <MarketplacePageShell width='xl' className='grid gap-6 lg:gap-8 xl:grid-cols-[1.1fr_0.9fr]'>
       <section className='space-y-6'>
-        <header className='flex flex-wrap items-center justify-between gap-3'>
-          <div>
+        <header className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='min-w-0'>
             <p className='text-xs font-semibold uppercase tracking-wide text-emerald-600'>Product {mode === 'create' ? 'composer' : 'editor'}</p>
-            <h1 className='text-2xl font-semibold text-slate-900'>{mode === 'create' ? 'Create a new listing' : `Editing ${product?.title}`}</h1>
+            <h1 className='text-xl font-semibold text-slate-900 sm:text-2xl'>{mode === 'create' ? 'Create a new listing' : `Editing ${product?.title}`}</h1>
             <p className='mt-1 text-sm text-slate-600'>Craft compelling content, then preview the buyer experience before publishing.</p>
           </div>
-          <div className='flex items-center gap-2'>
-            <Button variant='outline' onClick={() => navigate({ to: '/marketplace/dashboard/listings' })}>
+          <div className='grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-3'>
+            <Button variant='outline' className='w-full' onClick={() => navigate({ to: '/marketplace/dashboard/listings' })}>
               Cancel
             </Button>
-            <Button variant='secondary' disabled={saving} onClick={() => handleSubmit(false)}>
+            <Button variant='secondary' className='w-full' disabled={saving} onClick={() => handleSubmit(false)}>
               {saving ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
               Save draft
             </Button>
-            <Button disabled={saving} onClick={() => handleSubmit(true)}>
+            <Button className='w-full' disabled={saving} onClick={() => handleSubmit(true)}>
               {saving ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
               Publish changes
             </Button>
@@ -300,7 +300,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
           </div>
         ) : null}
 
-        <div className='space-y-6 rounded-4xl border border-slate-200 bg-white p-6 shadow-sm'>
+        <div className='space-y-6 rounded-4xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
           <div className='grid gap-4 md:grid-cols-2'>
             <div className='space-y-2'>
               <Label htmlFor='title'>Product title</Label>
@@ -402,14 +402,14 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
             </div>
             <div className='space-y-2'>
               <Label htmlFor='gallery'>Add gallery image</Label>
-              <div className='flex gap-2'>
+              <div className='flex flex-col gap-2 sm:flex-row'>
                 <Input
                   id='gallery'
                   placeholder='https://cdn.hedgetech.market/gallery.jpg'
                   value={imageDraft}
                   onChange={(event) => setImageDraft(event.target.value)}
                 />
-                <Button type='button' variant='outline' onClick={addImage}>Add</Button>
+                <Button type='button' variant='outline' className='w-full sm:w-auto' onClick={addImage}>Add</Button>
               </div>
               <Input
                 type='file'
@@ -424,9 +424,9 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
               {form.gallery.length ? (
                 <ul className='space-y-1 text-xs text-slate-600'>
                   {form.gallery.map((url) => (
-                    <li key={url} className='flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5'>
-                      <span className='truncate'>{url}</span>
-                      <button type='button' className='text-emerald-700 hover:underline' onClick={() => removeImage(url)}>
+                    <li key={url} className='flex min-w-0 flex-col gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between'>
+                      <span className='min-w-0 break-all text-[11px] sm:truncate sm:text-xs'>{url}</span>
+                      <button type='button' className='shrink-0 text-left text-emerald-700 hover:underline sm:text-right' onClick={() => removeImage(url)}>
                         Remove
                       </button>
                     </li>
@@ -519,8 +519,8 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
       </section>
 
       <aside className='space-y-6'>
-        <div className='rounded-4xl border border-slate-200 bg-white p-6 shadow-sm'>
-          <div className='flex items-center justify-between'>
+        <div className='rounded-4xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
             <h2 className='text-sm font-semibold text-slate-900'>Live preview</h2>
             <span className='inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600'>
               <Eye className='h-3 w-3' /> Buyer view
@@ -535,14 +535,14 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
               )}
             </div>
             <div className='space-y-2'>
-              <div className='flex items-center justify-between'>
+              <div className='flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between'>
                 <h3 className='text-lg font-semibold text-slate-900'>{form.title || 'Untitled product'}</h3>
                 <span className='text-lg font-semibold text-emerald-700'>A${(form.price || 0).toLocaleString()}</span>
               </div>
               <p className='text-xs text-slate-500'>Fulfilled by {form.seller || 'your brand'} · {form.type === 'service' ? 'Service listing' : 'Physical goods'}</p>
               <p className='text-sm text-slate-600'>{form.description || 'Add a compelling description to highlight value, materials, or service inclusions.'}</p>
               {previewGallery.length > 1 ? (
-                <div className='flex gap-2'>
+                <div className='grid grid-cols-2 gap-2 sm:flex'>
                   {previewGallery.slice(1, 5).map((url) => (
                     <img key={url} src={url} alt='' className='h-16 w-16 rounded-md border border-slate-200 object-cover' />
                   ))}
