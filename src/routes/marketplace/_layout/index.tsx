@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { Sparkles, ShieldCheck, Store, ShoppingBag, BarChart3, MessagesSquare, Home, type LucideIcon } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
@@ -526,5 +526,8 @@ function MarketplaceHome() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/')({
+  beforeLoad: () => {
+    throw redirect({ to: '/marketplace/listings' })
+  },
   component: MarketplaceHome,
 })

@@ -1,10 +1,11 @@
-import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { Store, ShoppingCart, Filter, SlidersHorizontal } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 export type ListingsSearch = { q?: string }
 
@@ -39,12 +40,14 @@ function Segmented({ active, onChange }: { active: TypeFilter; onChange: (value:
 function Listings() {
   const search = useSearch({ from: '/marketplace/_layout/listings/' }) as ListingsSearch
   const q = (search?.q ?? '').toLowerCase()
+  const navigate = useNavigate()
 
   const [products, setProducts] = useState<Product[]>([])
   const { user } = useAuthStore((s) => s.auth)
   const ns = user?.email || (user as any)?.accountNo || 'guest'
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [searchDraft, setSearchDraft] = useState(search?.q ?? '')
 
   useEffect(() => {
     let mounted = true
@@ -62,6 +65,10 @@ function Listings() {
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    setSearchDraft(search?.q ?? '')
+  }, [search?.q])
 
   const items = useMemo(() => {
     const base = products
@@ -144,7 +151,7 @@ function Listings() {
                 <input placeholder='Min' className='rounded-full border border-slate-200 px-3 py-2' />
                 <input placeholder='Max' className='rounded-full border border-slate-200 px-3 py-2' />
               </div>
-              <p className='mt-2 text-[11px] text-slate-400'>Dynamic filters sync once APIs connect.</p>
+              <p className='mt-2 text-[11px] text-slate-400'>Catalog and seller access are served directly from Gang Ledger.</p>
             </div>
             <div>
               <div className='font-semibold text-slate-800'>Seller rating</div>
@@ -168,16 +175,35 @@ function Listings() {
 
         <div className='flex-1'>
           <div className='mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-            <input
-              placeholder='Search listings...'
-              defaultValue={search?.q ?? ''}
-              className='w-full rounded-full border border-slate-200 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400 sm:max-w-sm'
-            />
+            <form
+              className='w-full sm:max-w-sm'
+              onSubmit={(event) => {
+                event.preventDefault()
+                const nextQuery = searchDraft.trim()
+                navigate({ to: '/marketplace/listings', search: nextQuery ? { q: nextQuery } : {} })
+              }}
+            >
+              <input
+                placeholder='Search listings...'
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                className='w-full rounded-full border border-slate-200 px-4 py-3 text-sm text-slate-700 shadow-sm outline-none placeholder:text-slate-400'
+              />
+            </form>
             <div className='flex items-center gap-2 text-xs text-slate-500'>
               <span className='inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2'><SlidersHorizontal className='h-3.5 w-3.5' />Sort: Popular</span>
-              <Link to='/marketplace/dashboard/import' className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-100'>
-                <Store className='h-3.5 w-3.5' />Become a seller
-              </Link>
+              {user ? (
+                <Link to='/marketplace/dashboard/verification' search={{ redirect: '' }} className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-100'>
+                  <Store className='h-3.5 w-3.5' />Seller access
+                </Link>
+              ) : (
+                <a
+                  href={marketplaceConsumerMode ? buildGangLedgerSignInUrl('/marketplace/dashboard/verification') : '/sign-in?redirect=%2Fmarketplace%2Fdashboard%2Fverification'}
+                  className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold text-emerald-700 transition hover:bg-emerald-100'
+                >
+                  <Store className='h-3.5 w-3.5' />Sell with Gang Ledger
+                </a>
+              )}
             </div>
           </div>
 

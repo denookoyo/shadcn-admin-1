@@ -30,3 +30,12 @@ export function buildGangLedgerSignInUrl(redirect?: string | null) {
   url.searchParams.set('redirect', normalizeMarketplaceRedirectTarget(redirect))
   return url.toString()
 }
+
+export function buildGangLedgerAppUrl(path = '/', redirect?: string | null) {
+  const baseUrl = gangLedgerBaseUrl || 'http://localhost:3000'
+  const url = new URL(path.startsWith('/') ? path : `/${path}`, baseUrl)
+  if (redirect) {
+    url.searchParams.set('redirect', normalizeMarketplaceRedirectTarget(redirect))
+  }
+  return url.toString()
+}

@@ -32,9 +32,6 @@ function ListingDetail() {
   const { slug } = useParams({ from: '/marketplace/_layout/listing/$slug/' })
   const [product, setProduct] = useState<Product | null>(null)
   const [loaded, setLoaded] = useState(false)
-  const [ownerName, setOwnerName] = useState<string | null>(null)
-  const [ownerImage, setOwnerImage] = useState<string | null>(null)
-  const [ownerRating, setOwnerRating] = useState<number>(4.9)
   const [qty, setQty] = useState(1)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
   const [slotError, setSlotError] = useState<string | null>(null)
@@ -68,34 +65,6 @@ function ListingDetail() {
     setSlotError(null)
   }, [product?.id])
 
-  useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const raw = (product as any)?.ownerId
-        const id = Number(raw)
-        if (!Number.isFinite(id)) {
-          if (mounted) setOwnerName((product as any)?.seller ?? null)
-          return
-        }
-        const owner = await db.getUserById?.(id)
-        if (!mounted) return
-        if (owner) {
-          setOwnerName(owner.name || owner.email?.split('@')[0] || 'Seller')
-          setOwnerImage(owner.image || null)
-          if ((owner as any).rating != null) setOwnerRating((owner as any).rating)
-        }
-      } catch {
-        if (mounted) setOwnerName(null)
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [product])
-
-  const ownerIdLabel = product?.ownerId ?? 'N/A'
-
   const bullets = useMemo(
     () => [
       'Genuine item verified by Hedgetech operations.',
@@ -128,6 +97,10 @@ function ListingDetail() {
 
   const isService = product.type === 'service'
   const displayQuantity = isService ? 1 : qty
+  const merchantRouteId = String((product as any)?.storeSlug || (product as any)?.ownerId || '').trim()
+  const ownerName = String((product as any)?.ownerName || product.seller || 'Seller').trim()
+  const ownerImage = String((product as any)?.ownerImage || '').trim() || null
+  const ownerRating = Number((product as any)?.ownerRating ?? product.rating ?? 4.9)
 
   return (
     <MarketplacePageShell width='wide' className='space-y-8'>
@@ -137,8 +110,8 @@ function ListingDetail() {
         <span>{product.title}</span>
       </div>
 
-      <div className='grid gap-8 lg:grid-cols-12'>
-        <div className='lg:col-span-5 space-y-6'>
+      <div className='grid gap-6 lg:grid-cols-12 lg:gap-8'>
+        <div className='space-y-4 lg:col-span-5 lg:space-y-6'>
           <Card className='overflow-hidden border-slate-200 shadow-sm'>
             <CardContent className='p-0'>
               <SafeImg
@@ -162,9 +135,9 @@ function ListingDetail() {
           ) : null}
         </div>
 
-        <div className='lg:col-span-7 space-y-6'>
+        <div className='space-y-6 lg:col-span-7'>
           <Card className='border-slate-200 shadow-sm'>
-            <CardContent className='space-y-6 p-6'>
+            <CardContent className='space-y-5 p-4 sm:p-6'>
               <div className='flex flex-wrap items-center justify-between gap-3'>
                 <Badge>{isService ? 'Service' : 'Product'}</Badge>
                 <span className='text-xs font-medium text-slate-500'>Listing ID {product.id.slice(0, 6)}</span>
@@ -173,24 +146,28 @@ function ListingDetail() {
                 <h1 className='text-3xl font-semibold text-slate-900'>{product.title}</h1>
                 <div className='flex flex-wrap items-center gap-2 text-sm text-slate-500'>
                   <span className='inline-flex items-center gap-2'>
-                    {ownerImage ? (
-                      <Link to='/marketplace/merchant/$id' params={{ id: String((product as any)?.ownerId ?? '') }}>
+                    {ownerImage && merchantRouteId ? (
+                      <Link to='/marketplace/merchant/$id' params={{ id: merchantRouteId }}>
                         <img src={ownerImage} alt={ownerName || 'Seller'} className='h-6 w-6 rounded-full object-cover' />
                       </Link>
-                    ) : null}
+                    ) : ownerImage ? <img src={ownerImage} alt={ownerName || 'Seller'} className='h-6 w-6 rounded-full object-cover' /> : null}
                     <span>
                       Sold by{' '}
-                      <Link
-                        to='/marketplace/merchant/$id'
-                        params={{ id: String((product as any)?.ownerId ?? '') }}
-                        className='font-semibold text-emerald-700 hover:underline'
-                      >
-                        {ownerName || ownerIdLabel}
-                      </Link>
+                      {merchantRouteId ? (
+                        <Link
+                          to='/marketplace/merchant/$id'
+                          params={{ id: merchantRouteId }}
+                          className='font-semibold text-emerald-700 hover:underline'
+                        >
+                          {ownerName}
+                        </Link>
+                      ) : (
+                        <span className='font-semibold text-emerald-700'>{ownerName}</span>
+                      )}
                     </span>
                   </span>
                   <span>•</span>
-                  <span className='text-emerald-700'>★ {Number(ownerRating ?? 4.9).toFixed(1)}</span>
+                  <span className='text-emerald-700'>★ {ownerRating.toFixed(1)}</span>
                 </div>
               </div>
               <div className='text-3xl font-bold text-emerald-600'>A${product.price}</div>
@@ -250,15 +227,25 @@ function ListingDetail() {
                   <Button asChild variant='outline' className='rounded-full px-5 py-3 text-sm font-semibold'>
                     <Link to='/marketplace/checkout'>Buy now</Link>
                   </Button>
-                  <Button
-                    variant='ghost'
-                    className='gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:border-emerald-200 hover:text-emerald-700'
-                    asChild
-                  >
-                    <Link to='/marketplace/merchant/$id' params={{ id: String((product as any)?.ownerId ?? '') }}>
-                      <MessageCircle className='h-4 w-4' /> Message seller
-                    </Link>
-                  </Button>
+                  {merchantRouteId ? (
+                    <Button
+                      variant='ghost'
+                      className='gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:border-emerald-200 hover:text-emerald-700'
+                      asChild
+                    >
+                      <Link to='/marketplace/merchant/$id' params={{ id: merchantRouteId }}>
+                        <MessageCircle className='h-4 w-4' /> View seller page
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant='ghost'
+                      className='gap-2 rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-400'
+                      disabled
+                    >
+                      <MessageCircle className='h-4 w-4' /> Seller page unavailable
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -292,7 +279,7 @@ function ListingDetail() {
                 <span className='font-semibold text-emerald-700'>{(product as any).repeatBuyerRate ?? '62%'}</span>
               </div>
               <div className='rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-500'>
-                Seller dashboard metrics sync automatically when connected to Hedgetech APIs.
+                Seller catalogue and availability are synchronized from Gang Ledger.
               </div>
             </CardContent>
           </Card>

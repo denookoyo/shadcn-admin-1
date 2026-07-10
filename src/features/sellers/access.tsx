@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { useAuthStore } from '@/stores/authStore'
 import { getSellerStatus, refreshSellerApplication, SELLER_VERIFICATION_EVENT, type SellerVerificationStatus } from '@/features/sellers/verification'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 type SellerAccessState = {
   user: any | null
@@ -188,9 +189,13 @@ export function SellerAccessNotice({
             </Button>
           ) : (
             <Button asChild className='rounded-full bg-emerald-600 text-white hover:bg-emerald-500'>
-              <Link to='/sign-in' search={{ redirect }}>
-                Sign in to apply
-              </Link>
+              {marketplaceConsumerMode ? (
+                <a href={buildGangLedgerSignInUrl(redirect)}>Sign in to apply</a>
+              ) : (
+                <Link to='/sign-in' search={{ redirect }}>
+                  Sign in to apply
+                </Link>
+              )}
             </Button>
           )}
           <Button asChild variant='outline' className='rounded-full'>

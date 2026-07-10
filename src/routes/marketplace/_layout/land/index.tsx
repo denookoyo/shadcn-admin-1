@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { SafeImg } from '@/components/safe-img'
 import { useSellerAccess } from '@/features/sellers/access'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 const counties = ['Kajiado', 'Nakuru', 'Kilifi', 'Laikipia', 'Narok', 'Machakos', 'Nyeri', 'Kiambu', 'Elgeyo-Marakwet', 'Nairobi']
 const zoningOptions = ['residential', 'mixed-use', 'agricultural', 'commercial'] as const
@@ -233,14 +234,14 @@ function KenyaLandPage() {
 
   return (
     <MarketplacePageShell width='wide' className='space-y-10' topSpacing='lg' bottomSpacing='lg'>
-      <header className='rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-emerald-600 via-emerald-500 to-emerald-400 p-6 text-white shadow-sm'>
+      <header className='rounded-3xl border border-emerald-100/70 bg-gradient-to-br from-emerald-600 via-emerald-500 to-emerald-400 p-5 text-white shadow-sm sm:p-6'>
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div className='max-w-2xl space-y-2'>
             <span className='inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide'>
               <Sparkles className='h-3.5 w-3.5' /> Kenyan real estate
             </span>
-            <h1 className='text-3xl font-semibold'>List Kenyan land and properties, share media, and invite qualified buyers</h1>
-            <p className='text-sm text-emerald-50'>Run one board for plots, villas, apartments, offices, and income assets across counties, with viewing requests and concierge support built in.</p>
+            <h1 className='text-2xl font-semibold sm:text-3xl'>List Kenyan land and properties, share media, and invite qualified buyers</h1>
+            <p className='text-sm text-emerald-50'>Published real estate inventory stays synchronized through Gang Ledger while marketplace handles public discovery and buyer enquiries.</p>
             <Link
               to='/marketplace/assistant'
               search={{ preset: 'land-general', intro: DEFAULT_LAND_CONCIERGE_INTRO }}
@@ -250,7 +251,7 @@ function KenyaLandPage() {
               Ask AI concierge to shortlist deals
             </Link>
           </div>
-          <div className='rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-emerald-50'>
+          <div className='w-full rounded-2xl border border-white/20 bg-white/10 p-4 text-sm text-emerald-50 sm:w-auto'>
             <div>Total inventory: <span className='font-semibold'>{formatAcreage(totalAcreage)}</span></div>
             <div>Value on platform: <span className='font-semibold'>{formatKes(totalValue)}</span></div>
             <div>Live listings: <span className='font-semibold'>{listings.length}</span></div>
@@ -262,7 +263,7 @@ function KenyaLandPage() {
 
       <div className='grid gap-8 lg:grid-cols-[1.2fr_0.8fr]'>
         <section className='space-y-4'>
-          <div className='flex items-center justify-between'>
+          <div className='flex flex-wrap items-center justify-between gap-3'>
             <h2 className='text-lg font-semibold text-slate-900'>Available Kenyan real estate</h2>
             <Badge variant='outline' className='border-emerald-200 text-emerald-700'>Land + properties</Badge>
           </div>
@@ -391,23 +392,32 @@ function KenyaLandPage() {
           )}
         </section>
 
-        <section className='space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+        <section className='space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6'>
           <div>
             <h2 className='text-lg font-semibold text-slate-900'>Post your real estate listing</h2>
-            <p className='text-sm text-slate-500'>Share verified details for land, homes, apartments, commercial units, and offices. Seller operations approval still applies.</p>
+            <p className='text-sm text-slate-500'>Create or update seller real estate supply from your Gang Ledger-backed workspace, then let marketplace surface it publicly.</p>
           </div>
           {!isSignedIn ? (
             <div className='rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600'>
               <p className='text-base font-semibold text-slate-900'>Sign in to continue</p>
-              <p className='mt-1 text-xs text-slate-500'>Real estate intake belongs to seller account operations. Sign in so we can confirm your workspace and permissions.</p>
+              <p className='mt-1 text-xs text-slate-500'>Seller account access is managed in Gang Ledger. Sign in there so marketplace can inherit your workspace and permissions.</p>
               <div className='mt-4 flex flex-wrap gap-3 text-sm'>
-                <Link
-                  to='/sign-in'
-                  search={{ redirect: '/marketplace/land' }}
-                  className='inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-500'
-                >
-                  Sign in
-                </Link>
+                {marketplaceConsumerMode ? (
+                  <a
+                    href={buildGangLedgerSignInUrl('/marketplace/land')}
+                    className='inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-500'
+                  >
+                    Sign in with Gang Ledger
+                  </a>
+                ) : (
+                  <Link
+                    to='/sign-in'
+                    search={{ redirect: '/marketplace/land' }}
+                    className='inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 font-semibold text-white shadow-sm transition hover:bg-emerald-500'
+                  >
+                    Sign in
+                  </Link>
+                )}
                 <Link
                   to='/marketplace/dashboard'
                   className='inline-flex items-center rounded-full border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100'
@@ -423,14 +433,14 @@ function KenyaLandPage() {
                   ? 'Your seller verification is under review'
                   : sellerStatus === 'rejected'
                     ? 'Seller verification needs attention'
-                    : 'Submit seller verification to unlock real estate posting'}
+                    : 'Seller access is still locked for real estate posting'}
               </p>
               <p className='mt-1 text-xs text-amber-800'>
                 {sellerStatus === 'pending'
                   ? 'Support has your documents. We will notify you once the review is complete.'
                   : sellerStatus === 'rejected'
                     ? 'Support flagged your last submission. Update your details or contact operations for next steps.'
-                    : 'Head to the seller cockpit → Account operations to upload compliance docs. Real estate listings stay locked until approval.'}
+                    : 'Marketplace posting permissions come from Gang Ledger seller access. Open the seller cockpit to finish the required account setup.'}
               </p>
               <div className='mt-4 flex flex-wrap gap-3 text-sm'>
                 <Link

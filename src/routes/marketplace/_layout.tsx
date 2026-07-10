@@ -7,6 +7,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { HedgetechLogo } from '@/components/hedgetech-logo'
 import { StageBadge } from '@/components/stage-badge'
 import { useSellerAccess } from '@/features/sellers/access'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 function Nav() {
   const { user } = useAuthStore((s) => s.auth)
@@ -56,7 +57,7 @@ function Nav() {
 
   const { sellerStatus, canAccessSellerTools, isAdmin } = useSellerAccess()
   const primaryLinks = [
-    { href: '/marketplace', label: 'Marketplace' },
+    { href: '/marketplace/listings', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
     { href: '/marketplace/land', label: 'Kenyan real estate' },
     { href: '/marketplace/my-orders', label: 'Track order' },
@@ -97,7 +98,7 @@ function Nav() {
     <header className="sticky top-0 z-40 w-full border-b border-border bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="mx-auto max-w-7xl px-4 pb-3 pt-4">
         <div className="flex flex-wrap items-center gap-3">
-          <Link to="/marketplace" className="flex shrink-0 items-center">
+          <Link to="/marketplace/listings" className="flex shrink-0 items-center">
             <HedgetechLogo withWordmark labelClassName="hidden text-base font-semibold text-slate-800 sm:block" />
             <span className="ml-2 text-sm font-medium text-emerald-700 sm:hidden">Hedgetech</span>
           </Link>
@@ -134,29 +135,47 @@ function Nav() {
                 <span>Seller cockpit</span>
               </Link>
             ) : (
-              <Link
-                to='/marketplace/dashboard/verification'
-                search={{ redirect: '' }}
-                className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
-              >
-                <span>
-                  {sellerStatus === 'pending'
-                    ? 'View verification'
-                    : sellerStatus === 'rejected'
-                      ? 'Fix verification'
-                      : 'Become a seller'}
-                </span>
-              </Link>
+              user || !marketplaceConsumerMode ? (
+                <Link
+                  to='/marketplace/dashboard/verification'
+                  search={{ redirect: '' }}
+                  className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
+                >
+                  <span>
+                    {sellerStatus === 'pending'
+                      ? 'View verification'
+                      : sellerStatus === 'rejected'
+                        ? 'Fix verification'
+                        : 'Become a seller'}
+                  </span>
+                </Link>
+              ) : (
+                <a
+                  href={buildGangLedgerSignInUrl('/marketplace/dashboard/verification')}
+                  className="hidden items-center gap-2 rounded-full border border-emerald-100 bg-white px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm transition hover:bg-emerald-50 lg:flex"
+                >
+                  <span>Become a seller</span>
+                </a>
+              )
             )}
             {user ? (
               <ProfileDropdown />
             ) : (
-              <Link
-                to="/sign-in"
-                className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-              >
-                Sign in
-              </Link>
+              marketplaceConsumerMode ? (
+                <a
+                  href={buildGangLedgerSignInUrl('/marketplace/listings')}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Sign in
+                </a>
+              ) : (
+                <Link
+                  to="/sign-in"
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                >
+                  Sign in
+                </Link>
+              )
             )}
           </div>
         </div>

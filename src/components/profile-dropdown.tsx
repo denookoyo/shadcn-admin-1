@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuthStore } from '@/stores/authStore'
+import { buildGangLedgerAppUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 export function ProfileDropdown() {
   const router = useRouter()
@@ -39,7 +40,7 @@ export function ProfileDropdown() {
       const { reset } = useAuthStore.getState().auth
       reset()
     } catch {}
-    router.navigate({ to: '/sign-in' })
+    router.navigate({ to: '/marketplace/listings' })
   }
 
   return (
@@ -65,25 +66,43 @@ export function ProfileDropdown() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link to='/settings'>
-              Profile
-              <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to='/settings'>
-              Billing
-              <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to='/settings'>
-              Settings
-              <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem>New Team</DropdownMenuItem>
+          {marketplaceConsumerMode ? (
+            <>
+              <DropdownMenuItem asChild>
+                <a href={buildGangLedgerAppUrl('/')} target='_blank' rel='noreferrer'>
+                  Manage account
+                  <DropdownMenuShortcut>GL</DropdownMenuShortcut>
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={buildGangLedgerAppUrl('/')} target='_blank' rel='noreferrer'>
+                  Billing & settings
+                  <DropdownMenuShortcut>GL</DropdownMenuShortcut>
+                </a>
+              </DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuItem asChild>
+                <Link to='/settings'>
+                  Profile
+                  <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to='/settings'>
+                  Billing
+                  <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to='/settings'>
+                  Settings
+                  <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={handleLogout}>

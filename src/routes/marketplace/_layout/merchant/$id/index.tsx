@@ -1,83 +1,36 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
-import { Star, ShieldCheck, MessageCircle } from 'lucide-react'
-import { db } from '@/lib/data'
+import { ShieldCheck, Store, Tag, Package } from 'lucide-react'
+import { db, type Product } from '@/lib/data'
 import { imageFor } from '@/features/marketplace/helpers'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { SafeImg } from '@/components/safe-img'
 
-type ReviewBundle = {
-  avg: number
-  count: number
-  histogram: Record<number, number>
-  reviews: {
-    orderId: string
-    rating: number
-    feedback: string
-    createdAt: string
-    buyer?: { id: number; name?: string | null; email: string; image?: string | null }
-  }[]
-}
-
-function Histogram({ histogram, count }: { histogram: Record<number, number>; count: number }) {
-  return (
-    <div className='space-y-2'>
-      {[5, 4, 3, 2, 1].map((star) => {
-        const value = histogram?.[star as 1 | 2 | 3 | 4 | 5] || 0
-        const pct = count ? Math.round((value / count) * 100) : 0
-        return (
-          <div key={star} className='flex items-center gap-3 text-xs text-slate-500'>
-            <span className='w-10 text-right font-semibold text-slate-600'>{star}★</span>
-            <div className='h-2 flex-1 rounded-full bg-slate-200'>
-              <div className='h-2 rounded-full bg-emerald-500' style={{ width: `${pct}%` }} />
-            </div>
-            <span className='w-8 text-right'>{value}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function ReviewCard({ review }: { review: ReviewBundle['reviews'][number] }) {
-  return (
-    <div className='rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'>
-      <div className='flex items-center justify-between text-xs text-slate-500'>
-        <div className='flex items-center gap-2'>
-          {review.buyer?.image ? (
-            <img src={review.buyer.image} className='h-6 w-6 rounded-full object-cover' alt={review.buyer?.name || review.buyer?.email} />
-          ) : null}
-          <span>{review.buyer?.name || review.buyer?.email || `Buyer #${review.buyer?.id ?? ''}`}</span>
-        </div>
-        <span>{new Date(review.createdAt).toLocaleDateString()}</span>
-      </div>
-      <div className='mt-2 text-sm font-semibold text-emerald-700'>
-        {Array.from({ length: review.rating }).map((_, idx) => (
-          <Star key={idx} className='inline h-4 w-4 fill-emerald-500 text-emerald-500' />
-        ))}
-      </div>
-      <p className='mt-2 text-sm text-slate-600'>{review.feedback}</p>
-    </div>
-  )
+function formatMoney(value: number) {
+  return `A$${Number(value || 0).toLocaleString()}`
 }
 
 function MerchantPage() {
   const { id } = useParams({ from: '/marketplace/_layout/merchant/$id/' })
-  const sellerId = Number(id)
-  const [user, setUser] = useState<any | null>(null)
-  const [reviews, setReviews] = useState<ReviewBundle | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const [profile, bundle] = await Promise.all([
-          db.getUserById?.(sellerId) ?? Promise.resolve(null),
-          db.listSellerReviews?.(sellerId) ?? Promise.resolve(null as any),
-        ])
+        const allProducts = await db.listProducts()
         if (!mounted) return
-        setUser(profile)
-        setReviews(bundle)
+        const normalizedId = String(id || '').trim().toLowerCase()
+        const sellerProducts = allProducts.filter((product) => {
+          const ownerId = Number((product as any)?.ownerId)
+          const storeSlug = String((product as any)?.storeSlug || '').trim().toLowerCase()
+          return (
+            (Number.isFinite(ownerId) && String(ownerId) === normalizedId) ||
+            (storeSlug && storeSlug === normalizedId)
+          )
+        })
+        setProducts(sellerProducts)
       } finally {
         if (mounted) setLoading(false)
       }
@@ -85,144 +38,172 @@ function MerchantPage() {
     return () => {
       mounted = false
     }
-  }, [sellerId])
+  }, [id])
 
-  const avgText = useMemo(() => (reviews?.avg ? reviews.avg.toFixed(1) : '—'), [reviews?.avg])
+  const merchant = useMemo(() => {
+    const primary = products[0]
+    if (!primary) return null
+    const sellerName = String((primary as any)?.ownerName || primary.seller || 'Merchant').trim()
+    const storeSlug = String((primary as any)?.storeSlug || '').trim()
+    const priceValues = products.map((product) => Number(product.price) || 0).filter((value) => value > 0)
+    const minPrice = priceValues.length ? Math.min(...priceValues) : 0
+    const maxPrice = priceValues.length ? Math.max(...priceValues) : 0
+    return {
+      sellerName,
+      storeSlug,
+      heroImage: primary.img || imageFor(sellerName, 1200, 800),
+      productCount: products.length,
+      goodsCount: products.filter((product) => product.type === 'goods').length,
+      serviceCount: products.filter((product) => product.type === 'service').length,
+      minPrice,
+      maxPrice,
+    }
+  }, [products])
 
-  if (!Number.isFinite(sellerId)) {
-    return (
-      <MarketplacePageShell width='default' className='text-sm text-red-600' topSpacing='md' bottomSpacing='md'>
-        Invalid seller id.
-      </MarketplacePageShell>
-    )
-  }
   if (loading) {
     return (
-      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+      <MarketplacePageShell width='wide' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
         Loading merchant…
       </MarketplacePageShell>
     )
   }
-  if (!user) {
+
+  if (!merchant) {
     return (
-      <MarketplacePageShell width='default' className='text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
-        Merchant not found.
+      <MarketplacePageShell width='wide' className='space-y-4 text-sm text-slate-500' topSpacing='md' bottomSpacing='md'>
+        <div className='rounded-3xl border border-dashed border-slate-200 p-10 text-center'>
+          Merchant not found.
+        </div>
+        <div className='text-center'>
+          <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>
+            Back to listings
+          </Link>
+        </div>
       </MarketplacePageShell>
     )
   }
 
-  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Merchant')
-  const avatar = user?.image || imageFor(displayName, 200, 200)
-  const rating = (user as any)?.rating ?? reviews?.avg ?? 0
-
   return (
-    <MarketplacePageShell width='default' className='space-y-10'>
-      <div className='flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500'>
-        <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>← Back to listings</Link>
-        <span>Seller ID: {sellerId}</span>
+    <MarketplacePageShell width='wide' className='space-y-8' topSpacing='md' bottomSpacing='md'>
+      <div className='flex flex-wrap items-center gap-2 text-xs text-slate-500'>
+        <Link to='/marketplace/listings' className='font-medium text-emerald-700 hover:underline'>
+          Marketplace
+        </Link>
+        <span>/</span>
+        <span>{merchant.sellerName}</span>
       </div>
 
-      <section className='grid gap-8 rounded-3xl border border-emerald-100/60 bg-emerald-50/60 p-6 shadow-sm md:grid-cols-[1.1fr_1fr]'>
-        <div className='flex items-start gap-4'>
-          <img src={avatar} alt={displayName} className='h-24 w-24 rounded-3xl border border-emerald-200 object-cover shadow-sm' />
-          <div className='space-y-3'>
-            <div>
-              <span className='inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>Verified seller</span>
-              <h1 className='mt-3 text-2xl font-semibold text-slate-900'>{displayName}</h1>
-              <p className='text-sm text-slate-600'>{user?.bio || 'Trusted Hedgetech merchant delivering premium goods and services with SLA-backed fulfilment.'}</p>
+      <section className='overflow-hidden rounded-3xl border border-emerald-100/70 bg-white shadow-sm'>
+        <div className='relative h-44 sm:h-56'>
+          <SafeImg src={merchant.heroImage} alt={merchant.sellerName} className='h-full w-full object-cover' />
+          <div className='absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent' />
+          <div className='absolute bottom-0 left-0 right-0 p-5 sm:p-6'>
+            <div className='inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700'>
+              <ShieldCheck className='h-3.5 w-3.5' />
+              Gang Ledger storefront
             </div>
-            <div className='flex flex-wrap items-center gap-4 text-xs text-slate-600'>
-              <span className='inline-flex items-center gap-1 rounded-full bg-emerald-600/10 px-3 py-1 font-semibold text-emerald-800'>★ {Number(rating).toFixed(1)}</span>
-              <span>{reviews?.count ?? 0} review{(reviews?.count ?? 0) === 1 ? '' : 's'}</span>
-              <span>{(user as any)?.location || 'Location pending'}</span>
-            </div>
-            <div className='flex flex-wrap gap-3 text-xs'>
-              <Badge>On Hedgetech since {user?.createdAt ? new Date(user.createdAt).getFullYear() : '—'}</Badge>
-              <Badge>{(user as any)?.responseTime ?? 'Under 2h response'}</Badge>
-              <Badge>Repeat buyers {(user as any)?.repeatBuyerRate ?? '62%'}</Badge>
-            </div>
+            <h1 className='mt-3 text-2xl font-semibold text-white sm:text-3xl'>{merchant.sellerName}</h1>
+            <p className='mt-1 max-w-2xl text-sm text-white/85'>
+              Public catalogue synchronized from Gang Ledger. Browse live products and services without signing in.
+            </p>
           </div>
         </div>
-        <div className='rounded-3xl border border-white/60 bg-white/80 p-5 text-sm text-slate-700 shadow-sm backdrop-blur'>
-          <h2 className='text-base font-semibold text-slate-900'>Partner highlights</h2>
-          <ul className='mt-3 space-y-2 text-xs'>
-            <li className='flex items-center gap-2'><ShieldCheck className='h-4 w-4 text-emerald-600' /> Identity & compliance verified</li>
-            <li className='flex items-center gap-2'><MessageCircle className='h-4 w-4 text-emerald-600' /> Average response under {(user as any)?.responseTime ?? '2 hours'}</li>
-            <li className='flex items-center gap-2'><Star className='h-4 w-4 text-emerald-600' /> {reviews?.count ?? 0} verified reviews</li>
-          </ul>
-          <div className='mt-5 flex flex-wrap gap-2'>
-            <Link
-              to='/marketplace/merchant/$id'
-              params={{ id: String(sellerId) }}
-              className='inline-flex items-center justify-center rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500'
-            >
-              View storefront
-            </Link>
-            <Link
-              to='/chats'
-              className='inline-flex items-center justify-center gap-2 rounded-full border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
-            >
-              <MessageCircle className='h-3.5 w-3.5' /> Message seller
-            </Link>
-          </div>
-        </div>
-      </section>
 
-      <section className='grid gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-[1fr_1.1fr]'>
-        <div className='space-y-4'>
-          <h2 className='text-lg font-semibold text-slate-900'>Rating distribution</h2>
+        <div className='grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4 sm:p-6'>
           <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
-            <div className='flex items-end gap-3'>
-              <span className='text-4xl font-semibold text-emerald-700'>{avgText}</span>
-              <span className='text-sm text-slate-500'>Average rating across {reviews?.count ?? 0} orders</span>
-            </div>
-            <div className='mt-4'>
-              <Histogram histogram={reviews?.histogram || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }} count={reviews?.count || 0} />
-            </div>
+            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Live listings</div>
+            <div className='mt-2 text-2xl font-semibold text-slate-900'>{merchant.productCount}</div>
           </div>
-        </div>
-        <div className='space-y-4'>
-          <h2 className='text-lg font-semibold text-slate-900'>Latest reviews</h2>
-          <div className='grid gap-3 max-h-[420px] overflow-auto pr-1 text-sm text-slate-600'>
-            {reviews?.reviews?.length ? (
-              reviews.reviews.map((review) => <ReviewCard key={review.orderId} review={review} />)
-            ) : (
-              <div className='rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500'>No reviews yet. Encourage buyers to leave feedback to build trust.</div>
-            )}
+          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Goods</div>
+            <div className='mt-2 text-2xl font-semibold text-slate-900'>{merchant.goodsCount}</div>
+          </div>
+          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Services</div>
+            <div className='mt-2 text-2xl font-semibold text-slate-900'>{merchant.serviceCount}</div>
+          </div>
+          <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Price range</div>
+            <div className='mt-2 text-sm font-semibold text-slate-900'>
+              {merchant.minPrice && merchant.maxPrice ? `${formatMoney(merchant.minPrice)} - ${formatMoney(merchant.maxPrice)}` : 'Available now'}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
-        <h2 className='text-lg font-semibold text-slate-900'>Merchant details</h2>
-        <div className='mt-4 grid gap-4 sm:grid-cols-2 text-sm text-slate-600'>
+      <section className='space-y-4'>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
           <div>
-            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Name</div>
-            <div className='mt-1 text-slate-900'>{user?.name || '—'}</div>
+            <h2 className='text-lg font-semibold text-slate-900'>Storefront catalogue</h2>
+            <p className='text-sm text-slate-500'>
+              Browse everything currently published from this merchant&apos;s Gang Ledger catalogue.
+            </p>
           </div>
-          <div>
-            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Email</div>
-            <div className='mt-1'>{user?.email || '—'}</div>
-          </div>
-          <div>
-            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Phone</div>
-            <div className='mt-1'>{user?.phoneNo || '—'}</div>
-          </div>
-          <div>
-            <div className='text-xs font-semibold uppercase tracking-wide text-slate-500'>ABN</div>
-            <div className='mt-1'>{user?.ABN || '—'}</div>
-          </div>
+          {merchant.storeSlug ? (
+            <div className='rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500'>
+              Store slug: <span className='font-semibold text-slate-700'>{merchant.storeSlug}</span>
+            </div>
+          ) : null}
         </div>
-        <div className='mt-4 rounded-2xl border border-dashed border-slate-200 p-4 text-xs text-slate-500'>
-          Hedgetech Marketplace syncs seller credentials and compliance checks automatically once platform integrations are enabled.
+
+        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+          {products.map((product) => (
+            <Link
+              key={product.id}
+              to='/marketplace/listing/$slug'
+              params={{ slug: product.slug }}
+              className='group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg'
+            >
+              <div className='aspect-[4/3] overflow-hidden'>
+                <SafeImg
+                  src={product.img || imageFor(product.title, 800, 600)}
+                  alt={product.title}
+                  className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
+                />
+              </div>
+              <div className='flex flex-1 flex-col gap-3 p-4'>
+                <div className='flex items-start justify-between gap-3'>
+                  <div className='min-w-0'>
+                    <h3 className='truncate text-sm font-semibold text-slate-900'>{product.title}</h3>
+                    <p className='mt-1 line-clamp-2 text-xs text-slate-500'>
+                      {product.description || 'Open the listing to view the full seller description and checkout flow.'}
+                    </p>
+                  </div>
+                  <span className='rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700'>
+                    {formatMoney(product.price)}
+                  </span>
+                </div>
+                <div className='mt-auto flex flex-wrap items-center gap-2 text-xs text-slate-500'>
+                  <span className='inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 capitalize'>
+                    <Package className='h-3.5 w-3.5' />
+                    {product.type}
+                  </span>
+                  {product.barcode ? (
+                    <span className='inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1'>
+                      <Tag className='h-3.5 w-3.5' />
+                      {product.barcode}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className='rounded-3xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600 shadow-sm'>
+        <div className='flex items-start gap-3'>
+          <Store className='mt-0.5 h-5 w-5 text-emerald-600' />
+          <div>
+            <div className='font-semibold text-slate-900'>Centralized seller data</div>
+            <p className='mt-1'>
+              Merchant identity, catalogue access, and seller permissions are managed in Gang Ledger. Marketplace only presents the published storefront and product detail pages.
+            </p>
+          </div>
         </div>
       </section>
     </MarketplacePageShell>
   )
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return <span className='inline-flex items-center gap-1 rounded-full bg-emerald-600/15 px-3 py-1 text-xs font-semibold text-emerald-800'>{children}</span>
 }
 
 export const Route = createFileRoute('/marketplace/_layout/merchant/$id/')({

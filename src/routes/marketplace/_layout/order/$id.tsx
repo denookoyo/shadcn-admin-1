@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { db, type RefundRequest } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 export const Route = createFileRoute('/marketplace/_layout/order/$id')({
   component: OrderDetail,
@@ -167,7 +168,13 @@ function OrderDetail() {
           <div className='text-lg font-semibold'>Sign in to view this order</div>
           <div>This order is only visible to the buyer or seller. If you checked out as a guest, use your tracking link.</div>
           <div className='flex gap-2'>
-            <Link to='/sign-in' search={{ redirect: `/marketplace/order/${id}` }} className='rounded-md border px-3 py-2'>Sign in</Link>
+            {marketplaceConsumerMode ? (
+              <a href={buildGangLedgerSignInUrl(`/marketplace/order/${id}`)} className='rounded-md border px-3 py-2'>
+                Sign in with Gang Ledger
+              </a>
+            ) : (
+              <Link to='/sign-in' search={{ redirect: `/marketplace/order/${id}` }} className='rounded-md border px-3 py-2'>Sign in</Link>
+            )}
             <Link to='/marketplace/order/track' className='rounded-md border px-3 py-2'>Track with code</Link>
           </div>
         </MarketplacePageShell>
@@ -263,11 +270,15 @@ function OrderDetail() {
   return (
     <MarketplacePageShell width='default'>
       <div className='mb-2 text-sm'><Link to='/marketplace/my-orders' className='underline'>Back to My Orders</Link></div>
-      <h1 className='text-2xl font-bold'>Order #{String(data.id).slice(0, 6)}</h1>
-      <div className='mt-2 text-sm text-gray-600'>
-        Status: <span className='capitalize font-semibold'>{data.status}</span>
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold'>Order #{String(data.id).slice(0, 6)}</h1>
+          <div className='mt-2 text-sm text-gray-600'>
+            Status: <span className='font-semibold capitalize'>{data.status}</span>
+          </div>
+          <div className='mt-1 text-sm text-gray-600'>Placed: {new Date(data.createdAt).toLocaleString()}</div>
+        </div>
       </div>
-      <div className='mt-1 text-sm text-gray-600'>Placed: {new Date(data.createdAt).toLocaleString()}</div>
       {data.address ? (
         <div className='mt-1 text-sm text-gray-600'>Posting address: <span className='font-medium'>{data.address}</span></div>
       ) : null}
@@ -323,11 +334,11 @@ function OrderDetail() {
       {/* Buyer details */}
       <div className='mt-3 rounded-2xl border p-4'>
         <div className='mb-2 text-lg font-semibold'>Buyer</div>
-        <div className='grid gap-1 text-sm'>
+        <div className='grid gap-1 text-sm sm:grid-cols-2'>
           <div>Name: <span className='font-medium'>{data.buyer?.name || data.buyer?.email || '—'}</span></div>
           <div>Email: <span className='font-medium'>{data.buyer?.email || '—'}</span></div>
           <div>Phone: <span className='font-medium'>{data.customerPhone || data.buyer?.phoneNo || '—'}</span></div>
-          <div>Address: <span className='font-medium'>{data.address || '—'}</span></div>
+          <div className='sm:col-span-2'>Address: <span className='font-medium'>{data.address || '—'}</span></div>
         </div>
       </div>
 
@@ -336,12 +347,12 @@ function OrderDetail() {
         <div className='space-y-2 text-sm'>
           {(data.items || []).map((it: any) => (
             <div key={it.id} className='rounded-md border p-2'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center gap-3'>
-                  {it.product?.img ? <img src={it.product.img} className='h-10 w-10 rounded object-cover' /> : null}
+              <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                <div className='flex min-w-0 items-center gap-3'>
+                  {it.product?.img ? <img src={it.product.img} className='h-10 w-10 shrink-0 rounded object-cover' /> : null}
                   <div className='font-medium'>{it.title}</div>
                 </div>
-                <div>A${it.price * it.quantity}</div>
+                <div className='text-sm font-medium'>A${it.price * it.quantity}</div>
               </div>
               <div className='text-xs text-gray-500'>Qty: {it.quantity}</div>
               {(isService(it) || it.appointmentAt || it.appointmentStatus) && (

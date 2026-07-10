@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { Checkbox } from '@/components/ui/checkbox'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 export type ProductEditorMode = 'create' | 'edit'
 
@@ -62,6 +63,21 @@ function ensureAbsoluteUrl(url: string) {
   if (!url) return ''
   if (/^https?:\/\//.test(url)) return url
   return `https://${url}`
+}
+
+function normalizeEditorError(error: unknown) {
+  const raw = error instanceof Error ? error.message : 'Unable to save product'
+  const normalized = raw.trim().toLowerCase()
+  if (
+    marketplaceConsumerMode &&
+    (normalized === 'unauthorized' ||
+      normalized === 'forbidden' ||
+      normalized.includes('access token') ||
+      normalized.includes('bearer token'))
+  ) {
+    return 'Your Gang Ledger marketplace session has expired or no longer has seller access. Sign in again, then reopen the listing editor.'
+  }
+  return raw
 }
 
 const WEEKDAY_OPTIONS = [
@@ -212,7 +228,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         await navigate({ to: '/marketplace/dashboard/listings' })
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unable to save product'
+      const message = normalizeEditorError(err)
       setError(message)
     } finally {
       setSaving(false)
@@ -238,7 +254,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
       const uploaded = await uploadMarketplaceAsset(file)
       setForm((state) => ({ ...state, img: uploaded.blobUrl }))
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unable to upload image')
+      setError(normalizeEditorError(err))
     } finally {
       setUploading(false)
     }
@@ -257,7 +273,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         gallery: Array.from(new Set([...state.gallery, ...urls])),
       }))
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Unable to upload images')
+      setError(normalizeEditorError(err))
     } finally {
       setUploading(false)
     }
@@ -288,9 +304,19 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         </header>
 
         {error ? (
-          <div className='flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>
-            <AlertCircle className='h-4 w-4' />
-            {error}
+          <div className='flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex items-start gap-2'>
+              <AlertCircle className='mt-0.5 h-4 w-4 shrink-0' />
+              <span>{error}</span>
+            </div>
+            {marketplaceConsumerMode && error.toLowerCase().includes('gang ledger marketplace session') ? (
+              <a
+                href={buildGangLedgerSignInUrl('/marketplace/dashboard/listings')}
+                className='inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100'
+              >
+                Sign in again
+              </a>
+            ) : null}
           </div>
         ) : null}
         {published ? (
