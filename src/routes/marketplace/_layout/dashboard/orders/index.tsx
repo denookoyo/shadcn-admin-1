@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react'
 
 import { db, type Order } from '@/lib/data'
+import type { PaymentRoute, StorePaymentSettings } from '@/lib/localdb'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
@@ -44,6 +46,14 @@ function getBuyerLabel(order: any) {
 
 function isServiceOrder(order: any) {
   return order?.items?.some((item: any) => item?.product?.type === 'service' || item?.type === 'service')
+}
+
+function getPaymentStatus(order: any) {
+  return String(order?.paymentStatus || '').toLowerCase() || 'pending'
+}
+
+function isPaidOrder(order: any) {
+  return getPaymentStatus(order) === 'paid' || ['paid', 'shipped', 'completed', 'refunded'].includes(String(order?.status || ''))
 }
 
 const MetricCard = ({
@@ -93,7 +103,11 @@ export default function OrdersPage() {
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewFeedback, setReviewFeedback] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'payment' | 'shipment' } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'shipment' } | null>(null)
+  const [paymentDialogOrder, setPaymentDialogOrder] = useState<any | null>(null)
+  const [paymentRoute, setPaymentRoute] = useState<PaymentRoute>('platform')
+  const [paymentSettings, setPaymentSettings] = useState<StorePaymentSettings | null>(null)
+  const [paymentActionBusy, setPaymentActionBusy] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -106,6 +120,10 @@ export default function OrdersPage() {
         if (!mounted) return
         setSellerOrders((asSeller || []) as any)
         setBuyerOrders(asBuyer || [])
+        try {
+          const settings = await db.getStorePaymentSettings?.()
+          if (mounted) setPaymentSettings(settings?.paymentSettings || null)
+        } catch {}
         if ((asSeller || []).length === 0 && (asBuyer || []).length > 0) setView('buyer')
       } finally {
         if (mounted) setLoading(false)
@@ -118,11 +136,16 @@ export default function OrdersPage() {
 
   const sellerNeedsAction = useMemo(
     () =>
-      sellerOrders.filter((order: any) =>
-        isServiceOrder(order)
-          ? order.status === 'pending' || order.status === 'scheduled'
-          : order.status === 'paid'
-      ),
+      sellerOrders.filter((order: any) => {
+        const paymentStatus = getPaymentStatus(order)
+        if (paymentStatus === 'pending' || paymentStatus === 'payment_requested' || paymentStatus === 'failed') {
+          return true
+        }
+        if (isServiceOrder(order)) {
+          return order.status === 'pending' || order.status === 'scheduled'
+        }
+        return order.status === 'paid'
+      }),
     [sellerOrders]
   )
 
@@ -238,18 +261,36 @@ export default function OrdersPage() {
     }
   }
 
-  async function markPaymentReceived(orderId: string) {
+  async function requestPayment(orderId: string, route: PaymentRoute) {
     try {
-      const updated = db.markOrderPaid ? await db.markOrderPaid(orderId) : null
-      if (updated) {
-        setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? updated : order)))
+      setPaymentActionBusy(true)
+      const response = await db.requestOrderPayment?.(orderId, route)
+      if (response?.order) {
+        setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? response.order : order)))
         window.dispatchEvent(new CustomEvent('orders:changed'))
       }
       setActionError(null)
+      setPaymentDialogOrder(null)
     } catch (err: unknown) {
-      setActionError(err instanceof Error ? err.message : 'Unable to mark payment as received.')
+      setActionError(err instanceof Error ? err.message : 'Unable to request payment.')
     } finally {
-      setPendingAction(null)
+      setPaymentActionBusy(false)
+    }
+  }
+
+  async function connectStripe() {
+    try {
+      setPaymentActionBusy(true)
+      const response = await db.connectStripeAccount?.()
+      if (response?.url) {
+        window.location.href = response.url
+        return
+      }
+      setActionError('Unable to start Stripe onboarding.')
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Unable to start Stripe onboarding.')
+    } finally {
+      setPaymentActionBusy(false)
     }
   }
 
@@ -303,20 +344,50 @@ export default function OrdersPage() {
                     </div>
                     <div className='mt-1 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
                     <div className='mt-2 flex items-center gap-2 text-xs'>
-                      {['pending', 'scheduled'].includes(order.status) ? (
+                      {getPaymentStatus(order) === 'pending' ? (
                         <button
                           className='rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
-                          onClick={() => setPendingAction({ orderId: order.id, kind: 'payment' })}
+                          onClick={() => {
+                            setPaymentDialogOrder(order)
+                            setPaymentRoute(paymentSettings?.defaultPaymentRoute || 'platform')
+                          }}
                         >
-                          Confirm payment received
+                          Request payment
                         </button>
                       ) : null}
-                      <button
-                        className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
-                        onClick={() => (isServiceOrder(order) ? openServiceAction(order) : setPendingAction({ orderId: order.id, kind: 'shipment' }))}
-                      >
-                        {isServiceOrder(order) ? 'Manage appointment' : 'Confirm shipped'}
-                      </button>
+                      {getPaymentStatus(order) === 'payment_requested' && order.paymentUrl ? (
+                        <>
+                          <a
+                            href={order.paymentUrl}
+                            target='_blank'
+                            rel='noreferrer'
+                            className='rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
+                          >
+                            Open checkout
+                          </a>
+                          <button
+                            className='rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50'
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(order.paymentUrl)
+                                setActionError(null)
+                              } catch {
+                                setActionError('Unable to copy the payment link.')
+                              }
+                            }}
+                          >
+                            Copy link
+                          </button>
+                        </>
+                      ) : null}
+                      {isServiceOrder(order) || isPaidOrder(order) ? (
+                        <button
+                          className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
+                          onClick={() => (isServiceOrder(order) ? openServiceAction(order) : setPendingAction({ orderId: order.id, kind: 'shipment' }))}
+                        >
+                          {isServiceOrder(order) ? 'Manage appointment' : 'Confirm shipped'}
+                        </button>
+                      ) : null}
                       <Link
                         to='/marketplace/order/$id'
                         params={{ id: order.id }}
@@ -468,24 +539,16 @@ export default function OrdersPage() {
                       >
                         Confirm received
                       </button>
-                    ) : (
-                      <button
+                    ) : getPaymentStatus(order) === 'payment_requested' && order.paymentUrl ? (
+                      <a
+                        href={order.paymentUrl}
+                        target='_blank'
+                        rel='noreferrer'
                         className='rounded-full border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100'
-                        onClick={async () => {
-                          try {
-                            await fetchJson(`/api/orders/${order.id}/pay`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                            })
-                            setBuyerOrders((current) =>
-                              current.map((o) => (o.id === order.id ? { ...o, status: 'paid' } : o))
-                            )
-                          } catch {}
-                        }}
                       >
-                        Pay now
-                      </button>
-                    )}
+                        Open checkout
+                      </a>
+                    ) : null}
                     <Link
                       to='/marketplace/order/$id'
                       params={{ id: order.id }}
@@ -703,13 +766,9 @@ export default function OrdersPage() {
       <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open: boolean) => { if (!open) setPendingAction(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pendingAction?.kind === 'payment' ? 'Confirm payment received' : 'Confirm shipment'}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Confirm shipment</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingAction?.kind === 'payment'
-                ? 'Only continue after the funds have been verified in your account.'
-                : 'Use this after you have handed the order to the carrier or completed dispatch.'}
+              Use this after you have handed the order to the carrier or completed dispatch.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -717,10 +776,6 @@ export default function OrdersPage() {
             <AlertDialogAction
               onClick={() => {
                 if (!pendingAction) return
-                if (pendingAction.kind === 'payment') {
-                  void markPaymentReceived(pendingAction.orderId)
-                  return
-                }
                 void confirmShipment(pendingAction.orderId)
               }}
             >
@@ -729,6 +784,90 @@ export default function OrdersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog open={Boolean(paymentDialogOrder)} onOpenChange={(open) => { if (!open) setPaymentDialogOrder(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request payment</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 text-sm text-slate-600'>
+            <div className='rounded-2xl border border-slate-200 bg-slate-50 p-4'>
+              <div className='text-xl font-semibold text-slate-900'>
+                {paymentDialogOrder ? formatCurrency(paymentDialogOrder.total) : 'A$0'}
+              </div>
+              <p className='mt-1 text-xs text-slate-500'>Choose where the payment should be processed.</p>
+            </div>
+            <label className='flex items-start gap-3 rounded-2xl border border-slate-200 p-4'>
+              <input
+                type='radio'
+                name='payment-route'
+                value='platform'
+                checked={paymentRoute === 'platform'}
+                onChange={() => setPaymentRoute('platform')}
+                className='mt-1'
+              />
+              <div>
+                <div className='font-semibold text-slate-900'>Gang Ledger Payments</div>
+                <div className='text-xs text-slate-500'>Process through Gang Ledger&apos;s Stripe account.</div>
+              </div>
+            </label>
+            <label className={`flex items-start gap-3 rounded-2xl border p-4 ${paymentSettings?.stripeChargesEnabled ? 'border-slate-200' : 'border-slate-100 bg-slate-50/70'}`}>
+              <input
+                type='radio'
+                name='payment-route'
+                value='connected_account'
+                checked={paymentRoute === 'connected_account'}
+                onChange={() => setPaymentRoute('connected_account')}
+                className='mt-1'
+                disabled={!paymentSettings?.stripeChargesEnabled}
+              />
+              <div className='flex-1'>
+                <div className='font-semibold text-slate-900'>My Stripe Account</div>
+                <div className='text-xs text-slate-500'>Receive payment through your connected Stripe account.</div>
+                {!paymentSettings?.stripeConnectedAccountId ? (
+                  <div className='mt-2 text-xs font-medium text-amber-700'>Connect Stripe first.</div>
+                ) : null}
+                {paymentSettings?.stripeConnectedAccountId && !paymentSettings?.stripeChargesEnabled ? (
+                  <div className='mt-2 text-xs font-medium text-amber-700'>Finish Stripe verification to enable this route.</div>
+                ) : null}
+              </div>
+            </label>
+          </div>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-between'>
+            <div>
+              {paymentRoute === 'connected_account' && !paymentSettings?.stripeChargesEnabled ? (
+                <button
+                  type='button'
+                  className='rounded-full border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
+                  onClick={() => void connectStripe()}
+                  disabled={paymentActionBusy}
+                >
+                  Connect my Stripe account
+                </button>
+              ) : null}
+            </div>
+            <div className='flex gap-2'>
+              <button
+                type='button'
+                className='rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700'
+                onClick={() => setPaymentDialogOrder(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type='button'
+                className='rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60'
+                disabled={paymentActionBusy || !paymentDialogOrder || (paymentRoute === 'connected_account' && !paymentSettings?.stripeChargesEnabled)}
+                onClick={() => {
+                  if (!paymentDialogOrder) return
+                  void requestPayment(paymentDialogOrder.id, paymentRoute)
+                }}
+              >
+                {paymentActionBusy ? 'Creating…' : 'Continue'}
+              </button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MarketplacePageShell>
   )
 }

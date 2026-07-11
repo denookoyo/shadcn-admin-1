@@ -11,14 +11,15 @@ type PaySearch = { code?: string }
 type OrderSummary = {
   id: string
   status: string
+  paymentStatus?: string
+  paymentUrl?: string | null
   total: number
   createdAt: string
   customerName?: string | null
   customerEmail?: string | null
   address?: string | null
   items?: { id: string; title: string; quantity: number; price: number }[]
-  seller?: { name?: string | null; email?: string | null; paymentInstructions?: string | null } | null
-  sellerPaymentInstructions?: string | null
+  seller?: { name?: string | null; email?: string | null } | null
 }
 
 function PayOrderRoute() {
@@ -55,10 +56,10 @@ function PayOrderRoute() {
       <MarketplacePageShell width='narrow' className='space-y-6'>
         <header className='space-y-2 text-center'>
           <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-            Payment instructions
+            Payment lookup
           </div>
-          <h1 className='text-2xl font-semibold text-slate-900'>Retrieve seller payment details</h1>
-          <p className='text-sm text-slate-600'>Paste the code issued by the assistant to view how to pay your seller directly.</p>
+          <h1 className='text-2xl font-semibold text-slate-900'>Retrieve order payment status</h1>
+          <p className='text-sm text-slate-600'>Paste the order code to see whether a Stripe Checkout link has been requested for your order.</p>
         </header>
         <div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
           <div className='text-sm font-semibold text-slate-900'>Payment code</div>
@@ -107,7 +108,7 @@ function PayOrderRoute() {
     <MarketplacePageShell width='narrow' className='space-y-6'>
       <header className='space-y-2'>
         <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-          Manual payment
+          Payment status
         </div>
         <h1 className='text-2xl font-semibold text-slate-900'>Order #{order.id.slice(0, 8)}</h1>
         <p className='text-sm text-slate-600'>Placed {new Date(order.createdAt).toLocaleString()}</p>
@@ -142,16 +143,16 @@ function PayOrderRoute() {
       </section>
 
       <div className='rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-700 shadow-sm'>
-        <div className='font-semibold text-emerald-800'>Manual payment required</div>
-        {order.sellerPaymentInstructions ? (
+        <div className='font-semibold text-emerald-800'>Checkout status</div>
+        {order.paymentStatus === 'payment_requested' && order.paymentUrl ? (
           <>
-            <p className='mt-1 text-xs text-emerald-600'>Use the instructions below to settle with the seller. Include your order ID when sending proof of payment.</p>
-            <pre className='mt-3 whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-[11px] text-emerald-900'>
-              {order.sellerPaymentInstructions}
-            </pre>
+            <p className='mt-1 text-xs text-emerald-600'>Your seller requested payment through Stripe Checkout.</p>
+            <a href={order.paymentUrl} target='_blank' rel='noreferrer' className='mt-3 inline-flex rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-700'>
+              Open checkout
+            </a>
           </>
         ) : (
-          <p className='mt-1 text-xs text-emerald-600'>This seller will email you payment instructions shortly. Reach out to them if you need help.</p>
+          <p className='mt-1 text-xs text-emerald-600'>No checkout link has been requested for this order yet.</p>
         )}
       </div>
     </MarketplacePageShell>

@@ -7,6 +7,7 @@ import { db, type RefundRequest } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
+import type { PaymentRoute, StorePaymentSettings } from '@/lib/localdb'
 
 export const Route = createFileRoute('/marketplace/_layout/order/$id')({
   component: OrderDetail,
@@ -125,9 +126,12 @@ function OrderDetail() {
   const [refundAmount, setRefundAmount] = useState('')
   const [selectedRefundItem, setSelectedRefundItem] = useState<string>('order')
   const [submittingRefund, setSubmittingRefund] = useState(false)
-  const [markingPaid, setMarkingPaid] = useState(false)
   const [refundFeedback, setRefundFeedback] = useState<string | null>(null)
   const [paymentFeedback, setPaymentFeedback] = useState<string | null>(null)
+  const [paymentSettings, setPaymentSettings] = useState<StorePaymentSettings | null>(null)
+  const [paymentRoute, setPaymentRoute] = useState<PaymentRoute>('platform')
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [paymentBusy, setPaymentBusy] = useState(false)
   useEffect(() => {
     // Preload proposals from current order once data arrives
     try {
@@ -154,6 +158,21 @@ function OrderDetail() {
       mounted = false
     }
   }, [id, isBuyer])
+
+  useEffect(() => {
+    let mounted = true
+    if (!isSeller || typeof db.getStorePaymentSettings !== 'function') return () => { mounted = false }
+    db.getStorePaymentSettings()
+      .then((result) => {
+        if (!mounted) return
+        setPaymentSettings(result?.paymentSettings || null)
+        setPaymentRoute(result?.paymentSettings?.defaultPaymentRoute || 'platform')
+      })
+      .catch(() => undefined)
+    return () => {
+      mounted = false
+    }
+  }, [isSeller])
 
   const refundableItems = useMemo(() => data?.items ?? [], [data])
   const hasPendingRefund = useMemo(
@@ -196,8 +215,8 @@ function OrderDetail() {
 
   const isService = (item: any) => item.product?.type === 'service'
   const hasService = (data.items || []).some((it: any) => isService(it))
-  const paymentMade = ['paid', 'shipped', 'completed'].includes(data.status)
-  const paymentInstructions = data.paymentInstructions || data.seller?.paymentInstructions || null
+  const paymentStatus = String(data.paymentStatus || '').toLowerCase() || 'pending'
+  const paymentMade = paymentStatus === 'paid' || ['paid', 'shipped', 'completed', 'refunded'].includes(data.status)
   const firstService = (data.items || []).find((it: any) => it?.product?.type === 'service')
   let proposals: string[] = []
   try { proposals = firstService?.appointmentAlternates ? JSON.parse(firstService.appointmentAlternates) : [] } catch {}
@@ -267,6 +286,53 @@ function OrderDetail() {
     }
   }
 
+  async function connectStripe() {
+    try {
+      setPaymentBusy(true)
+      const response = await db.connectStripeAccount?.()
+      if (response?.url) {
+        window.location.href = response.url
+        return
+      }
+      setPaymentFeedback('Unable to start Stripe onboarding.')
+    } catch (err) {
+      setPaymentFeedback((err as Error)?.message ?? 'Unable to start Stripe onboarding.')
+    } finally {
+      setPaymentBusy(false)
+    }
+  }
+
+  async function requestPayment() {
+    try {
+      setPaymentBusy(true)
+      const response = await db.requestOrderPayment?.(id, paymentRoute)
+      if (response?.order) {
+        setData(response.order)
+        setPaymentFeedback('Payment request created.')
+        setPaymentDialogOpen(false)
+      }
+    } catch (err) {
+      setPaymentFeedback((err as Error)?.message ?? 'Unable to create payment request.')
+    } finally {
+      setPaymentBusy(false)
+    }
+  }
+
+  async function cancelPaymentRequest() {
+    try {
+      setPaymentBusy(true)
+      const updated = await db.cancelOrderPaymentRequest?.(id)
+      if (updated) {
+        setData(updated)
+        setPaymentFeedback('Payment request cancelled.')
+      }
+    } catch (err) {
+      setPaymentFeedback((err as Error)?.message ?? 'Unable to cancel payment request.')
+    } finally {
+      setPaymentBusy(false)
+    }
+  }
+
   return (
     <MarketplacePageShell width='default'>
       <div className='mb-2 text-sm'><Link to='/marketplace/my-orders' className='underline'>Back to My Orders</Link></div>
@@ -284,45 +350,62 @@ function OrderDetail() {
       ) : null}
 
       <div className='mt-3 text-sm text-gray-600'>
-        Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : 'Not paid'}</span>
+        Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : paymentStatus.replace(/_/g, ' ')}</span>
       </div>
       {paymentFeedback ? (
         <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm ${paymentFeedback.toLowerCase().includes('unable') ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
           {paymentFeedback}
         </div>
       ) : null}
-      {isSeller && !paymentMade && ['pending', 'scheduled'].includes(data.status) ? (
+      {isSeller && paymentStatus === 'pending' ? (
         <button
           type='button'
-          onClick={async () => {
-            if (markingPaid) return
-            setMarkingPaid(true)
-            try {
-              const updated = db.markOrderPaid ? await db.markOrderPaid(id) : null
-              if (updated) {
-                setData(updated)
-                setPaymentFeedback('Order marked as paid.')
-              }
-            } catch (err) {
-              setPaymentFeedback((err as Error)?.message ?? 'Unable to mark as paid.')
-            } finally {
-              setMarkingPaid(false)
-            }
-          }}
+          onClick={() => setPaymentDialogOpen(true)}
           className='mt-2 inline-flex items-center rounded-full border border-emerald-200 px-4 py-1 text-sm font-semibold text-emerald-700 hover:bg-emerald-50'
         >
-          {markingPaid ? 'Updating…' : 'Mark payment received'}
+          Request payment
         </button>
       ) : null}
-      {paymentInstructions ? (
+      {paymentStatus === 'payment_requested' && data.paymentUrl ? (
         <div className='mt-4 rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800'>
-          <div className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>Payment instructions</div>
+          <div className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>Payment requested</div>
           <p className='mt-1 text-xs text-emerald-700'>
-            {isSeller ? 'Share these details with the buyer so they can transfer funds directly.' : 'Use these details to pay your seller directly and include your order ID as the reference.'}
+            {isSeller ? 'Share or reopen the Stripe Checkout link below.' : 'Complete payment using the secure checkout link below.'}
           </p>
-          <pre className='mt-2 whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-xs text-emerald-900'>
-            {paymentInstructions}
-          </pre>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            <a
+              href={data.paymentUrl}
+              target='_blank'
+              rel='noreferrer'
+              className='rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-semibold text-emerald-700'
+            >
+              Open checkout
+            </a>
+            <button
+              type='button'
+              className='rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700'
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(data.paymentUrl)
+                  setPaymentFeedback('Payment link copied.')
+                } catch {
+                  setPaymentFeedback('Unable to copy the payment link.')
+                }
+              }}
+            >
+              Copy payment link
+            </button>
+            {isSeller ? (
+              <button
+                type='button'
+                className='rounded-full border border-rose-200 bg-white px-4 py-2 text-xs font-semibold text-rose-700'
+                onClick={() => void cancelPaymentRequest()}
+                disabled={paymentBusy}
+              >
+                Cancel payment request
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {localFallback ? (
@@ -559,7 +642,7 @@ function OrderDetail() {
             </DialogContent>
           </Dialog>
         )}
-        {isSeller && !((data.items || []).some((it: any) => it?.product?.type === 'service')) && data.status === 'paid' && (
+        {isSeller && !((data.items || []).some((it: any) => it?.product?.type === 'service')) && paymentMade && data.status === 'paid' && (
           <button disabled={working} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={async () => {
             setWorking(true); try { const updated = await db.shipOrder?.(data.id, true); if (updated) location.reload() } finally { setWorking(false) }
           }}>Confirm Shipped</button>
@@ -569,12 +652,71 @@ function OrderDetail() {
             setWorking(true); try { const updated = await db.confirmReceived?.(data.id); if (updated) location.reload() } finally { setWorking(false) }
           }}>Confirm Received</button>
         )}
-        {isBuyer && hasService && data.status === 'completed' && (
-          <button disabled={working} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={async () => {
-            setWorking(true); try { await fetchJson(`/api/orders/${data.id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }); location.reload() } finally { setWorking(false) }
-          }}>Pay Now</button>
-        )}
+        {isBuyer && paymentStatus === 'payment_requested' && data.paymentUrl ? (
+          <a href={data.paymentUrl} target='_blank' rel='noreferrer' className='rounded-md bg-black px-3 py-2 text-sm text-white'>
+            Open Checkout
+          </a>
+        ) : null}
       </div>
+      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request payment</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 text-sm text-slate-600'>
+            <div className='text-xl font-semibold text-slate-900'>A${Number(data.total || 0).toFixed(2)}</div>
+            <div className='text-xs text-slate-500'>Choose where the payment should be processed.</div>
+            <label className='flex items-start gap-3 rounded-2xl border border-slate-200 p-4'>
+              <input type='radio' name='payment-route' value='platform' checked={paymentRoute === 'platform'} onChange={() => setPaymentRoute('platform')} className='mt-1' />
+              <div>
+                <div className='font-semibold text-slate-900'>Gang Ledger Payments</div>
+                <div className='text-xs text-slate-500'>Process through Gang Ledger&apos;s Stripe account.</div>
+              </div>
+            </label>
+            <label className={`flex items-start gap-3 rounded-2xl border p-4 ${paymentSettings?.stripeChargesEnabled ? 'border-slate-200' : 'border-slate-100 bg-slate-50/70'}`}>
+              <input
+                type='radio'
+                name='payment-route'
+                value='connected_account'
+                checked={paymentRoute === 'connected_account'}
+                onChange={() => setPaymentRoute('connected_account')}
+                className='mt-1'
+                disabled={!paymentSettings?.stripeChargesEnabled}
+              />
+              <div className='flex-1'>
+                <div className='font-semibold text-slate-900'>My Stripe Account</div>
+                <div className='text-xs text-slate-500'>Receive payment through your connected Stripe account.</div>
+                {!paymentSettings?.stripeConnectedAccountId ? <div className='mt-2 text-xs font-medium text-amber-700'>Connect Stripe first.</div> : null}
+                {paymentSettings?.stripeConnectedAccountId && !paymentSettings?.stripeChargesEnabled ? (
+                  <div className='mt-2 text-xs font-medium text-amber-700'>Finish Stripe verification to enable this route.</div>
+                ) : null}
+              </div>
+            </label>
+          </div>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-between'>
+            <div>
+              {paymentRoute === 'connected_account' && !paymentSettings?.stripeChargesEnabled ? (
+                <button type='button' className='rounded-full border border-emerald-200 px-4 py-2 text-xs font-semibold text-emerald-700' onClick={() => void connectStripe()} disabled={paymentBusy}>
+                  Connect my Stripe account
+                </button>
+              ) : null}
+            </div>
+            <div className='flex gap-2'>
+              <button type='button' className='rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700' onClick={() => setPaymentDialogOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type='button'
+                className='rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60'
+                disabled={paymentBusy || (paymentRoute === 'connected_account' && !paymentSettings?.stripeChargesEnabled)}
+                onClick={() => void requestPayment()}
+              >
+                {paymentBusy ? 'Creating…' : 'Continue'}
+              </button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MarketplacePageShell>
   )
 }

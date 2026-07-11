@@ -64,22 +64,52 @@ export type OrderItem = {
   quantity: number
 }
 
+export type PaymentRoute = 'platform' | 'connected_account'
+export type OrderPaymentStatus =
+  | 'pending'
+  | 'payment_requested'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'refunded'
+  | 'partially_refunded'
+  | 'cancelled'
+
+export type StorePaymentSettings = {
+  defaultPaymentRoute: PaymentRoute
+  stripeConnectedAccountId?: string | null
+  stripeChargesEnabled: boolean
+  stripePayoutsEnabled: boolean
+  stripeDetailsSubmitted: boolean
+}
+
 export type Order = {
   id: string
   items: OrderItem[]
   total: number
   createdAt: string
   status: 'pending' | 'scheduled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
+  paymentStatus?: OrderPaymentStatus
+  paymentRoute?: PaymentRoute | null
+  paymentUrl?: string | null
+  paymentRequestedAt?: string | null
+  paidAt?: string | null
+  refundedAt?: string | null
+  currency?: string
   customerName?: string
   customerEmail?: string
   address?: string
   customerPhone?: string
-  paymentInstructions?: string | null
   seller?: {
     id?: number | string | null
     name?: string | null
     email?: string | null
-    paymentInstructions?: string | null
+  } | null
+  store?: {
+    id?: number | string | null
+    name?: string | null
+    slug?: string | null
+    paymentSettings?: StorePaymentSettings | null
   } | null
 }
 
@@ -175,7 +205,7 @@ export const db = {
     return read<Order[]>(nsKey('db_orders', namespace), [])
   },
   async createOrder(
-    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     namespace?: string,
   ): Promise<Order> {
     const orders = await this.listOrders(namespace)
@@ -183,14 +213,21 @@ export const db = {
       id: uid('ord'),
       createdAt: new Date().toISOString(),
       status: input.status ?? 'pending',
+      paymentStatus: input.paymentStatus ?? 'pending',
+      paymentRoute: input.paymentRoute ?? null,
+      paymentUrl: input.paymentUrl ?? null,
+      paymentRequestedAt: input.paymentRequestedAt ?? null,
+      paidAt: input.paidAt ?? null,
+      refundedAt: input.refundedAt ?? null,
+      currency: input.currency ?? 'AUD',
       items: input.items,
       total: input.total,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
       address: input.address,
       customerPhone: (input as any).customerPhone,
-      paymentInstructions: input.paymentInstructions ?? null,
       seller: input.seller ?? null,
+      store: input.store ?? null,
     }
     write(nsKey('db_orders', namespace), [order, ...orders])
     return order

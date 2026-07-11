@@ -21,7 +21,7 @@ function AllOrdersPage() {
   const [orders, setOrders] = useState<AllOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'payment' | 'shipment' | 'delete' } | null>(null)
+  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'shipment' | 'delete' } | null>(null)
   const user = useAuthStore((s) => s.auth.user as any | null)
   const myId = (user?.id as number | undefined) ?? undefined
 
@@ -50,10 +50,7 @@ function AllOrdersPage() {
   async function runPendingAction() {
     if (!pendingAction) return
     try {
-      if (pendingAction.kind === 'payment') {
-        const updated = db.markOrderPaid ? await db.markOrderPaid(pendingAction.orderId) : null
-        if (updated) setOrders((cur) => cur.map((x) => (x.id === pendingAction.orderId ? updated : x)))
-      } else if (pendingAction.kind === 'shipment') {
+      if (pendingAction.kind === 'shipment') {
         const updated = await db.shipOrder?.(pendingAction.orderId, true)
         if (updated) setOrders((cur) => cur.map((x) => (x.id === pendingAction.orderId ? updated : x)))
       } else {
@@ -101,14 +98,6 @@ function AllOrdersPage() {
                 <td className='py-2 pr-4 capitalize'>{o.status}</td>
                 <td className='py-2 pr-4 text-right'>
                   <div className='space-y-2'>
-                    {(['pending', 'scheduled'].includes(o.status) && myId && (o.sellerId === myId)) ? (
-                      <button
-                        className='w-full rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100'
-                        onClick={() => setPendingAction({ orderId: o.id, kind: 'payment' })}
-                      >
-                        Confirm Payment
-                      </button>
-                    ) : null}
                     {(o.status === 'paid' && myId && (o.sellerId === myId)) ? (
                       <button
                         className='w-full rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white'
@@ -201,18 +190,12 @@ function AllOrdersPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pendingAction?.kind === 'payment'
-                ? 'Confirm payment received'
-                : pendingAction?.kind === 'shipment'
-                  ? 'Mark order as shipped'
-                  : 'Delete order'}
+              {pendingAction?.kind === 'shipment' ? 'Mark order as shipped' : 'Delete order'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingAction?.kind === 'payment'
-                ? 'Only continue after verifying funds for this order.'
-                : pendingAction?.kind === 'shipment'
-                  ? 'Use this after the seller has dispatched the order.'
-                  : 'This permanently removes the order record from the dashboard.'}
+              {pendingAction?.kind === 'shipment'
+                ? 'Use this after the seller has dispatched the order.'
+                : 'This permanently removes the order record from the dashboard.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,4 +1,14 @@
-import { db as localdb, seedProducts, categories as localCategories, type Product, type Order, type CartItem, type Category } from './localdb'
+import {
+  db as localdb,
+  seedProducts,
+  categories as localCategories,
+  type Product,
+  type Order,
+  type CartItem,
+  type Category,
+  type PaymentRoute,
+  type StorePaymentSettings,
+} from './localdb'
 import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
 import { CATALOG } from '@/features/marketplace/catalog'
 import { useStageStore } from '@/stores/stageStore'
@@ -154,7 +164,7 @@ export type DataAPI = {
   clearCart: (namespace?: string) => Promise<void>
   // Orders
   listOrders: (namespace?: string) => Promise<Order[]>
-  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null }, namespace?: string) => Promise<Order>
+  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<Order>
   // POS (seller-created order)
   createPosOrder?: (input: { items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
   listSellerOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>
@@ -165,7 +175,11 @@ export type DataAPI = {
   adminDeleteOrder?: (id: string) => Promise<void>
   submitOrderReview?: (orderId: string, rating: number, feedback: string) => Promise<{ rating: number; feedback: string }>
   getOrderReview?: (orderId: string) => Promise<{ rating: number; feedback: string } | null>
-  markOrderPaid?: (id: string) => Promise<Order>
+  requestOrderPayment?: (id: string, paymentRoute: PaymentRoute) => Promise<{ checkoutUrl: string; order: Order }>
+  cancelOrderPaymentRequest?: (id: string) => Promise<Order>
+  getStorePaymentSettings?: () => Promise<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>
+  connectStripeAccount?: () => Promise<{ url: string }>
+  updateStorePaymentSettings?: (input: { defaultPaymentRoute: PaymentRoute }) => Promise<{ paymentSettings: StorePaymentSettings }>
   // Support
   listSupportTickets?: () => Promise<SupportTicket[]>
   getSupportTicket?: (id: string) => Promise<SupportTicket | null>
@@ -383,13 +397,10 @@ const api: DataAPI = {
     return http<Order[]>(`/api/orders`)
   },
   async createOrder(
-    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     _namespace?: string,
   ): Promise<Order> {
-    // Do not pass ownerId; rely on session
-    const payload = { ...input }
-    delete (payload as any).paymentInstructions
-    const order = await http<Order & { accessCode?: string }>('/api/checkout', { method: 'POST', body: JSON.stringify(payload) })
+    const order = await http<Order & { accessCode?: string }>('/api/checkout', { method: 'POST', body: JSON.stringify(input) })
     // If guest checkout, persist tracking accessCode locally for convenience
     try {
       if (typeof window !== 'undefined' && (order as any)?.accessCode) {
@@ -423,8 +434,26 @@ const api: DataAPI = {
   async adminDeleteOrder(id: string) {
     await http<void>(`/api/admin/orders/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
-  async markOrderPaid(id: string) {
-    return http<Order>(`/api/orders/${encodeURIComponent(id)}/mark-paid`, { method: 'POST' })
+  async requestOrderPayment(id: string, paymentRoute: PaymentRoute) {
+    return http<{ checkoutUrl: string; order: Order }>(`/api/orders/${encodeURIComponent(id)}/request-payment`, {
+      method: 'POST',
+      body: JSON.stringify({ paymentRoute: paymentRoute.toUpperCase() }),
+    })
+  },
+  async cancelOrderPaymentRequest(id: string) {
+    return http<Order>(`/api/orders/${encodeURIComponent(id)}/cancel-payment-request`, { method: 'POST' })
+  },
+  async getStorePaymentSettings() {
+    return http<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>('/api/storefront/payment-settings')
+  },
+  async updateStorePaymentSettings(input: { defaultPaymentRoute: PaymentRoute }) {
+    return http<{ paymentSettings: StorePaymentSettings }>('/api/storefront/payment-settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ defaultPaymentRoute: input.defaultPaymentRoute.toUpperCase() }),
+    })
+  },
+  async connectStripeAccount() {
+    return http<{ url: string }>('/api/stripe/connect', { method: 'POST', body: JSON.stringify({}) })
   },
   async submitOrderReview(orderId: string, rating: number, feedback: string) {
     return http<{ rating: number; feedback: string }>(`/api/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ rating, feedback }) })
@@ -680,7 +709,7 @@ const localWrapper: DataAPI = {
   // Orders
   async listOrders(namespace?: string) { return localdb.listOrders(namespace) },
   async createOrder(
-    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status']; paymentInstructions?: string | null },
+    input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     namespace?: string,
   ) {
     return localdb.createOrder(input, namespace)
@@ -703,11 +732,36 @@ const localWrapper: DataAPI = {
   async listAllOrders() { return [] },
   async adminUpdateOrderStatus(id: string, status: Order['status']) { return { id, items: [], total: 0, createdAt: new Date().toISOString(), status } as unknown as Order },
   async adminDeleteOrder(_id: string) { return },
-  async markOrderPaid(id: string) {
+  async requestOrderPayment(id: string, paymentRoute: PaymentRoute) {
     const orders = await localdb.listOrders()
     const idx = orders.findIndex((order) => order.id === id)
     if (idx === -1) throw new Error('Order not found')
-    const updated = { ...orders[idx], status: 'paid' as Order['status'] }
+    const updated = {
+      ...orders[idx],
+      paymentStatus: 'payment_requested' as const,
+      paymentRoute,
+      paymentUrl: `https://example.com/orders/${encodeURIComponent(id)}/checkout`,
+      paymentRequestedAt: new Date().toISOString(),
+    }
+    orders[idx] = updated
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('db_orders', JSON.stringify(orders))
+      }
+    } catch {}
+    return { checkoutUrl: updated.paymentUrl || '', order: updated }
+  },
+  async cancelOrderPaymentRequest(id: string) {
+    const orders = await localdb.listOrders()
+    const idx = orders.findIndex((order) => order.id === id)
+    if (idx === -1) throw new Error('Order not found')
+    const updated = {
+      ...orders[idx],
+      paymentStatus: 'pending' as const,
+      paymentRoute: null,
+      paymentUrl: null,
+      paymentRequestedAt: null,
+    }
     orders[idx] = updated
     try {
       if (typeof window !== 'undefined') {
@@ -715,6 +769,32 @@ const localWrapper: DataAPI = {
       }
     } catch {}
     return updated
+  },
+  async getStorePaymentSettings() {
+    return {
+      store: { id: 'local-store', name: 'Demo store', slug: 'demo-store', currency: 'AUD' },
+      paymentSettings: {
+        defaultPaymentRoute: 'platform' as const,
+        stripeConnectedAccountId: null,
+        stripeChargesEnabled: false,
+        stripePayoutsEnabled: false,
+        stripeDetailsSubmitted: false,
+      },
+    }
+  },
+  async updateStorePaymentSettings(input: { defaultPaymentRoute: PaymentRoute }) {
+    return {
+      paymentSettings: {
+        defaultPaymentRoute: input.defaultPaymentRoute,
+        stripeConnectedAccountId: null,
+        stripeChargesEnabled: false,
+        stripePayoutsEnabled: false,
+        stripeDetailsSubmitted: false,
+      },
+    }
+  },
+  async connectStripeAccount() {
+    return { url: 'https://connect.stripe.com/setup/demo' }
   },
   async submitOrderReview(_orderId: string, rating: number, feedback: string) { return { rating, feedback } },
   async getOrderReview(_orderId: string) { return null },

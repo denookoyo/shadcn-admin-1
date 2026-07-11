@@ -69,7 +69,7 @@ function ListingDetail() {
     () => [
       'Genuine item verified by Hedgetech operations.',
       'Flexible fulfilment windows and buyer-side support.',
-      'Pay sellers directly using the instructions they share.',
+      'Payments are requested through Gang Ledger or the seller’s connected Stripe account.',
     ],
     []
   )
@@ -253,10 +253,10 @@ function ListingDetail() {
                 <CardContent className='space-y-2 p-4'>
                   <div className='flex items-center justify-between text-sm font-semibold'>
                     <span>Buyer coverage</span>
-                    <span className='text-emerald-700'>Manual payments</span>
+                    <span className='text-emerald-700'>Centralized checkout</span>
                   </div>
                   <p>
-                    Sellers provide their preferred payment instructions after checkout. Transfer funds directly and share proof of payment to keep fulfilment on track.
+                    Sellers request payment through Gang Ledger. Buyers receive a Stripe Checkout link instead of manual transfer instructions.
                   </p>
                 </CardContent>
               </Card>

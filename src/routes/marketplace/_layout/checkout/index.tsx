@@ -98,19 +98,9 @@ function CheckoutPage() {
         <CheckCircle2 className='mx-auto h-16 w-16 text-emerald-500' />
         <h1 className='text-2xl font-semibold text-slate-900'>Order confirmed</h1>
         <p className='text-sm text-slate-600'>Your order ID is <span className='font-semibold text-emerald-700'>#{confirmedOrder.id}</span>. A confirmation was sent to {email || 'your email'}.</p>
-        {confirmedOrder.paymentInstructions ? (
-          <div className='mx-auto max-w-md space-y-2 rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800 shadow-sm'>
-            <div className='text-xs font-semibold uppercase tracking-wide text-emerald-600'>Pay the seller directly</div>
-            <p className='text-[13px]'>Use the details below to send payment. Include your order ID in the reference so the seller can match it quickly.</p>
-            <pre className='whitespace-pre-wrap break-words rounded-2xl border border-emerald-100 bg-white/80 p-3 text-xs text-emerald-900'>
-              {confirmedOrder.paymentInstructions}
-            </pre>
-          </div>
-        ) : (
-          <div className='mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm'>
-            The seller will email payment instructions shortly. Keep an eye on your inbox.
-          </div>
-        )}
+        <div className='mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm'>
+          The seller can now request payment through Gang Ledger Payments or their connected Stripe account. You will see the checkout link here and in your order detail as soon as they send it.
+        </div>
         {isGuest && accessCode ? (
           <div className='mx-auto max-w-md rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800'>
             <div className='text-sm font-semibold mb-2'>Guest tracking link</div>
@@ -143,13 +133,13 @@ function CheckoutPage() {
               Step 2 • Confirm details
             </span>
             <h1 className='mt-3 text-2xl font-semibold text-slate-900'>Confirm delivery & contact details</h1>
-            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Once your order is created, your seller will send payment instructions. Use accurate contact information so they can invoice you quickly and keep fulfilment aligned.</p>
+            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Once your order is created, your seller can send a secure checkout link from Gang Ledger. Use accurate contact information so payment and fulfilment stay aligned.</p>
           </div>
           <div className='flex items-center gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm'>
             <ShieldCheck className='h-4 w-4 text-emerald-600' />
             <div>
-              <div className='font-semibold text-slate-800'>Manual payments</div>
-              <div>Pay sellers directly using their preferred method</div>
+              <div className='font-semibold text-slate-800'>Centralized payments</div>
+              <div>Checkout links come from Gang Ledger or the seller&apos;s connected Stripe account</div>
             </div>
           </div>
         </div>
@@ -201,8 +191,7 @@ function CheckoutPage() {
           <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600'>
             <div className='font-semibold text-slate-900'>How payment works</div>
             <p className='mt-1 text-xs text-slate-500'>
-              After you place the order, the seller&apos;s payment instructions will appear in the confirmation screen and in your inbox. Transfer funds
-              directly to them and share proof of payment so they can fulfil the order.
+              After you place the order, the seller can request payment and share a Stripe Checkout link. Complete payment through that link when it appears in your order detail.
             </p>
           </div>
         </section>
@@ -253,11 +242,11 @@ function CheckoutPage() {
           <div className='rounded-3xl border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600'>
             <div className='flex items-center gap-3'>
               <ShieldCheck className='h-4 w-4 text-emerald-600' />
-              Pay sellers directly using the bank, PayID, or wallet details they share.
+              Payments are requested from Gang Ledger and opened through Stripe Checkout.
             </div>
             <div className='mt-2 flex items-center gap-3'>
               <CheckCircle2 className='h-4 w-4 text-emerald-600' />
-              Track progress and upload remittance via your Hedgetech dashboard.
+              Track progress from the same order detail after the seller sends the payment link.
             </div>
           </div>
         </aside>
