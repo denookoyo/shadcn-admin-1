@@ -7,14 +7,19 @@ import {
   type CartItem,
   type Category,
   type PaymentRoute,
+  type ShipmentItemInput,
+  type StockIntakeInput,
   type StorePaymentSettings,
 } from './localdb'
 import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
 import { CATALOG } from '@/features/marketplace/catalog'
+import { marketplaceConsumerMode } from './marketplace-consumer'
 import { useStageStore } from '@/stores/stageStore'
 import { fetchJson } from './http'
 
-const useApi = typeof window !== 'undefined' && (import.meta as any).env?.VITE_USE_API === 'true'
+const useApi =
+  typeof window !== 'undefined' &&
+  ((import.meta as any).env?.VITE_USE_API === 'true' || marketplaceConsumerMode)
 
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
@@ -164,11 +169,12 @@ export type DataAPI = {
   clearCart: (namespace?: string) => Promise<void>
   // Orders
   listOrders: (namespace?: string) => Promise<Order[]>
+  getOrder?: (id: string, namespace?: string) => Promise<Order | undefined>
   createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<Order>
   // POS (seller-created order)
   createPosOrder?: (input: { items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
   listSellerOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>
-  shipOrder?: (id: string, ackPaid: boolean) => Promise<Order>
+  shipOrder?: (id: string, shipment?: { ackPaid?: boolean; items?: ShipmentItemInput[] } | boolean) => Promise<Order>
   confirmReceived?: (id: string) => Promise<Order>
   listAllOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string }, seller?: { id: number; name?: string | null; email: string } })[]>
   adminUpdateOrderStatus?: (id: string, status: Order['status']) => Promise<Order>
@@ -180,6 +186,8 @@ export type DataAPI = {
   getStorePaymentSettings?: () => Promise<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>
   connectStripeAccount?: () => Promise<{ url: string }>
   updateStorePaymentSettings?: (input: { defaultPaymentRoute: PaymentRoute }) => Promise<{ paymentSettings: StorePaymentSettings }>
+  createStockIntake?: (input: StockIntakeInput) => Promise<any>
+  listStockIntakes?: () => Promise<any[]>
   // Support
   listSupportTickets?: () => Promise<SupportTicket[]>
   getSupportTicket?: (id: string) => Promise<SupportTicket | null>
@@ -396,6 +404,9 @@ const api: DataAPI = {
   async listOrders(_namespace?: string): Promise<Order[]> {
     return http<Order[]>(`/api/orders`)
   },
+  async getOrder(id: string): Promise<Order | undefined> {
+    return http<Order>(`/api/orders/${encodeURIComponent(id)}`)
+  },
   async createOrder(
     input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     _namespace?: string,
@@ -419,8 +430,18 @@ const api: DataAPI = {
   async listSellerOrders() {
     return http<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>('/api/seller/orders')
   },
-  async shipOrder(id: string, ackPaid: boolean) {
-    return http<Order>(`/api/orders/${encodeURIComponent(id)}/ship`, { method: 'POST', body: JSON.stringify({ ackPaid }) })
+  async shipOrder(id: string, shipment) {
+    const normalized =
+      typeof shipment === 'boolean'
+        ? { ackPaid: shipment, items: [] as ShipmentItemInput[] }
+        : { ackPaid: shipment?.ackPaid ?? true, items: shipment?.items ?? [] }
+    return http<Order>(`/api/orders/${encodeURIComponent(id)}/ship`, {
+      method: 'POST',
+      body: JSON.stringify({
+        ackPaid: normalized.ackPaid,
+        items: normalized.items,
+      }),
+    })
   },
   async confirmReceived(id: string) {
     return http<Order>(`/api/orders/${encodeURIComponent(id)}/received`, { method: 'POST' })
@@ -454,6 +475,15 @@ const api: DataAPI = {
   },
   async connectStripeAccount() {
     return http<{ url: string }>('/api/stripe/connect', { method: 'POST', body: JSON.stringify({}) })
+  },
+  async createStockIntake(input: StockIntakeInput) {
+    return http<any>('/api/storefront/stock-intakes', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    })
+  },
+  async listStockIntakes() {
+    return http<any[]>('/api/storefront/stock-intakes')
   },
   async submitOrderReview(orderId: string, rating: number, feedback: string) {
     return http<{ rating: number; feedback: string }>(`/api/orders/${encodeURIComponent(orderId)}/review`, { method: 'POST', body: JSON.stringify({ rating, feedback }) })
@@ -708,6 +738,14 @@ const localWrapper: DataAPI = {
   async clearCart(namespace?: string) { return localdb.clearCart(namespace) },
   // Orders
   async listOrders(namespace?: string) { return localdb.listOrders(namespace) },
+  async getOrder(id: string, namespace?: string) {
+    const namespaces = Array.from(new Set([namespace, 'guest', 'pos', undefined]))
+    for (const currentNamespace of namespaces) {
+      const found = await localdb.getOrder(id, currentNamespace)
+      if (found) return found
+    }
+    return undefined
+  },
   async createOrder(
     input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     namespace?: string,
@@ -727,7 +765,18 @@ const localWrapper: DataAPI = {
     }, ns)
   },
   async listSellerOrders() { return [] },
-  async shipOrder(id: string, _ackPaid: boolean) { return { id, items: [], total: 0, createdAt: new Date().toISOString(), status: 'shipped' } as unknown as Order },
+  async shipOrder(id: string, shipment) {
+    const normalized =
+      typeof shipment === 'boolean'
+        ? { ackPaid: shipment, items: [] as ShipmentItemInput[] }
+        : shipment
+    const namespaces = ['guest', 'pos', undefined]
+    for (const namespace of namespaces) {
+      const updated = await localdb.shipOrder(id, normalized, namespace)
+      if (updated) return updated as Order
+    }
+    throw new Error('Order not found')
+  },
   async confirmReceived(id: string) { return { id, items: [], total: 0, createdAt: new Date().toISOString(), status: 'completed' } as unknown as Order },
   async listAllOrders() { return [] },
   async adminUpdateOrderStatus(id: string, status: Order['status']) { return { id, items: [], total: 0, createdAt: new Date().toISOString(), status } as unknown as Order },
@@ -795,6 +844,12 @@ const localWrapper: DataAPI = {
   },
   async connectStripeAccount() {
     return { url: 'https://connect.stripe.com/setup/demo' }
+  },
+  async createStockIntake(input: StockIntakeInput) {
+    return localdb.createStockIntake(input)
+  },
+  async listStockIntakes() {
+    return localdb.listStockIntakes()
   },
   async submitOrderReview(_orderId: string, rating: number, feedback: string) { return { rating, feedback } },
   async getOrderReview(_orderId: string) { return null },

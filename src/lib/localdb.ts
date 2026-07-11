@@ -58,10 +58,13 @@ export type CartItem = {
 }
 
 export type OrderItem = {
+  id?: string
   productId: string
   title: string
   price: number
   quantity: number
+  shippedBarcodes?: string[]
+  stockSource?: 'tracked_units' | 'manual'
 }
 
 export type PaymentRoute = 'platform' | 'connected_account'
@@ -111,6 +114,20 @@ export type Order = {
     slug?: string | null
     paymentSettings?: StorePaymentSettings | null
   } | null
+}
+
+export type ShipmentItemInput = {
+  orderItemId: string
+  barcodes: string[]
+}
+
+export type StockIntakeInput = {
+  productId: string
+  supplierName?: string
+  supplierReference?: string
+  unitCost?: number | null
+  barcodes?: string[]
+  quantity?: number
 }
 
 function nsKey(key: string, namespace?: string) {
@@ -204,6 +221,10 @@ export const db = {
   async listOrders(namespace?: string): Promise<Order[]> {
     return read<Order[]>(nsKey('db_orders', namespace), [])
   },
+  async getOrder(id: string, namespace?: string): Promise<Order | undefined> {
+    const orders = await this.listOrders(namespace)
+    return orders.find((order) => order.id === id)
+  },
   async createOrder(
     input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     namespace?: string,
@@ -220,7 +241,11 @@ export const db = {
       paidAt: input.paidAt ?? null,
       refundedAt: input.refundedAt ?? null,
       currency: input.currency ?? 'AUD',
-      items: input.items,
+      items: input.items.map((item) => ({
+        ...item,
+        id: item.id ?? uid('item'),
+        shippedBarcodes: item.shippedBarcodes ?? [],
+      })),
       total: input.total,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
@@ -231,6 +256,55 @@ export const db = {
     }
     write(nsKey('db_orders', namespace), [order, ...orders])
     return order
+  },
+  async shipOrder(id: string, shipment?: { items?: ShipmentItemInput[] }, namespace?: string): Promise<Order | undefined> {
+    const orders = await this.listOrders(namespace)
+    const idx = orders.findIndex((order) => order.id === id)
+    if (idx === -1) return undefined
+    const barcodeMap = new Map(
+      (shipment?.items || []).map((item) => [item.orderItemId, item.barcodes.map((barcode) => barcode.trim()).filter(Boolean)])
+    )
+    const updated: Order = {
+      ...orders[idx],
+      status: 'shipped',
+      items: (orders[idx].items || []).map((item) => ({
+        ...item,
+        shippedBarcodes: barcodeMap.get(item.id || '') || item.shippedBarcodes || [],
+        stockSource: barcodeMap.has(item.id || '') ? 'tracked_units' : item.stockSource,
+      })),
+    }
+    orders[idx] = updated
+    write(nsKey('db_orders', namespace), orders)
+    return updated
+  },
+  async createStockIntake(input: StockIntakeInput, namespace?: string) {
+    const products = await this.listProducts(namespace)
+    const idx = products.findIndex((product) => product.id === input.productId)
+    if (idx === -1) throw new Error('Product not found')
+    const quantityFromBarcodes = (input.barcodes || []).filter(Boolean).length
+    const quantity = Math.max(quantityFromBarcodes, Number(input.quantity || 0))
+    products[idx] = {
+      ...products[idx],
+      stockCount: Math.max(0, Number(products[idx].stockCount || 0)) + quantity,
+      barcode: products[idx].barcode || input.barcodes?.find(Boolean) || products[idx].barcode,
+    }
+    write(nsKey('db_products', namespace), products)
+    const intake = {
+      id: uid('intake'),
+      productId: input.productId,
+      supplierName: input.supplierName?.trim() || null,
+      supplierReference: input.supplierReference?.trim() || null,
+      unitCost: input.unitCost ?? null,
+      quantity,
+      barcodes: (input.barcodes || []).map((barcode) => barcode.trim()).filter(Boolean),
+      createdAt: new Date().toISOString(),
+    }
+    const history = read<any[]>(nsKey('db_stock_intakes', namespace), [])
+    write(nsKey('db_stock_intakes', namespace), [intake, ...history])
+    return intake
+  },
+  async listStockIntakes(namespace?: string) {
+    return read<any[]>(nsKey('db_stock_intakes', namespace), [])
   },
 }
 

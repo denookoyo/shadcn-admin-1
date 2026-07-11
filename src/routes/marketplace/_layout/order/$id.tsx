@@ -17,7 +17,9 @@ function OrderDetail() {
   const { id } = useParams({ from: '/marketplace/_layout/order/$id' })
   const me = useAuthStore((s) => s.auth.user as any | null)
   const namespace = me?.email || (me as any)?.accountNo || 'guest'
-  const isApiEnabled = typeof window !== 'undefined' && (import.meta as any)?.env?.VITE_USE_API === 'true'
+  const isLiveDataEnabled =
+    typeof window !== 'undefined' &&
+    (((import.meta as any)?.env?.VITE_USE_API === 'true') || marketplaceConsumerMode)
   const [data, setData] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<number | null>(null)
@@ -27,70 +29,24 @@ function OrderDetail() {
   useEffect(() => {
     let mounted = true
 
-    async function loadFromLocal(): Promise<boolean> {
-      try {
-        const candidateNamespaces = Array.from(
-          new Set<string | undefined>([namespace, 'guest', 'pos', undefined])
-        )
-        const ordersByNamespace = await Promise.all(
-          candidateNamespaces.map(async (ns) => {
-            try {
-              return await db.listOrders(ns)
-            } catch {
-              return []
-            }
-          })
-        )
-        const allOrders = ordersByNamespace.flat()
-        const match = allOrders.find((order) => order.id === id)
-        if (!match) return false
-        const products = await db.listProducts()
-        const productMap = new Map(products.map((product: any) => [product.id, product]))
-        const normalized = {
-          ...match,
-          items: match.items.map((item: any) => ({
-            ...item,
-            product: productMap.get(item.productId) || null,
-          })),
-        }
-        if (mounted) {
-          setStatus(null)
-          setError(null)
-          setData(normalized)
-          setLocalFallback(true)
-        }
-        return true
-      } catch (_err) {
-        return false
-      }
-    }
-
     async function loadOrder() {
-      if (!isApiEnabled) {
-        const ok = await loadFromLocal()
-        if (!ok && mounted) {
-          setError('Unable to load this order in demo mode. Try the tracking link or enable the API backend.')
-        }
-        return
-      }
-
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(id)}`, { credentials: 'include' })
-        if (!res.ok) {
-          if (mounted) setStatus(res.status)
-          throw new Error(`HTTP ${res.status}`)
+        const order = await db.getOrder?.(id, namespace)
+        if (!order) {
+          throw new Error(isLiveDataEnabled ? 'Order not found.' : 'Unable to load this order in demo mode.')
         }
-        const json = await res.json()
         if (mounted) {
-          setData(json)
+          setData(order)
           setError(null)
-          setLocalFallback(false)
+          setStatus(null)
+          setLocalFallback(!isLiveDataEnabled)
         }
       } catch (e: any) {
-        if (!mounted) return
-        const fallbackWorked = await loadFromLocal()
-        if (!fallbackWorked) {
-          setError(e?.message || 'Failed to load order')
+        if (mounted) {
+          const message = String(e?.message || 'Failed to load order')
+          const matchedStatus = message.match(/HTTP\s+(\d{3})/)
+          setStatus(matchedStatus ? Number(matchedStatus[1]) : null)
+          setError(message)
         }
       }
     }
@@ -100,7 +56,7 @@ function OrderDetail() {
     return () => {
       mounted = false
     }
-  }, [id, namespace, isApiEnabled])
+  }, [id, namespace, isLiveDataEnabled])
 
   // Compute hooks unconditionally to keep hook order stable
   const isBuyer = useMemo(() => {
@@ -132,6 +88,9 @@ function OrderDetail() {
   const [paymentRoute, setPaymentRoute] = useState<PaymentRoute>('platform')
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [paymentBusy, setPaymentBusy] = useState(false)
+  const [shipmentDialogOpen, setShipmentDialogOpen] = useState(false)
+  const [shipmentBarcodes, setShipmentBarcodes] = useState<Record<string, string>>({})
+  const [shipmentBusy, setShipmentBusy] = useState(false)
   useEffect(() => {
     // Preload proposals from current order once data arrives
     try {
@@ -215,6 +174,7 @@ function OrderDetail() {
 
   const isService = (item: any) => item.product?.type === 'service'
   const hasService = (data.items || []).some((it: any) => isService(it))
+  const goodsItems = (data.items || []).filter((it: any) => !isService(it))
   const paymentStatus = String(data.paymentStatus || '').toLowerCase() || 'pending'
   const paymentMade = paymentStatus === 'paid' || ['paid', 'shipped', 'completed', 'refunded'].includes(data.status)
   const firstService = (data.items || []).find((it: any) => it?.product?.type === 'service')
@@ -333,6 +293,43 @@ function OrderDetail() {
     }
   }
 
+  function openShipmentDialog() {
+    const next: Record<string, string> = {}
+    for (const item of goodsItems) {
+      next[item.id] = Array.isArray(item.shippedBarcodes) ? item.shippedBarcodes.join('\n') : ''
+    }
+    setShipmentBarcodes(next)
+    setShipmentDialogOpen(true)
+  }
+
+  async function confirmShipment() {
+    try {
+      const shipmentItems = goodsItems.map((item: any) => {
+        const barcodes = String(shipmentBarcodes[item.id] || '')
+          .split('\n')
+          .map((value) => value.trim())
+          .filter(Boolean)
+        if (barcodes.length !== Number(item.quantity || 0)) {
+          throw new Error(`Enter ${item.quantity} barcode${item.quantity === 1 ? '' : 's'} for ${item.title}.`)
+        }
+        return {
+          orderItemId: item.id,
+          barcodes,
+        }
+      })
+      setShipmentBusy(true)
+      const updated = await db.shipOrder?.(data.id, { ackPaid: true, items: shipmentItems })
+      if (updated) {
+        setData(updated)
+        setShipmentDialogOpen(false)
+      }
+    } catch (err) {
+      setPaymentFeedback((err as Error)?.message ?? 'Unable to confirm shipment.')
+    } finally {
+      setShipmentBusy(false)
+    }
+  }
+
   return (
     <MarketplacePageShell width='default'>
       <div className='mb-2 text-sm'><Link to='/marketplace/my-orders' className='underline'>Back to My Orders</Link></div>
@@ -438,6 +435,9 @@ function OrderDetail() {
                 <div className='text-sm font-medium'>A${it.price * it.quantity}</div>
               </div>
               <div className='text-xs text-gray-500'>Qty: {it.quantity}</div>
+              {Array.isArray(it.shippedBarcodes) && it.shippedBarcodes.length ? (
+                <div className='mt-1 text-xs text-gray-500'>Shipped barcodes: {it.shippedBarcodes.join(', ')}</div>
+              ) : null}
               {(isService(it) || it.appointmentAt || it.appointmentStatus) && (
                 <div className='text-xs text-gray-500'>Appointment: {it.appointmentAt ? new Date(it.appointmentAt).toLocaleString() : 'pending'} {it.appointmentStatus ? `(${it.appointmentStatus})` : ''}</div>
               )}
@@ -642,10 +642,8 @@ function OrderDetail() {
             </DialogContent>
           </Dialog>
         )}
-        {isSeller && !((data.items || []).some((it: any) => it?.product?.type === 'service')) && paymentMade && data.status === 'paid' && (
-          <button disabled={working} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={async () => {
-            setWorking(true); try { const updated = await db.shipOrder?.(data.id, true); if (updated) location.reload() } finally { setWorking(false) }
-          }}>Confirm Shipped</button>
+        {isSeller && !hasService && paymentMade && data.status === 'paid' && (
+          <button disabled={working || shipmentBusy} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={openShipmentDialog}>Confirm Shipped</button>
         )}
         {isBuyer && data.status === 'shipped' && (
           <button disabled={working} className='rounded-md border px-3 py-2 text-sm' onClick={async () => {
@@ -714,6 +712,49 @@ function OrderDetail() {
                 {paymentBusy ? 'Creating…' : 'Continue'}
               </button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={shipmentDialogOpen} onOpenChange={setShipmentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm shipped</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 text-sm text-slate-600'>
+            <p>Enter one barcode per line for each item being shipped.</p>
+            {goodsItems.map((item: any) => (
+              <label key={item.id} className='block space-y-2 rounded-2xl border border-slate-200 p-4'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
+                  <div className='font-semibold text-slate-900'>{item.title}</div>
+                  <div className='text-xs text-slate-500'>Quantity: {item.quantity}</div>
+                </div>
+                <textarea
+                  rows={Math.max(3, Number(item.quantity || 1))}
+                  value={shipmentBarcodes[item.id] || ''}
+                  onChange={(event) =>
+                    setShipmentBarcodes((current) => ({
+                      ...current,
+                      [item.id]: event.target.value,
+                    }))
+                  }
+                  placeholder='One barcode per line'
+                  className='w-full rounded-2xl border border-slate-200 p-3 text-sm'
+                />
+              </label>
+            ))}
+          </div>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-end'>
+            <button type='button' className='rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700' onClick={() => setShipmentDialogOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type='button'
+              className='rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60'
+              disabled={shipmentBusy}
+              onClick={() => void confirmShipment()}
+            >
+              {shipmentBusy ? 'Saving…' : 'Confirm shipped'}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

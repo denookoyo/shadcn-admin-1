@@ -1,16 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -52,8 +48,12 @@ function getPaymentStatus(order: any) {
   return String(order?.paymentStatus || '').toLowerCase() || 'pending'
 }
 
-function isPaidOrder(order: any) {
-  return getPaymentStatus(order) === 'paid' || ['paid', 'shipped', 'completed', 'refunded'].includes(String(order?.status || ''))
+function getGoodsItems(order: any) {
+  return (order?.items || []).filter((item: any) => item?.product?.type !== 'service')
+}
+
+function isShippableGoodsOrder(order: any) {
+  return !isServiceOrder(order) && String(order?.status || '') === 'paid' && getPaymentStatus(order) === 'paid'
 }
 
 const MetricCard = ({
@@ -103,7 +103,9 @@ export default function OrdersPage() {
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewFeedback, setReviewFeedback] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<{ orderId: string; kind: 'shipment' } | null>(null)
+  const [shipmentDialogOrder, setShipmentDialogOrder] = useState<any | null>(null)
+  const [shipmentBarcodes, setShipmentBarcodes] = useState<Record<string, string>>({})
+  const [shipmentBusy, setShipmentBusy] = useState(false)
   const [paymentDialogOrder, setPaymentDialogOrder] = useState<any | null>(null)
   const [paymentRoute, setPaymentRoute] = useState<PaymentRoute>('platform')
   const [paymentSettings, setPaymentSettings] = useState<StorePaymentSettings | null>(null)
@@ -246,18 +248,44 @@ export default function OrdersPage() {
         ]
   }, [view, sellerNeedsAction, sellerInMotion, sellerCompleted, sellerOrders, buyerAttention, buyerHistory, buyerOrders])
 
-  async function confirmShipment(orderId: string) {
+  function openShipmentDialog(order: any) {
+    const next: Record<string, string> = {}
+    for (const item of getGoodsItems(order)) {
+      next[item.id] = Array.isArray(item.shippedBarcodes) ? item.shippedBarcodes.join('\n') : ''
+    }
+    setShipmentBarcodes(next)
+    setShipmentDialogOrder(order)
+  }
+
+  async function confirmShipment(order: any) {
     try {
-      const updated = await db.shipOrder?.(orderId, true)
+      const goodsItems = getGoodsItems(order)
+      const shipmentItems = goodsItems.map((item: any) => {
+        const raw = shipmentBarcodes[item.id] || ''
+        const barcodes = raw
+          .split('\n')
+          .map((value) => value.trim())
+          .filter(Boolean)
+        if (barcodes.length !== Number(item.quantity || 0)) {
+          throw new Error(`Enter ${item.quantity} barcode${item.quantity === 1 ? '' : 's'} for ${item.title}.`)
+        }
+        return {
+          orderItemId: item.id,
+          barcodes,
+        }
+      })
+      setShipmentBusy(true)
+      const updated = await db.shipOrder?.(order.id, { ackPaid: true, items: shipmentItems })
       if (updated) {
-        setSellerOrders((current) => current.map((order: any) => (order.id === orderId ? updated : order)))
+        setSellerOrders((current) => current.map((entry: any) => (entry.id === order.id ? updated : entry)))
         window.dispatchEvent(new CustomEvent('orders:changed'))
       }
       setActionError(null)
+      setShipmentDialogOrder(null)
     } catch (err: unknown) {
       setActionError(err instanceof Error ? err.message : 'Unable to mark order as shipped.')
     } finally {
-      setPendingAction(null)
+      setShipmentBusy(false)
     }
   }
 
@@ -380,10 +408,10 @@ export default function OrdersPage() {
                           </button>
                         </>
                       ) : null}
-                      {isServiceOrder(order) || isPaidOrder(order) ? (
+                      {isServiceOrder(order) || isShippableGoodsOrder(order) ? (
                         <button
                           className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
-                          onClick={() => (isServiceOrder(order) ? openServiceAction(order) : setPendingAction({ orderId: order.id, kind: 'shipment' }))}
+                          onClick={() => (isServiceOrder(order) ? openServiceAction(order) : openShipmentDialog(order))}
                         >
                           {isServiceOrder(order) ? 'Manage appointment' : 'Confirm shipped'}
                         </button>
@@ -763,27 +791,58 @@ export default function OrdersPage() {
       ) : null}
 
       {view === 'seller' ? renderSellerBoards() : renderBuyerBoards()}
-      <AlertDialog open={Boolean(pendingAction)} onOpenChange={(open: boolean) => { if (!open) setPendingAction(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm shipment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Use this after you have handed the order to the carrier or completed dispatch.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+      <Dialog open={Boolean(shipmentDialogOrder)} onOpenChange={(open) => { if (!open) setShipmentDialogOrder(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm shipped</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 text-sm text-slate-600'>
+            <p>
+              Enter the barcode for each unit being shipped. Add one barcode per line for every item below.
+            </p>
+            {(shipmentDialogOrder ? getGoodsItems(shipmentDialogOrder) : []).map((item: any) => (
+              <label key={item.id} className='block space-y-2 rounded-2xl border border-slate-200 p-4'>
+                <div className='flex flex-wrap items-center justify-between gap-2'>
+                  <div className='font-semibold text-slate-900'>{item.title}</div>
+                  <div className='text-xs text-slate-500'>Quantity: {item.quantity}</div>
+                </div>
+                <textarea
+                  rows={Math.max(3, Number(item.quantity || 1))}
+                  value={shipmentBarcodes[item.id] || ''}
+                  onChange={(event) =>
+                    setShipmentBarcodes((current) => ({
+                      ...current,
+                      [item.id]: event.target.value,
+                    }))
+                  }
+                  placeholder='One barcode per line'
+                  className='w-full rounded-2xl border border-slate-200 p-3 text-sm'
+                />
+              </label>
+            ))}
+          </div>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-end'>
+            <button
+              type='button'
+              className='rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700'
+              onClick={() => setShipmentDialogOrder(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type='button'
+              className='rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white hover:bg-amber-500 disabled:opacity-60'
+              disabled={!shipmentDialogOrder || shipmentBusy}
               onClick={() => {
-                if (!pendingAction) return
-                void confirmShipment(pendingAction.orderId)
+                if (!shipmentDialogOrder) return
+                void confirmShipment(shipmentDialogOrder)
               }}
             >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {shipmentBusy ? 'Saving…' : 'Confirm shipped'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={Boolean(paymentDialogOrder)} onOpenChange={(open) => { if (!open) setPaymentDialogOrder(null) }}>
         <DialogContent>
           <DialogHeader>

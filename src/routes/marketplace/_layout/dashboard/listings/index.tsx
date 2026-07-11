@@ -4,6 +4,7 @@ import { Filter, PlusCircle, MoreVertical } from 'lucide-react'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
@@ -14,6 +15,15 @@ function SellerListingsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [stockDialogOpen, setStockDialogOpen] = useState(false)
+  const [stockProductId, setStockProductId] = useState('')
+  const [supplierName, setSupplierName] = useState('')
+  const [supplierReference, setSupplierReference] = useState('')
+  const [unitCost, setUnitCost] = useState('')
+  const [stockQuantity, setStockQuantity] = useState('')
+  const [barcodeLines, setBarcodeLines] = useState('')
+  const [stockBusy, setStockBusy] = useState(false)
+  const [stockFeedback, setStockFeedback] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -47,6 +57,46 @@ function SellerListingsPage() {
     return mine.filter((product) => [product.title, product.slug, product.barcode, product.type].some((field) => field?.toLowerCase?.().includes(term)))
   }, [mine, query])
 
+  async function submitStockIntake() {
+    if (!stockProductId) {
+      setStockFeedback('Choose a listing before recording stock.')
+      return
+    }
+    const barcodes = barcodeLines
+      .split('\n')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const quantity = Number(stockQuantity || 0)
+    if (!barcodes.length && (!Number.isFinite(quantity) || quantity <= 0)) {
+      setStockFeedback('Enter at least one barcode or a quantity.')
+      return
+    }
+    try {
+      setStockBusy(true)
+      await db.createStockIntake?.({
+        productId: stockProductId,
+        supplierName,
+        supplierReference,
+        unitCost: unitCost ? Number(unitCost) : undefined,
+        quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : undefined,
+        barcodes,
+      })
+      const refreshed = await db.listProducts()
+      setProducts(refreshed)
+      setStockFeedback('Stock purchase recorded.')
+      setSupplierName('')
+      setSupplierReference('')
+      setUnitCost('')
+      setStockQuantity('')
+      setBarcodeLines('')
+      setStockDialogOpen(false)
+    } catch (error) {
+      setStockFeedback(error instanceof Error ? error.message : 'Unable to record stock purchase.')
+    } finally {
+      setStockBusy(false)
+    }
+  }
+
   return (
     <MarketplacePageShell width='wide' className='space-y-8'>
       <header className='flex flex-wrap items-center justify-between gap-4'>
@@ -54,13 +104,32 @@ function SellerListingsPage() {
           <h1 className='text-3xl font-semibold text-slate-900'>Catalogue manager</h1>
           <p className='mt-1 text-sm text-slate-600'>Launch, optimise, and organise your Hedgetech listings from a single workspace.</p>
         </div>
-        <Link
-          to='/marketplace/dashboard/listings/new'
-          className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500'
-        >
-          <PlusCircle className='h-4 w-4' /> New listing
-        </Link>
+        <div className='flex flex-wrap gap-2'>
+          <button
+            type='button'
+            className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700'
+            onClick={() => {
+              setStockProductId(mine[0]?.id || '')
+              setStockFeedback(null)
+              setStockDialogOpen(true)
+            }}
+          >
+            Record stock purchase
+          </button>
+          <Link
+            to='/marketplace/dashboard/listings/new'
+            className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500'
+          >
+            <PlusCircle className='h-4 w-4' /> New listing
+          </Link>
+        </div>
       </header>
+
+      {stockFeedback ? (
+        <div className={`rounded-2xl border px-4 py-3 text-sm ${stockFeedback.toLowerCase().includes('recorded') ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          {stockFeedback}
+        </div>
+      ) : null}
 
       <section className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
         <div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm'>
@@ -217,6 +286,73 @@ function SellerListingsPage() {
           })}
         </div>
       </section>
+      <Dialog open={stockDialogOpen} onOpenChange={setStockDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record stock purchase</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4 text-sm text-slate-600'>
+            <label className='block space-y-2'>
+              <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Listing</span>
+              <select
+                value={stockProductId}
+                onChange={(event) => setStockProductId(event.target.value)}
+                className='w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm'
+              >
+                <option value=''>Select a listing</option>
+                {mine.filter((product) => product.type !== 'service').map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <label className='block space-y-2'>
+                <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Supplier name</span>
+                <Input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder='Wholesaler or vendor' />
+              </label>
+              <label className='block space-y-2'>
+                <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Supplier reference</span>
+                <Input value={supplierReference} onChange={(event) => setSupplierReference(event.target.value)} placeholder='Invoice or PO number' />
+              </label>
+            </div>
+            <div className='grid gap-3 sm:grid-cols-2'>
+              <label className='block space-y-2'>
+                <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Unit cost (optional)</span>
+                <Input type='number' min='0' step='0.01' value={unitCost} onChange={(event) => setUnitCost(event.target.value)} placeholder='0.00' />
+              </label>
+              <label className='block space-y-2'>
+                <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Manual quantity (optional)</span>
+                <Input type='number' min='0' step='1' value={stockQuantity} onChange={(event) => setStockQuantity(event.target.value)} placeholder='Used when barcodes are not available' />
+              </label>
+            </div>
+            <label className='block space-y-2'>
+              <span className='text-xs font-semibold uppercase tracking-wide text-slate-500'>Barcodes</span>
+              <textarea
+                rows={8}
+                value={barcodeLines}
+                onChange={(event) => setBarcodeLines(event.target.value)}
+                placeholder='One barcode per line'
+                className='w-full rounded-2xl border border-slate-200 p-3 text-sm'
+              />
+            </label>
+          </div>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-end'>
+            <button type='button' className='rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700' onClick={() => setStockDialogOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type='button'
+              className='rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60'
+              disabled={stockBusy}
+              onClick={() => void submitStockIntake()}
+            >
+              {stockBusy ? 'Saving…' : 'Save stock purchase'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MarketplacePageShell>
   )
 }
