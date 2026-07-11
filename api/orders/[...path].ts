@@ -9,12 +9,15 @@ authMiddleware(app)
 app.use('/', createApiRouter())
 const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
 
+function buildRemoteOrdersPath(req: any) {
+  const incomingUrl = new URL(String(req.url || '/api/orders'), 'http://localhost')
+  const normalizedPath = incomingUrl.pathname.replace(/^\/api\/orders/, '') || ''
+  return `/api/integrations/marketplace/orders${normalizedPath}`
+}
+
 export default function handler(req: any, res: any) {
   if (MARKETPLACE_CONSUMER_MODE) {
-    const requestUrl = String(req.url || '')
-    const remotePath =
-      requestUrl.replace(/^\/api\/orders/, '/api/integrations/marketplace/orders') ||
-      '/api/integrations/marketplace/orders'
+    const remotePath = buildRemoteOrdersPath(req)
     return proxyGangLedgerJson(req, res, remotePath, {
       allowMethods: ['GET', 'POST'],
       notSupportedMessage: 'Marketplace orders are managed by Gang Ledger.',

@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
+import { isMarketplaceConsumerMode, notSupportedInConsumerMode } from './consumer.js'
 
 function imageForServer(query, w = 640, h = 640) {
   const provider = process.env.VITE_IMAGE_PROVIDER || 'brand'
@@ -220,6 +221,8 @@ const SELLER_APPLICATION_SEEDS = [
     reviewerNotes: 'Documents verified by ops team.',
   },
 ]
+
+const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
 
 // No seeding in API
 
@@ -653,6 +656,37 @@ export function createApiRouter() {
     return null
   }
 
+  function sellerStatusFromConsumerSession(req) {
+    return req.user?.marketplaceEligible || req.user?.marketplaceCatalog || req.user?.marketplaceApi || req.user?.isAdmin
+      ? 'approved'
+      : 'not_submitted'
+  }
+
+  function buildConsumerSellerApplication(req, input = {}) {
+    const email = typeof req.user?.email === 'string' ? String(req.user.email).trim().toLowerCase() : ''
+    if (!email) return null
+    const status = sellerStatusFromConsumerSession(req)
+    const name = typeof req.user?.name === 'string' ? req.user.name : ''
+    const now = new Date().toISOString()
+    return {
+      id: `gangledger-${email}`,
+      email,
+      companyName: String(input.companyName || '').trim() || name || 'Gang Ledger seller',
+      contactName: String(input.contactName || '').trim() || name || 'Seller',
+      phone: String(input.phone || '').trim(),
+      location: input.location ? String(input.location).trim() : undefined,
+      documents: normalizeSellerDocuments(input.documents),
+      pitch: input.pitch ? String(input.pitch).trim() : undefined,
+      status,
+      submittedAt: now,
+      reviewedAt: status === 'approved' ? now : undefined,
+      reviewerNotes:
+        status === 'approved' ? 'Seller access is already managed through your Gang Ledger account.' : undefined,
+      createdAt: now,
+      updatedAt: now,
+    }
+  }
+
   router.get('/health', (_req, res) => res.json({ ok: true }))
 
   // ---------------- Amazing Freight (Admin) ----------------
@@ -664,6 +698,12 @@ export function createApiRouter() {
 
   router.get('/seller/application', ensureAuth, async (req, res) => {
     try {
+      if (MARKETPLACE_CONSUMER_MODE) {
+        return res.json({
+          application: null,
+          status: sellerStatusFromConsumerSession(req),
+        })
+      }
       await ensureSellerApplicationsSeeded()
       const actor = await resolveSellerActor(req)
       if (!actor.email && !actor.userId) {
@@ -689,6 +729,11 @@ export function createApiRouter() {
       const parsed = sellerApplicationInputSchema.safeParse(req.body || {})
       if (!parsed.success) {
         return res.status(400).json({ error: 'Invalid seller verification payload', details: parsed.error.flatten() })
+      }
+      if (MARKETPLACE_CONSUMER_MODE) {
+        const application = buildConsumerSellerApplication(req, parsed.data)
+        if (!application) return res.status(400).json({ error: 'Signed-in email is required for seller verification.' })
+        return res.status(200).json({ application, status: application.status })
       }
       const actor = await resolveSellerActor(req)
       if (!actor.email) return res.status(400).json({ error: 'Signed-in email is required for seller verification.' })
@@ -732,6 +777,9 @@ export function createApiRouter() {
 
   router.get('/seller/applications', ensureAuth, ensureAdmin, async (_req, res) => {
     try {
+      if (MARKETPLACE_CONSUMER_MODE) {
+        return res.json({ applications: [] })
+      }
       await ensureSellerApplicationsSeeded()
       const applications = await prisma.sellerApplication.findMany({ orderBy: [{ submittedAt: 'desc' }] })
       return res.json({ applications: applications.map(sellerApplicationToResponse) })
@@ -743,6 +791,9 @@ export function createApiRouter() {
 
   router.post('/seller/applications/:id/review', ensureAuth, ensureAdmin, async (req, res) => {
     try {
+      if (MARKETPLACE_CONSUMER_MODE) {
+        return notSupportedInConsumerMode(res, 'Seller verification review is managed through Gang Ledger.')
+      }
       const applicationId = String(req.params.id || '').trim()
       if (!applicationId) return res.status(400).json({ error: 'Missing seller application id' })
       const parsed = sellerApplicationReviewSchema.safeParse(req.body || {})

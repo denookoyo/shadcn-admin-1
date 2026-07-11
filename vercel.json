@@ -1,10 +1,9 @@
 {
-    "version": 2,
-    "framework": null,
-    "buildCommand": "pnpm run build",
-    "outputDirectory": "dist",
+  "version": 2,
+  "framework": null,
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api?path=$1" },
     { "source": "/docs/user-guides", "destination": "/docs/user-guides/index.html" },
     { "source": "/docs/user-guides/marketplace-rules", "destination": "/docs/user-guides/marketplace-rules.html" },
     { "source": "/docs/user-guides/seller-guide", "destination": "/docs/user-guides/seller-guide.html" },
