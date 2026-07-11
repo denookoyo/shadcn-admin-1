@@ -9,9 +9,16 @@ authMiddleware(app)
 app.use('/', createApiRouter())
 const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
 
+function buildRemoteProductsPath(req: any) {
+  const incomingUrl = new URL(String(req.url || '/api/products'), 'http://localhost')
+  const rewrittenPath = String(incomingUrl.searchParams.get('path') || '').trim().replace(/^\/+/, '')
+  const normalizedPath = rewrittenPath ? `/${rewrittenPath}` : incomingUrl.pathname.replace(/^\/api\/products/, '') || ''
+  return `/api/integrations/marketplace/products${normalizedPath}`
+}
+
 export default function handler(req: any, res: any) {
   if (MARKETPLACE_CONSUMER_MODE) {
-    return proxyGangLedgerJson(req, res, '/api/integrations/marketplace/products', {
+    return proxyGangLedgerJson(req, res, buildRemoteProductsPath(req), {
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
       notSupportedMessage: 'Product edits are synchronized through Gang Ledger.',
     })

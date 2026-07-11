@@ -11,7 +11,8 @@ const MARKETPLACE_CONSUMER_MODE = isMarketplaceConsumerMode()
 
 function buildRemoteOrdersPath(req: any) {
   const incomingUrl = new URL(String(req.url || '/api/orders'), 'http://localhost')
-  const normalizedPath = incomingUrl.pathname.replace(/^\/api\/orders/, '') || ''
+  const rewrittenPath = String(incomingUrl.searchParams.get('path') || '').trim().replace(/^\/+/, '')
+  const normalizedPath = rewrittenPath ? `/${rewrittenPath}` : incomingUrl.pathname.replace(/^\/api\/orders/, '') || ''
   return `/api/integrations/marketplace/orders${normalizedPath}`
 }
 
