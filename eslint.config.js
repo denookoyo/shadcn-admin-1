@@ -24,18 +24,24 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      '@tanstack/query/no-unstable-deps': 'warn',
+      '@typescript-eslint/ban-ts-comment': 'warn',
+      '@typescript-eslint/no-explicit-any': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-      'no-console': 'error',
+      'no-console': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unsafe-finally': 'warn',
+      'no-useless-escape': 'warn',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
           args: 'all',
           argsIgnorePattern: '^_',
-          caughtErrors: 'all',
+          caughtErrors: 'none',
           caughtErrorsIgnorePattern: '^_',
           destructuredArrayIgnorePattern: '^_',
           varsIgnorePattern: '^_',

@@ -52,7 +52,7 @@ Copy `.env` and set values for your environment. Required keys vary by feature. 
 - JWT_SECRET / NEXTAUTH_SECRET: JWT signing secret (cookies)
 - VITE_GOOGLE_CLIENT_ID / GOOGLE_CLIENT_ID: Google OAuth Client ID
 - OPENAI_API_KEY: required for the AI product description endpoint and the new sales assistant
-- EXTERNAL_PRODUCTS_API_KEY: shared secret required for the external products API (Flutter/mobile clients)
+- EXTERNAL_PRODUCTS_API_KEY: optional legacy read-only shared secret for external product/category feeds. New integrations should use managed API applications.
 
 3) Database
 
@@ -87,14 +87,42 @@ Health
 
 Products & Categories
 - GET /api/products — list products (enriched with owner metrics)
-- GET /api/external/products — API-key protected product feed for external clients (`x-api-key` header)
-- GET /api/external/categories — API-key protected categories list for external clients
-- GET /api/external/products/:id — API-key protected product detail lookup (id or slug)
 - POST /api/products — create product (auth)
 - PUT /api/products — update product (auth)
 - DELETE /api/products — delete product (auth)
 - GET /api/categories — list categories
 - POST|PUT|DELETE /api/categories — manage categories (auth)
+
+OAuth/API Applications
+- GET /api/oauth/scopes — list available API-key scopes (admin auth)
+- GET|POST /api/oauth/applications — list or create third-party API applications (admin auth)
+- GET|PUT|DELETE /api/oauth/applications/:id — view, update, or delete an API application (admin auth)
+- POST /api/oauth/applications/:id/rotate-key — rotate an API key; the raw key is returned once (admin auth)
+- POST /api/oauth/applications/:id/rotate-client-secret — rotate the OAuth client secret; the raw secret is returned once (admin auth)
+- External apps authenticate with `Authorization: Bearer <apiKey>` or `x-api-key: <apiKey>`
+- Scopes: `products:read`, `products:write`, `categories:read`, `categories:write`, `orders:read`, `orders:write`, `sales:read`, `refunds:read`, `refunds:write`, `profile:read`, `*`
+
+OAuth Authorization Code Flow
+- Browser entrypoint: `/oauth/authorize?client_id=...&redirect_uri=...&response_type=code&scope=products:read%20orders:read&state=...`
+- Validation endpoint: `GET /api/oauth/authorize/request`
+- Consent endpoint: `POST /api/oauth/authorize`
+- Token exchange: `POST /api/oauth/token`
+- Token revoke: `POST /api/oauth/revoke`
+- User profile: `GET /api/oauth/userinfo`
+- OAuth clients must be created with `oauthEnabled: true` and at least one `redirectUris` entry
+- `POST /api/oauth/token` supports `grant_type=authorization_code` and `grant_type=refresh_token`
+
+External CRUD
+- GET|POST /api/external/products — list or create products by API key
+- GET|PUT|DELETE /api/external/products/:id — read, update, or delete a product by id or slug
+- GET|POST /api/external/categories — list or create categories by API key
+- PUT|DELETE /api/external/categories/:id — update or delete a category by id or slug
+- GET|POST /api/external/orders — list or create orders by API key
+- GET|PUT|DELETE /api/external/orders/:id — read, update, or delete an order by API key
+- GET /api/external/sales/summary — sales totals and revenue summary for a connected seller
+- GET /api/external/refunds — list refunds for the connected account
+- POST /api/external/orders/:id/refund — create a refund request
+- POST /api/external/refunds/:id/review — accept, reject, or mark a refund as refunded
 
 Cart & Checkout
 - GET /api/cart — get a user cart (cookie-based or userId)

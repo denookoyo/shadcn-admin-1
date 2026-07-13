@@ -29,6 +29,7 @@ type FormState = {
   img: string
   gallery: string[]
   barcode?: string
+  barcodeText: string
   stockCount: number
   serviceOpenDays: string[]
   serviceOpenTime: string
@@ -47,6 +48,7 @@ const emptyState: FormState = {
   img: '',
   gallery: [],
   barcode: '',
+  barcodeText: '',
   stockCount: 0,
   serviceOpenDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
   serviceOpenTime: '09:00',
@@ -105,6 +107,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         img: product.img,
         gallery: product.images ?? [],
         barcode: product.barcode,
+        barcodeText: Array.isArray((product as any)?.barcodes) ? ((product as any).barcodes as string[]).join('\n') : '',
         stockCount: Number((product as any)?.stockCount ?? (product as any)?.inventory ?? 0),
         serviceOpenDays: Array.isArray((product as any)?.serviceOpenDays) && (product as any)?.serviceOpenDays.length
           ? ((product as any)?.serviceOpenDays as string[])
@@ -135,6 +138,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         img: product.img,
         gallery: product.images ?? [],
         barcode: product.barcode,
+        barcodeText: Array.isArray((product as any)?.barcodes) ? ((product as any).barcodes as string[]).join('\n') : '',
         stockCount: Number((product as any)?.stockCount ?? (product as any)?.inventory ?? 0),
         serviceOpenDays: Array.isArray((product as any)?.serviceOpenDays) && (product as any)?.serviceOpenDays.length
           ? ((product as any)?.serviceOpenDays as string[])
@@ -151,6 +155,19 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
     if (!form.gallery.length && form.img) return [form.img]
     return form.gallery
   }, [form.gallery, form.img])
+
+  const normalizedBarcodes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          form.barcodeText
+            .split(/[\n,;]+/)
+            .map((value) => value.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [form.barcodeText],
+  )
 
   const isService = form.type === 'service'
   const openTimeLabel = form.serviceOpenTime || '09:00'
@@ -186,6 +203,7 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         return undefined
       })()
       const stockCount = Math.max(0, Number(form.stockCount) || 0)
+      const resolvedStockCount = isService ? 0 : normalizedBarcodes.length > 0 ? normalizedBarcodes.length : stockCount
       const serviceDurationMinutes = Math.max(15, Number(form.serviceDurationMinutes) || 60)
       const serviceDailyCapacity = Math.max(1, Number(form.serviceDailyCapacity) || 1)
       const serviceOpenTime = (form.serviceOpenTime || '09:00').slice(0, 5)
@@ -198,11 +216,12 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
         rating: product?.rating,
         type: form.type,
         img: ensureAbsoluteUrl(form.img),
-        barcode: form.barcode?.trim() || undefined,
+        barcode: form.barcode?.trim() || normalizedBarcodes[0] || undefined,
+        barcodes: isService ? [] : normalizedBarcodes,
         description: form.description.trim() || undefined,
         images: form.gallery.length ? form.gallery.map(ensureAbsoluteUrl) : undefined,
         categoryId: product?.categoryId,
-        stockCount,
+        stockCount: resolvedStockCount,
         serviceOpenDays: isService ? form.serviceOpenDays : [],
         serviceOpenTime: isService ? serviceOpenTime : undefined,
         serviceCloseTime: isService ? serviceCloseTime : undefined,
@@ -367,7 +386,11 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
                 min={0}
                 value={form.stockCount}
                 onChange={(event) => setForm((state) => ({ ...state, stockCount: Number(event.target.value) }))}
+                disabled={!isService && normalizedBarcodes.length > 0}
               />
+              {!isService && normalizedBarcodes.length > 0 ? (
+                <p className='text-xs text-slate-500'>Derived from barcode units below.</p>
+              ) : null}
             </div>
           </div>
 
@@ -392,8 +415,38 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
                 value={form.barcode ?? ''}
                 onChange={(event) => setForm((state) => ({ ...state, barcode: event.target.value }))}
               />
+              <p className='text-xs text-slate-500'>Primary fallback code. Bulk stock barcodes can be added separately.</p>
             </div>
           </div>
+
+          {!isService ? (
+            <div className='space-y-2'>
+              <Label htmlFor='barcodeText'>Stock barcodes</Label>
+              <Textarea
+                id='barcodeText'
+                placeholder={'ABC-001\nABC-002\nABC-003'}
+                rows={7}
+                value={form.barcodeText}
+                onChange={(event) => {
+                  const nextBarcodeText = event.target.value
+                  const count = Array.from(
+                    new Set(
+                      nextBarcodeText
+                        .split(/[\n,;]+/)
+                        .map((value) => value.trim())
+                        .filter(Boolean),
+                    ),
+                  ).length
+                  setForm((state) => ({
+                    ...state,
+                    barcodeText: nextBarcodeText,
+                    stockCount: count > 0 ? count : state.stockCount,
+                  }))
+                }}
+              />
+              <p className='text-xs text-slate-500'>One code per line. When provided, stock is kept from these barcode units.</p>
+            </div>
+          ) : null}
 
           <div className='space-y-2'>
             <Label htmlFor='description'>Description</Label>
@@ -602,6 +655,12 @@ export function ProductEditor({ mode, product }: ProductEditorProps) {
               <span>Barcode</span>
               <span className='font-semibold text-slate-900'>{form.barcode || '—'}</span>
             </div>
+            {!isService ? (
+              <div className='flex items-center justify-between'>
+                <span>Tracked barcodes</span>
+                <span className='font-semibold text-slate-900'>{normalizedBarcodes.length}</span>
+              </div>
+            ) : null}
           </div>
         </div>
 

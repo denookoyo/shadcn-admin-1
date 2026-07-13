@@ -6,13 +6,6 @@ const getPrisma = async () => {
   return new PrismaClient()
 }
 
-function imageForServer(query: string, w = 640, h = 640) {
-  const provider = process.env.VITE_IMAGE_PROVIDER || 'picsum'
-  if (provider === 'picsum') return `https://picsum.photos/seed/${encodeURIComponent(query)}/${w}/${h}`
-  if (provider === 'placeholder') return `https://placehold.co/${w}x${h}?text=${encodeURIComponent(query)}`
-  return `https://source.unsplash.com/${w}x${h}/?${encodeURIComponent(query)}`
-}
-
 // No dummy seed data; always return what's in the database
 
 export const handler: Handler = async (event) => {

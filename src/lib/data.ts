@@ -725,7 +725,11 @@ const localWrapper: DataAPI = {
   },
   async getProductByBarcode(code: string) {
     const list = await ensureLocalProducts()
-    const p = list.find((x: any) => String(x.barcode || '').trim() === String(code).trim())
+    const normalized = String(code || '').trim()
+    const p = list.find((x: any) =>
+      String(x.barcode || '').trim() === normalized ||
+      (Array.isArray(x.barcodes) && x.barcodes.some((value: string) => String(value || '').trim() === normalized))
+    )
     return p || null
   },
   async createProduct(input: Omit<Product, 'id'>) { return localdb.createProduct(input) },

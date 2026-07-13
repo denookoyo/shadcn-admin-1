@@ -18,7 +18,14 @@ function buildRemoteProductsPath(req: any) {
 
 export default function handler(req: any, res: any) {
   if (MARKETPLACE_CONSUMER_MODE) {
-    return proxyGangLedgerJson(req, res, buildRemoteProductsPath(req), {
+    const incomingUrl = new URL(String(req.url || '/api/products'), 'http://localhost')
+    const rewrittenPath = String(incomingUrl.searchParams.get('path') || '').trim().replace(/^\/+/, '')
+    const normalizedPath = rewrittenPath ? `/${rewrittenPath}` : incomingUrl.pathname.replace(/^\/api\/products/, '') || ''
+    const barcodeMatch = normalizedPath.match(/^\/barcode\/(.+)$/)
+    const remotePath = barcodeMatch
+      ? `/api/integrations/marketplace/products/barcode/${encodeURIComponent(decodeURIComponent(barcodeMatch[1]).trim())}`
+      : buildRemoteProductsPath(req)
+    return proxyGangLedgerJson(req, res, remotePath, {
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE'],
       notSupportedMessage: 'Product edits are synchronized through Gang Ledger.',
     })

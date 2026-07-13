@@ -635,7 +635,6 @@ function MessageBubble({ message }: { message: AssistantMessage }) {
             remarkPlugins={[remarkGfm]}
             components={{
               img: ({ src, alt }) => (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={src ?? ''}
                   alt={alt ?? ''}

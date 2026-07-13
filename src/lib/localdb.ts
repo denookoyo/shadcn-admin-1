@@ -36,6 +36,7 @@ export type Product = {
   type: ProductType
   img: string
   barcode?: string
+  barcodes?: string[]
   description?: string
   images?: string[]
   ownerId?: string | number | null
@@ -165,13 +166,18 @@ export const db = {
   },
   async createProduct(input: Omit<Product, 'id'>, namespace?: string): Promise<Product> {
     const products = await this.listProducts(namespace)
+    const normalizedBarcodes = Array.isArray(input.barcodes)
+      ? Array.from(new Set(input.barcodes.map((value) => String(value || '').trim()).filter(Boolean)))
+      : []
     const product: Product = {
       id: uid('prod'),
-      stockCount: input.stockCount ?? 0,
+      ...input,
+      barcode: input.barcode ?? normalizedBarcodes[0],
+      barcodes: normalizedBarcodes,
+      stockCount: normalizedBarcodes.length > 0 ? normalizedBarcodes.length : input.stockCount ?? 0,
       serviceOpenDays: input.serviceOpenDays ?? [],
       vertical: input.vertical ?? 'commerce',
       spaceProfile: input.spaceProfile ?? null,
-      ...input,
     }
     write(nsKey('db_products', namespace), [product, ...products])
     return product
@@ -180,7 +186,19 @@ export const db = {
     const products = await this.listProducts(namespace)
     const idx = products.findIndex((p) => p.id === id)
     if (idx === -1) return undefined
-    const updated = { ...products[idx], ...patch }
+    const normalizedBarcodes = Array.isArray(patch.barcodes)
+      ? Array.from(new Set(patch.barcodes.map((value) => String(value || '').trim()).filter(Boolean)))
+      : undefined
+    const updated = {
+      ...products[idx],
+      ...patch,
+      barcode: patch.barcode ?? normalizedBarcodes?.[0] ?? products[idx].barcode,
+      barcodes: normalizedBarcodes ?? products[idx].barcodes,
+      stockCount:
+        normalizedBarcodes && normalizedBarcodes.length > 0
+          ? normalizedBarcodes.length
+          : patch.stockCount ?? products[idx].stockCount,
+    }
     products[idx] = updated
     write(nsKey('db_products', namespace), products)
     return updated

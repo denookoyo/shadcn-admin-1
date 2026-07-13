@@ -1,6 +1,6 @@
 import express from 'express'
 import { z } from 'zod'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
@@ -230,6 +230,47 @@ export function createApiRouter() {
   const router = express.Router()
   const prisma = getPrisma()
   const externalApiKey = (process.env.EXTERNAL_PRODUCTS_API_KEY || '').trim()
+  const apiKeyPrefix = 'hgt_live_'
+  const apiKeyPreviewLength = 18
+  const clientSecretPrefix = 'hgt_cls_'
+  const accessTokenPrefix = 'hgt_oat_'
+  const refreshTokenPrefix = 'hgt_ort_'
+  const externalApiScopes = [
+    'products:read',
+    'products:write',
+    'categories:read',
+    'categories:write',
+    'orders:read',
+    'orders:write',
+    'sales:read',
+    'refunds:read',
+    'refunds:write',
+    'profile:read',
+    '*',
+  ]
+  const externalApiScopeSet = new Set(externalApiScopes)
+  const legacyExternalScopes = ['products:read', 'categories:read']
+  const oauthTokenLifetimeMs = 60 * 60 * 1000
+  const oauthRefreshTokenLifetimeMs = 30 * 24 * 60 * 60 * 1000
+  const oauthAuthorizationCodeLifetimeMs = 10 * 60 * 1000
+
+  const apiApplicationCreateSchema = z.object({
+    name: z.string().trim().min(2).max(120),
+    scopes: z.union([z.array(z.string()), z.string()]).optional(),
+    description: z.string().trim().max(400).optional().nullable(),
+    redirectUris: z.array(z.string().url()).max(10).optional(),
+    oauthEnabled: z.boolean().optional(),
+  })
+
+  const apiApplicationUpdateSchema = z.object({
+    name: z.string().trim().min(2).max(120).optional(),
+    scopes: z.union([z.array(z.string()), z.string()]).optional(),
+    active: z.boolean().optional(),
+    description: z.string().trim().max(400).optional().nullable(),
+    redirectUris: z.array(z.string().url()).max(10).optional(),
+    oauthEnabled: z.boolean().optional(),
+  })
+
   function baseUrlFromRequest(req) {
     const protoHeader = req.headers['x-forwarded-proto'] || req.protocol || 'https'
     const proto = Array.isArray(protoHeader) ? protoHeader[0] : String(protoHeader).split(',')[0]
@@ -352,6 +393,310 @@ export function createApiRouter() {
           }
         : null,
       conciergeIntro: profile.conciergeIntro ? String(profile.conciergeIntro) : null,
+    }
+  }
+
+  function normalizeSlug(value, fallback = 'item') {
+    const source = String(value || fallback)
+    return source
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+      .slice(0, 80) || fallback
+  }
+
+  function stripUndefined(record) {
+    return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined))
+  }
+
+  function timingSafeStringEqual(left, right) {
+    const leftBuffer = Buffer.from(String(left || ''))
+    const rightBuffer = Buffer.from(String(right || ''))
+    if (leftBuffer.length !== rightBuffer.length) return false
+    return timingSafeEqual(leftBuffer, rightBuffer)
+  }
+
+  function hashSecret(value) {
+    return createHash('sha256').update(String(value || '')).digest('hex')
+  }
+
+  function createApiCredential() {
+    const apiKey = `${apiKeyPrefix}${randomBytes(32).toString('base64url')}`
+    return {
+      apiKey,
+      apiKeyHash: hashSecret(apiKey),
+      apiKeyPrefix: apiKey.slice(0, apiKeyPreviewLength),
+    }
+  }
+
+  function createClientId() {
+    return `hgt_client_${randomBytes(16).toString('hex')}`
+  }
+
+  function createClientSecretCredential() {
+    const clientSecret = `${clientSecretPrefix}${randomBytes(32).toString('base64url')}`
+    return {
+      clientSecret,
+      clientSecretHash: hashSecret(clientSecret),
+      clientSecretPrefix: clientSecret.slice(0, apiKeyPreviewLength),
+    }
+  }
+
+  function createOAuthTokenCredential(prefix) {
+    const token = `${prefix}${randomBytes(32).toString('base64url')}`
+    return {
+      token,
+      tokenHash: hashSecret(token),
+      tokenPrefix: token.slice(0, apiKeyPreviewLength),
+    }
+  }
+
+  function normalizeApiScopes(rawScopes, fallback = ['products:read']) {
+    const raw = rawScopes === undefined || rawScopes === null || rawScopes === ''
+      ? fallback
+      : Array.isArray(rawScopes)
+        ? rawScopes
+        : String(rawScopes).split(/[,\s]+/)
+    const requested = raw.map((scope) => String(scope || '').trim()).filter(Boolean)
+    const invalid = requested.filter((scope) => !externalApiScopeSet.has(scope))
+    const scopes = [...new Set(requested.filter((scope) => externalApiScopeSet.has(scope)))]
+    return {
+      scopes: scopes.length ? scopes : fallback,
+      invalid,
+    }
+  }
+
+  function normalizeRedirectUris(value) {
+    if (!Array.isArray(value)) return []
+    return [...new Set(value.map((entry) => String(entry || '').trim()).filter(Boolean))]
+  }
+
+  function normalizeRequestedScopes(rawScopes, fallback = []) {
+    const raw = rawScopes === undefined || rawScopes === null || rawScopes === ''
+      ? fallback
+      : Array.isArray(rawScopes)
+        ? rawScopes
+        : String(rawScopes).split(/[,\s]+/)
+    return [...new Set(raw.map((scope) => String(scope || '').trim()).filter(Boolean))]
+  }
+
+  function apiApplicationToResponse(application) {
+    if (!application) return null
+    return {
+      id: application.id,
+      name: application.name,
+      description: application.description || null,
+      clientId: application.clientId,
+      clientSecretPrefix: application.clientSecretPrefix || null,
+      apiKeyPrefix: application.apiKeyPrefix,
+      scopes: Array.isArray(application.scopes) ? application.scopes : [],
+      active: Boolean(application.active),
+      oauthEnabled: Boolean(application.oauthEnabled),
+      redirectUris: Array.isArray(application.redirectUris) ? application.redirectUris : [],
+      createdById: application.createdById ?? null,
+      lastUsedAt: application.lastUsedAt?.toISOString?.() || null,
+      createdAt: application.createdAt?.toISOString?.() || null,
+      updatedAt: application.updatedAt?.toISOString?.() || null,
+    }
+  }
+
+  function extractBearerToken(req) {
+    const auth = String(req.get('authorization') || '').trim()
+    return String(auth.match(/^Bearer\s+(.+)$/i)?.[1] || '').trim()
+  }
+
+  function extractExternalCredential(req) {
+    return String(extractBearerToken(req) || req.get('x-api-key') || req.query.apiKey || req.query.api_key || '').trim()
+  }
+
+  function apiApplicationHasScope(application, scope) {
+    const scopes = Array.isArray(application?.scopes) ? application.scopes : []
+    const [resource] = String(scope || '').split(':')
+    return scopes.includes('*') || scopes.includes(scope) || scopes.includes(`${resource}:*`)
+  }
+
+  function apiApplicationsUnavailable(res) {
+    return res.status(503).json({ error: 'OAuth/API applications are not migrated. Run pnpm prisma:push to create the application and token tables.' })
+  }
+
+  function isMissingApiApplicationTable(error) {
+    const message = String(error?.message || '')
+    return error?.code === 'P2021'
+      || error?.code === 'P2022'
+      || message.includes('ApiApplication')
+      || message.includes('OauthAuthorizationCode')
+      || message.includes('OauthAccessToken')
+  }
+
+  async function resolveAuthenticatedUserId(req) {
+    const direct = Number(req.user?.uid)
+    if (Number.isFinite(direct) && direct > 0) return direct
+    const email = typeof req.user?.email === 'string' ? String(req.user.email).trim().toLowerCase() : ''
+    if (!email) return null
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } }).catch(() => null)
+    return user?.id ?? null
+  }
+
+  function formatOAuthTimestamp(value) {
+    return value?.toISOString?.() || null
+  }
+
+  function buildSafeRedirectUri(target, params = {}) {
+    const url = new URL(target)
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value))
+    }
+    return url.toString()
+  }
+
+  function parseClientCredentials(req) {
+    const auth = String(req.get('authorization') || '').trim()
+    if (/^Basic\s+/i.test(auth)) {
+      try {
+        const decoded = Buffer.from(auth.replace(/^Basic\s+/i, ''), 'base64').toString('utf8')
+        const separatorIndex = decoded.indexOf(':')
+        if (separatorIndex >= 0) {
+          return {
+            clientId: decoded.slice(0, separatorIndex),
+            clientSecret: decoded.slice(separatorIndex + 1),
+          }
+        }
+      } catch {}
+    }
+    return {
+      clientId: String(req.body?.client_id || req.body?.clientId || '').trim(),
+      clientSecret: String(req.body?.client_secret || req.body?.clientSecret || '').trim(),
+    }
+  }
+
+  function createAuthorizationCodeCredential() {
+    return createOAuthTokenCredential('hgt_oac_')
+  }
+
+  function buildTokenPair() {
+    const access = createOAuthTokenCredential(accessTokenPrefix)
+    const refresh = createOAuthTokenCredential(refreshTokenPrefix)
+    return {
+      accessToken: access.token,
+      accessTokenHash: access.tokenHash,
+      refreshToken: refresh.token,
+      refreshTokenHash: refresh.tokenHash,
+    }
+  }
+
+  async function authenticateApiApplicationByCredential(provided) {
+    if (!provided) return { ok: false, status: 401, error: 'API key required' }
+
+    if (externalApiKey && timingSafeStringEqual(provided, externalApiKey)) {
+      return {
+        ok: true,
+        application: {
+          id: 'legacy-env-key',
+          name: 'Legacy external API key',
+          clientId: 'legacy-env-key',
+          scopes: legacyExternalScopes,
+          active: true,
+          legacy: true,
+        },
+      }
+    }
+
+    if (!prisma.apiApplication) {
+      return { ok: false, status: 503, error: 'API applications are not available. Run pnpm prisma:generate and pnpm prisma:push.' }
+    }
+
+    try {
+      const application = await prisma.apiApplication.findUnique({ where: { apiKeyHash: hashSecret(provided) } })
+      if (!application || !application.active) return { ok: false, status: 401, error: 'Invalid API key' }
+      prisma.apiApplication.update({ where: { id: application.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+      return { ok: true, application }
+    } catch (error) {
+      if (isMissingApiApplicationTable(error)) {
+        return { ok: false, status: 503, error: 'API applications are not migrated. Run pnpm prisma:push.' }
+      }
+      throw error
+    }
+  }
+
+  async function authenticateOAuthAccessToken(req) {
+    const bearer = extractBearerToken(req)
+    if (!bearer || !prisma.oauthAccessToken) return { ok: false, status: 401, error: 'Bearer token required' }
+
+    try {
+      const token = await prisma.oauthAccessToken.findUnique({
+        where: { accessTokenHash: hashSecret(bearer) },
+        include: { application: true, user: true },
+      })
+      if (!token) return { ok: false, status: 401, error: 'Invalid access token' }
+      if (token.revokedAt) return { ok: false, status: 401, error: 'Access token revoked' }
+      if (new Date(token.expiresAt).getTime() <= Date.now()) return { ok: false, status: 401, error: 'Access token expired' }
+      prisma.oauthAccessToken.update({ where: { id: token.id }, data: { lastUsedAt: new Date() } }).catch(() => {})
+      return {
+        ok: true,
+        token,
+        application: token.application,
+        user: token.user,
+        scopes: Array.isArray(token.scopes) ? token.scopes : [],
+      }
+    } catch (error) {
+      if (isMissingApiApplicationTable(error)) {
+        return { ok: false, status: 503, error: 'OAuth tables are not migrated. Run pnpm prisma:push.' }
+      }
+      throw error
+    }
+  }
+
+  async function authenticateExternalCredential(req) {
+    const oauthAuth = await authenticateOAuthAccessToken(req)
+    if (oauthAuth.ok) {
+      return {
+        ok: true,
+        kind: 'oauth_token',
+        application: oauthAuth.application,
+        user: oauthAuth.user,
+        token: oauthAuth.token,
+        scopes: oauthAuth.scopes,
+      }
+    }
+
+    const provided = extractExternalCredential(req)
+    const apiKeyAuth = await authenticateApiApplicationByCredential(provided)
+    if (!apiKeyAuth.ok) return apiKeyAuth
+    return {
+      ok: true,
+      kind: 'api_key',
+      application: apiKeyAuth.application,
+      scopes: Array.isArray(apiKeyAuth.application?.scopes) ? apiKeyAuth.application.scopes : [],
+    }
+  }
+
+  function requireApiScope(...requiredScopes) {
+    return async (req, res, next) => {
+      try {
+        const auth = await authenticateExternalCredential(req)
+        if (!auth.ok) return res.status(auth.status).json({ error: auth.error })
+        const allowed = requiredScopes.length === 0 || requiredScopes.some((scope) => apiApplicationHasScope({ scopes: auth.scopes }, scope))
+        if (!allowed) return res.status(403).json({ error: 'Credential does not have the required scope' })
+        req.apiApplication = apiApplicationToResponse(auth.application)
+        req.externalAuth = {
+          kind: auth.kind,
+          user: auth.user
+            ? {
+                id: auth.user.id,
+                email: auth.user.email,
+                name: auth.user.name || null,
+                role: auth.user.role || null,
+              }
+            : null,
+          scopes: auth.scopes,
+          application: apiApplicationToResponse(auth.application),
+          expiresAt: auth.token ? formatOAuthTimestamp(auth.token.expiresAt) : null,
+        }
+        return next()
+      } catch (error) {
+        console.error('External credential authentication error:', error)
+        return res.status(500).json({ error: 'Unable to authenticate external credential' })
+      }
     }
   }
 
@@ -696,6 +1041,451 @@ export function createApiRouter() {
     return res.status(403).json({ error: 'Forbidden' })
   }
 
+  async function validateOauthAuthorizationRequest(source = {}) {
+    const clientId = String(source.client_id || source.clientId || '').trim()
+    const redirectUri = String(source.redirect_uri || source.redirectUri || '').trim()
+    const responseType = String(source.response_type || source.responseType || 'code').trim()
+    const state = String(source.state || '').trim()
+    const scope = String(source.scope || '').trim()
+
+    if (!clientId) return { ok: false, status: 400, error: 'Missing client_id' }
+    if (!redirectUri) return { ok: false, status: 400, error: 'Missing redirect_uri' }
+    if (responseType !== 'code') return { ok: false, status: 400, error: 'Unsupported response_type' }
+    if (!prisma.apiApplication) return { ok: false, status: 503, error: 'OAuth clients are not available. Run pnpm prisma:push.' }
+
+    const application = await prisma.apiApplication.findUnique({ where: { clientId } })
+    if (!application || !application.active || !application.oauthEnabled) {
+      return { ok: false, status: 404, error: 'OAuth application not found' }
+    }
+
+    const redirectUris = Array.isArray(application.redirectUris) ? application.redirectUris : []
+    if (!redirectUris.includes(redirectUri)) {
+      return { ok: false, status: 400, error: 'redirect_uri is not allowed for this application' }
+    }
+
+    const defaultScopes = application.scopes.includes('*')
+      ? externalApiScopes.filter((entry) => entry !== '*')
+      : application.scopes
+    const requestedScopes = normalizeRequestedScopes(scope, defaultScopes)
+    const invalidScopes = requestedScopes.filter((entry) => !apiApplicationHasScope(application, entry))
+    if (invalidScopes.length) {
+      return { ok: false, status: 400, error: 'Requested scopes are not allowed for this application', invalidScopes }
+    }
+
+    return {
+      ok: true,
+      application,
+      redirectUri,
+      state,
+      scopes: requestedScopes.length ? requestedScopes : defaultScopes,
+    }
+  }
+
+  router.get('/oauth/scopes', ensureAuth, ensureAdmin, (_req, res) => {
+    res.json({ scopes: externalApiScopes })
+  })
+
+  router.get('/oauth/applications', ensureAuth, ensureAdmin, async (_req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const applications = await prisma.apiApplication.findMany({ orderBy: { createdAt: 'desc' } })
+      res.json({ applications: applications.map(apiApplicationToResponse) })
+    } catch (e) {
+      console.error('GET /api/oauth/applications error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/oauth/applications/:id', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing application id' })
+      const application = await prisma.apiApplication.findUnique({ where: { id } })
+      if (!application) return res.status(404).json({ error: 'API application not found' })
+      res.json({ application: apiApplicationToResponse(application) })
+    } catch (e) {
+      console.error('GET /api/oauth/applications/:id error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/applications', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const parsed = apiApplicationCreateSchema.safeParse(req.body || {})
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid API application payload', details: parsed.error.flatten() })
+      }
+      const { scopes, invalid } = normalizeApiScopes(parsed.data.scopes, ['products:read'])
+      if (invalid.length) return res.status(400).json({ error: 'Invalid scopes', invalidScopes: invalid, allowedScopes: externalApiScopes })
+      const redirectUris = normalizeRedirectUris(parsed.data.redirectUris)
+      const oauthEnabled = Boolean(parsed.data.oauthEnabled || redirectUris.length > 0)
+      if (oauthEnabled && redirectUris.length === 0) {
+        return res.status(400).json({ error: 'OAuth applications require at least one redirect URI' })
+      }
+      const credential = createApiCredential()
+      const clientSecretCredential = oauthEnabled ? createClientSecretCredential() : null
+      const createdById = Number.isFinite(Number(req.user?.uid)) ? Number(req.user.uid) : null
+      const application = await prisma.apiApplication.create({
+        data: {
+          name: parsed.data.name,
+          description: parsed.data.description ? String(parsed.data.description).trim() : null,
+          clientId: createClientId(),
+          clientSecretHash: clientSecretCredential?.clientSecretHash || null,
+          clientSecretPrefix: clientSecretCredential?.clientSecretPrefix || null,
+          apiKeyHash: credential.apiKeyHash,
+          apiKeyPrefix: credential.apiKeyPrefix,
+          scopes,
+          active: true,
+          oauthEnabled,
+          redirectUris,
+          createdById,
+        },
+      })
+      res.status(201).json({
+        application: apiApplicationToResponse(application),
+        apiKey: credential.apiKey,
+        clientSecret: clientSecretCredential?.clientSecret || null,
+        note: 'Store this API key now. It is only returned once.',
+      })
+    } catch (e) {
+      console.error('POST /api/oauth/applications error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.put('/oauth/applications/:id', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing application id' })
+      const parsed = apiApplicationUpdateSchema.safeParse(req.body || {})
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Invalid API application payload', details: parsed.error.flatten() })
+      }
+      const data = {}
+      if (parsed.data.name !== undefined) data.name = parsed.data.name
+      if (parsed.data.active !== undefined) data.active = parsed.data.active
+      if (parsed.data.description !== undefined) data.description = parsed.data.description ? String(parsed.data.description).trim() : null
+      if (parsed.data.scopes !== undefined) {
+        const { scopes, invalid } = normalizeApiScopes(parsed.data.scopes, [])
+        if (invalid.length) return res.status(400).json({ error: 'Invalid scopes', invalidScopes: invalid, allowedScopes: externalApiScopes })
+        data.scopes = scopes
+      }
+      if (parsed.data.redirectUris !== undefined) data.redirectUris = normalizeRedirectUris(parsed.data.redirectUris)
+      if (parsed.data.oauthEnabled !== undefined) data.oauthEnabled = parsed.data.oauthEnabled
+      if (data.oauthEnabled === true && (!Array.isArray(data.redirectUris) ? false : data.redirectUris.length === 0)) {
+        const current = await prisma.apiApplication.findUnique({ where: { id }, select: { redirectUris: true } })
+        const currentRedirectUris = Array.isArray(current?.redirectUris) ? current.redirectUris : []
+        if (!(Array.isArray(data.redirectUris) && data.redirectUris.length > 0) && currentRedirectUris.length === 0) {
+          return res.status(400).json({ error: 'OAuth applications require at least one redirect URI' })
+        }
+      }
+      if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No application fields supplied' })
+      const application = await prisma.apiApplication.update({ where: { id }, data })
+      res.json({ application: apiApplicationToResponse(application) })
+    } catch (e) {
+      console.error('PUT /api/oauth/applications/:id error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      if (e?.code === 'P2025') return res.status(404).json({ error: 'API application not found' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/applications/:id/rotate-key', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing application id' })
+      const credential = createApiCredential()
+      const application = await prisma.apiApplication.update({
+        where: { id },
+        data: {
+          apiKeyHash: credential.apiKeyHash,
+          apiKeyPrefix: credential.apiKeyPrefix,
+          lastUsedAt: null,
+        },
+      })
+      res.json({
+        application: apiApplicationToResponse(application),
+        apiKey: credential.apiKey,
+        note: 'Store this API key now. It is only returned once.',
+      })
+    } catch (e) {
+      console.error('POST /api/oauth/applications/:id/rotate-key error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      if (e?.code === 'P2025') return res.status(404).json({ error: 'API application not found' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/applications/:id/rotate-client-secret', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing application id' })
+      const credential = createClientSecretCredential()
+      const application = await prisma.apiApplication.update({
+        where: { id },
+        data: {
+          clientSecretHash: credential.clientSecretHash,
+          clientSecretPrefix: credential.clientSecretPrefix,
+          oauthEnabled: true,
+        },
+      })
+      res.json({
+        application: apiApplicationToResponse(application),
+        clientSecret: credential.clientSecret,
+        note: 'Store this client secret now. It is only returned once.',
+      })
+    } catch (e) {
+      console.error('POST /api/oauth/applications/:id/rotate-client-secret error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      if (e?.code === 'P2025') return res.status(404).json({ error: 'API application not found' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.delete('/oauth/applications/:id', ensureAuth, ensureAdmin, async (req, res) => {
+    try {
+      if (!prisma.apiApplication) return apiApplicationsUnavailable(res)
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing application id' })
+      await prisma.apiApplication.delete({ where: { id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/oauth/applications/:id error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      if (e?.code === 'P2025') return res.status(404).json({ error: 'API application not found' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/oauth/authorize/request', async (req, res) => {
+    try {
+      const validation = await validateOauthAuthorizationRequest(req.query || {})
+      if (!validation.ok) {
+        return res.status(validation.status).json({
+          error: validation.error,
+          invalidScopes: validation.invalidScopes || [],
+        })
+      }
+      const userId = await resolveAuthenticatedUserId(req)
+      return res.json({
+        application: apiApplicationToResponse(validation.application),
+        redirectUri: validation.redirectUri,
+        scopes: validation.scopes,
+        state: validation.state || null,
+        loginRequired: !userId,
+        loggedIn: Boolean(userId),
+        user: userId
+          ? {
+              id: userId,
+              email: req.user?.email || null,
+              name: req.user?.name || null,
+            }
+          : null,
+      })
+    } catch (e) {
+      console.error('GET /api/oauth/authorize/request error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/authorize', ensureAuth, async (req, res) => {
+    try {
+      const validation = await validateOauthAuthorizationRequest(req.body || {})
+      if (!validation.ok) {
+        return res.status(validation.status).json({
+          error: validation.error,
+          invalidScopes: validation.invalidScopes || [],
+        })
+      }
+
+      const decision = String(req.body?.decision || 'approve').trim().toLowerCase()
+      if (decision !== 'approve') {
+        return res.json({
+          redirectTo: buildSafeRedirectUri(validation.redirectUri, {
+            error: 'access_denied',
+            state: validation.state || undefined,
+          }),
+        })
+      }
+
+      const userId = await resolveAuthenticatedUserId(req)
+      if (!userId) return res.status(401).json({ error: 'Sign in required' })
+
+      if (!prisma.oauthAuthorizationCode) return apiApplicationsUnavailable(res)
+      const codeCredential = createAuthorizationCodeCredential()
+      await prisma.oauthAuthorizationCode.create({
+        data: {
+          applicationId: validation.application.id,
+          userId,
+          codeHash: codeCredential.tokenHash,
+          redirectUri: validation.redirectUri,
+          scopes: validation.scopes,
+          expiresAt: new Date(Date.now() + oauthAuthorizationCodeLifetimeMs),
+        },
+      })
+
+      return res.json({
+        redirectTo: buildSafeRedirectUri(validation.redirectUri, {
+          code: codeCredential.token,
+          state: validation.state || undefined,
+        }),
+      })
+    } catch (e) {
+      console.error('POST /api/oauth/authorize error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/token', async (req, res) => {
+    try {
+      const { clientId, clientSecret } = parseClientCredentials(req)
+      const grantType = String(req.body?.grant_type || req.body?.grantType || '').trim()
+      if (!clientId || !clientSecret) return res.status(401).json({ error: 'Client authentication failed' })
+      if (!prisma.apiApplication || !prisma.oauthAccessToken || !prisma.oauthAuthorizationCode) return apiApplicationsUnavailable(res)
+
+      const application = await prisma.apiApplication.findUnique({ where: { clientId } })
+      if (!application || !application.active || !application.oauthEnabled) {
+        return res.status(401).json({ error: 'Client authentication failed' })
+      }
+      if (!application.clientSecretHash || !timingSafeStringEqual(application.clientSecretHash, hashSecret(clientSecret))) {
+        return res.status(401).json({ error: 'Client authentication failed' })
+      }
+
+      if (grantType === 'authorization_code') {
+        const code = String(req.body?.code || '').trim()
+        const redirectUri = String(req.body?.redirect_uri || req.body?.redirectUri || '').trim()
+        if (!code || !redirectUri) return res.status(400).json({ error: 'Missing code or redirect_uri' })
+        const authCode = await prisma.oauthAuthorizationCode.findUnique({ where: { codeHash: hashSecret(code) } })
+        if (!authCode || authCode.applicationId !== application.id || authCode.redirectUri !== redirectUri) {
+          return res.status(400).json({ error: 'Invalid authorization code' })
+        }
+        if (authCode.usedAt) return res.status(400).json({ error: 'Authorization code already used' })
+        if (new Date(authCode.expiresAt).getTime() <= Date.now()) return res.status(400).json({ error: 'Authorization code expired' })
+
+        const tokenPair = buildTokenPair()
+        const now = Date.now()
+        const createToken = async (tx) => {
+          await tx.oauthAuthorizationCode.update({ where: { id: authCode.id }, data: { usedAt: new Date() } })
+          return tx.oauthAccessToken.create({
+            data: {
+              applicationId: application.id,
+              userId: authCode.userId,
+              accessTokenHash: tokenPair.accessTokenHash,
+              refreshTokenHash: tokenPair.refreshTokenHash,
+              scopes: authCode.scopes,
+              expiresAt: new Date(now + oauthTokenLifetimeMs),
+              refreshExpiresAt: new Date(now + oauthRefreshTokenLifetimeMs),
+            },
+          })
+        }
+        const tokenRecord = prisma.$transaction ? await prisma.$transaction(createToken) : await createToken(prisma)
+
+        return res.json({
+          access_token: tokenPair.accessToken,
+          token_type: 'Bearer',
+          expires_in: Math.round((new Date(tokenRecord.expiresAt).getTime() - now) / 1000),
+          refresh_token: tokenPair.refreshToken,
+          scope: authCode.scopes.join(' '),
+        })
+      }
+
+      if (grantType === 'refresh_token') {
+        const refreshToken = String(req.body?.refresh_token || req.body?.refreshToken || '').trim()
+        if (!refreshToken) return res.status(400).json({ error: 'Missing refresh_token' })
+        const tokenRecord = await prisma.oauthAccessToken.findUnique({ where: { refreshTokenHash: hashSecret(refreshToken) } })
+        if (!tokenRecord || tokenRecord.applicationId !== application.id) return res.status(400).json({ error: 'Invalid refresh token' })
+        if (tokenRecord.revokedAt) return res.status(400).json({ error: 'Refresh token revoked' })
+        if (!tokenRecord.refreshExpiresAt || new Date(tokenRecord.refreshExpiresAt).getTime() <= Date.now()) {
+          return res.status(400).json({ error: 'Refresh token expired' })
+        }
+
+        const tokenPair = buildTokenPair()
+        const now = Date.now()
+        const updated = await prisma.oauthAccessToken.update({
+          where: { id: tokenRecord.id },
+          data: {
+            accessTokenHash: tokenPair.accessTokenHash,
+            refreshTokenHash: tokenPair.refreshTokenHash,
+            expiresAt: new Date(now + oauthTokenLifetimeMs),
+            refreshExpiresAt: new Date(now + oauthRefreshTokenLifetimeMs),
+            revokedAt: null,
+          },
+        })
+
+        return res.json({
+          access_token: tokenPair.accessToken,
+          token_type: 'Bearer',
+          expires_in: Math.round((new Date(updated.expiresAt).getTime() - now) / 1000),
+          refresh_token: tokenPair.refreshToken,
+          scope: Array.isArray(updated.scopes) ? updated.scopes.join(' ') : '',
+        })
+      }
+
+      return res.status(400).json({ error: 'Unsupported grant_type' })
+    } catch (e) {
+      console.error('POST /api/oauth/token error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/oauth/revoke', async (req, res) => {
+    try {
+      const { clientId, clientSecret } = parseClientCredentials(req)
+      const token = String(req.body?.token || '').trim()
+      if (!clientId || !clientSecret || !token) return res.status(400).json({ error: 'Missing client credentials or token' })
+      if (!prisma.apiApplication || !prisma.oauthAccessToken) return apiApplicationsUnavailable(res)
+
+      const application = await prisma.apiApplication.findUnique({ where: { clientId } })
+      if (!application || !application.clientSecretHash || !timingSafeStringEqual(application.clientSecretHash, hashSecret(clientSecret))) {
+        return res.status(401).json({ error: 'Client authentication failed' })
+      }
+
+      const tokenHash = hashSecret(token)
+      const accessToken = await prisma.oauthAccessToken.findFirst({
+        where: {
+          applicationId: application.id,
+          OR: [{ accessTokenHash: tokenHash }, { refreshTokenHash: tokenHash }],
+        },
+      })
+      if (accessToken) {
+        await prisma.oauthAccessToken.update({ where: { id: accessToken.id }, data: { revokedAt: new Date() } })
+      }
+      return res.status(200).json({ revoked: true })
+    } catch (e) {
+      console.error('POST /api/oauth/revoke error:', e)
+      if (isMissingApiApplicationTable(e)) return apiApplicationsUnavailable(res)
+      return res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/oauth/userinfo', requireApiScope('profile:read'), async (req, res) => {
+    const actor = req.externalAuth
+    if (actor?.kind !== 'oauth_token' || !actor.user) {
+      return res.status(403).json({ error: 'OAuth bearer token required' })
+    }
+    return res.json({
+      sub: String(actor.user.id),
+      id: actor.user.id,
+      email: actor.user.email,
+      name: actor.user.name || null,
+      role: actor.user.role || null,
+      application: actor.application,
+      scope: Array.isArray(actor.scopes) ? actor.scopes.join(' ') : '',
+      expiresAt: actor.expiresAt || null,
+    })
+  })
+
   router.get('/seller/application', ensureAuth, async (req, res) => {
     try {
       if (MARKETPLACE_CONSUMER_MODE) {
@@ -895,11 +1685,169 @@ export function createApiRouter() {
     }
   }
 
-  function requireExternalApiKey(req, res, next) {
-    if (!externalApiKey) return res.status(503).json({ error: 'External API disabled' })
-    const provided = String(req.get('x-api-key') || req.query.apiKey || req.query.api_key || '').trim()
-    if (!provided || provided !== externalApiKey) return res.status(401).json({ error: 'Invalid API key' })
-    return next()
+  async function generateProductSlug(title, preferredSlug) {
+    const base = normalizeSlug(preferredSlug || title || 'product', 'product')
+    let candidate = base
+    let counter = 2
+    // eslint-disable-next-line no-await-in-loop
+    while (await prisma.product.findUnique({ where: { slug: candidate } })) {
+      candidate = `${base}-${counter}`
+      counter += 1
+    }
+    return candidate
+  }
+
+  function normalizeProductRating(value) {
+    if (value === undefined) return undefined
+    if (value === null || value === '') return null
+    const rating = Number(value)
+    if (!Number.isFinite(rating)) return null
+    return Math.max(0, Math.min(5, rating))
+  }
+
+  function normalizeProductOwnerId(value) {
+    if (value === undefined) return undefined
+    if (value === null || value === '') return null
+    return parseIntOrNull(value, { min: 1 })
+  }
+
+  async function buildExternalProductCreateData(input = {}) {
+    const title = String(input.title || '').trim()
+    if (!title) return { error: 'Product title is required' }
+
+    const vertical = input.vertical === 'shared_space' ? 'shared_space' : 'commerce'
+    const spaceProfile = normalizeSpaceProfile(input.spaceProfile)
+    const data = {
+      slug: await generateProductSlug(title, input.slug),
+      title,
+      price: parseIntOrDefault(input.price, 0, { min: 0 }),
+      seller: String(input.seller || '').trim() || 'External seller',
+      rating: normalizeProductRating(input.rating) ?? null,
+      type: input.type === 'service' ? 'service' : 'goods',
+      img: String(input.img || '').trim() || imageForServer(title),
+      barcode: input.barcode === undefined ? null : String(input.barcode || '').trim() || null,
+      description: input.description === undefined ? null : String(input.description || '').trim() || null,
+      images: normalizeStringArray(input.images),
+      stockCount: parseIntOrDefault(input.stockCount, 0, { min: 0 }),
+      serviceOpenDays: normalizeOpenDays(input.serviceOpenDays),
+      serviceDurationMinutes: parseIntOrNull(input.serviceDurationMinutes, { min: 0 }),
+      serviceOpenTime: normalizeTimeString(input.serviceOpenTime),
+      serviceCloseTime: normalizeTimeString(input.serviceCloseTime),
+      serviceDailyCapacity: parseIntOrNull(input.serviceDailyCapacity, { min: 0 }),
+      ownerId: normalizeProductOwnerId(input.ownerId) ?? null,
+      categoryId: input.categoryId ? String(input.categoryId).trim() : null,
+      vertical,
+      spaceProfile: vertical === 'shared_space' ? spaceProfile : null,
+    }
+    if (vertical === 'shared_space' && spaceProfile) {
+      data.price = parseIntOrDefault(spaceProfile.rentPerWeek ?? data.price, 0, { min: 0 })
+    }
+    return { data }
+  }
+
+  function buildExternalProductUpdateData(input = {}) {
+    const vertical = input.vertical === undefined ? undefined : (input.vertical === 'shared_space' ? 'shared_space' : 'commerce')
+    const spaceProfile = input.spaceProfile === undefined ? undefined : normalizeSpaceProfile(input.spaceProfile)
+    const data = stripUndefined({
+      slug: input.slug === undefined ? undefined : normalizeSlug(input.slug, 'product'),
+      title: input.title === undefined ? undefined : String(input.title || '').trim(),
+      price: input.price === undefined ? undefined : parseIntOrDefault(input.price, 0, { min: 0 }),
+      seller: input.seller === undefined ? undefined : String(input.seller || '').trim(),
+      rating: normalizeProductRating(input.rating),
+      type: input.type === undefined ? undefined : (input.type === 'service' ? 'service' : 'goods'),
+      img: input.img === undefined ? undefined : String(input.img || '').trim(),
+      barcode: input.barcode === undefined ? undefined : String(input.barcode || '').trim() || null,
+      description: input.description === undefined ? undefined : String(input.description || '').trim() || null,
+      images: input.images === undefined ? undefined : normalizeStringArray(input.images),
+      stockCount: input.stockCount === undefined ? undefined : parseIntOrDefault(input.stockCount, 0, { min: 0 }),
+      serviceOpenDays: input.serviceOpenDays === undefined ? undefined : normalizeOpenDays(input.serviceOpenDays),
+      serviceDurationMinutes:
+        input.serviceDurationMinutes === undefined ? undefined : parseIntOrNull(input.serviceDurationMinutes, { min: 0 }),
+      serviceOpenTime: input.serviceOpenTime === undefined ? undefined : normalizeTimeString(input.serviceOpenTime),
+      serviceCloseTime: input.serviceCloseTime === undefined ? undefined : normalizeTimeString(input.serviceCloseTime),
+      serviceDailyCapacity:
+        input.serviceDailyCapacity === undefined ? undefined : parseIntOrNull(input.serviceDailyCapacity, { min: 0 }),
+      ownerId: normalizeProductOwnerId(input.ownerId),
+      categoryId: input.categoryId === undefined ? undefined : (input.categoryId ? String(input.categoryId).trim() : null),
+      vertical,
+      spaceProfile,
+    })
+    if (vertical === 'shared_space' && spaceProfile) {
+      data.price = parseIntOrDefault(spaceProfile.rentPerWeek ?? data.price ?? input.price, 0, { min: 0 })
+    } else if (vertical === 'commerce') {
+      data.spaceProfile = spaceProfile ?? null
+    }
+    return data
+  }
+
+  async function findCategoryByIdentifier(identifier) {
+    const id = String(identifier || '').trim()
+    if (!id) return null
+    return prisma.category.findUnique({ where: { id } })
+      .then((category) => category || prisma.category.findUnique({ where: { slug: id } }))
+  }
+
+  const orderStatusValues = ['pending', 'scheduled', 'paid', 'shipped', 'completed', 'cancelled', 'refunded']
+
+  function normalizeExternalOrderStatus(status, fallback) {
+    if (status === undefined) return fallback
+    const next = String(status || '').trim()
+    return orderStatusValues.includes(next) ? next : fallback
+  }
+
+  function normalizeExternalOrderItems(items) {
+    if (!Array.isArray(items)) return []
+    return items
+      .map((item) => {
+        const productId = String(item?.productId || '').trim()
+        const title = String(item?.title || '').trim()
+        if (!productId || !title) return null
+        const appointmentAt = item.appointmentAt ? new Date(item.appointmentAt) : null
+        return {
+          productId,
+          title,
+          price: parseIntOrDefault(item.price, 0, { min: 0 }),
+          quantity: Math.max(1, parseIntOrDefault(item.quantity, 1, { min: 1 })),
+          appointmentAt: appointmentAt && !Number.isNaN(appointmentAt.getTime()) ? appointmentAt : null,
+          appointmentStatus: item.appointmentStatus ? String(item.appointmentStatus).trim() : null,
+          appointmentAlternates: Array.isArray(item.appointmentAlternates) ? JSON.stringify(item.appointmentAlternates) : null,
+        }
+      })
+      .filter(Boolean)
+  }
+
+  function buildExternalOrderPatch(input = {}, { fallbackStatus } = {}) {
+    return stripUndefined({
+      buyerId: normalizeProductOwnerId(input.buyerId),
+      sellerId: normalizeProductOwnerId(input.sellerId),
+      total: input.total === undefined ? undefined : parseIntOrDefault(input.total, 0, { min: 0 }),
+      status: normalizeExternalOrderStatus(input.status, fallbackStatus),
+      customerName: input.customerName === undefined ? undefined : String(input.customerName || '').trim() || null,
+      customerEmail: input.customerEmail === undefined ? undefined : String(input.customerEmail || '').trim() || null,
+      address: input.address === undefined ? undefined : String(input.address || '').trim() || null,
+      customerPhone: input.customerPhone === undefined ? undefined : String(input.customerPhone || '').trim() || null,
+      paymentInstructions:
+        input.paymentInstructions === undefined ? undefined : String(input.paymentInstructions || '').trim() || null,
+      accessCode: input.accessCode === undefined ? undefined : String(input.accessCode || '').trim() || null,
+    })
+  }
+
+  function getExternalActorUserId(req) {
+    const candidate = Number(req.externalAuth?.user?.id)
+    return Number.isFinite(candidate) && candidate > 0 ? candidate : null
+  }
+
+  function isOAuthUserScopedRequest(req) {
+    return req.externalAuth?.kind === 'oauth_token' && Number.isFinite(Number(req.externalAuth?.user?.id))
+  }
+
+  function buildSellerOrderWhere(userId) {
+    return {
+      OR: [
+        { sellerId: userId },
+        { items: { some: { product: { ownerId: userId } } } },
+      ],
+    }
   }
 
   router.get('/products', async (req, res) => {
@@ -926,7 +1874,7 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/external/products', requireExternalApiKey, async (req, res) => {
+  router.get('/external/products', requireApiScope('products:read'), async (req, res) => {
     try {
       const enriched = await fetchProductsWithMeta({ limit: req.query.limit })
       const payload = enriched.map(sanitiseProductForExternal)
@@ -937,7 +1885,7 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/external/products/:id', requireExternalApiKey, async (req, res) => {
+  router.get('/external/products/:id', requireApiScope('products:read'), async (req, res) => {
     try {
       const id = String(req.params.id || '').trim()
       if (!id) return res.status(400).json({ error: 'Missing product id' })
@@ -951,12 +1899,368 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/external/categories', requireExternalApiKey, async (_req, res) => {
+  router.post('/external/products', requireApiScope('products:write'), async (req, res) => {
     try {
-      const categories = await prisma.category.findMany({ orderBy: { name: 'asc' }, select: { name: true } })
-      res.json({ categories: categories.map((item) => item.name).filter(Boolean) })
+      const built = await buildExternalProductCreateData(req.body || {})
+      if (built.error) return res.status(400).json({ error: built.error })
+      if (isOAuthUserScopedRequest(req)) {
+        built.data.ownerId = getExternalActorUserId(req)
+      }
+      const created = await prisma.product.create({ data: built.data })
+      res.status(201).json({ product: sanitiseProductForExternal(created) })
+    } catch (e) {
+      console.error('POST /api/external/products error:', e)
+      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate product slug or barcode' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.put('/external/products/:id', requireApiScope('products:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing product id' })
+      const data = buildExternalProductUpdateData(req.body || {})
+      if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No product fields supplied' })
+      const where = isOAuthUserScopedRequest(req)
+        ? { AND: [{ OR: [{ id }, { slug: id }] }, { ownerId: getExternalActorUserId(req) }] }
+        : { OR: [{ id }, { slug: id }] }
+      const existing = await prisma.product.findFirst({ where })
+      if (!existing) return res.status(404).json({ error: 'Product not found' })
+      if (isOAuthUserScopedRequest(req)) delete data.ownerId
+      const updated = await prisma.product.update({ where: { id: existing.id }, data })
+      res.json({ product: sanitiseProductForExternal(updated) })
+    } catch (e) {
+      console.error('PUT /api/external/products/:id error:', e)
+      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate product slug or barcode' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.delete('/external/products/:id', requireApiScope('products:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing product id' })
+      const where = isOAuthUserScopedRequest(req)
+        ? { AND: [{ OR: [{ id }, { slug: id }] }, { ownerId: getExternalActorUserId(req) }] }
+        : { OR: [{ id }, { slug: id }] }
+      const existing = await prisma.product.findFirst({ where })
+      if (!existing) return res.status(404).json({ error: 'Product not found' })
+      await prisma.product.delete({ where: { id: existing.id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/external/products/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/categories', requireApiScope('categories:read'), async (_req, res) => {
+    try {
+      const records = await prisma.category.findMany({ orderBy: { name: 'asc' } })
+      res.json({ categories: records.map((item) => item.name).filter(Boolean), records })
     } catch (e) {
       console.error('GET /api/external/categories error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/external/categories', requireApiScope('categories:write'), async (req, res) => {
+    try {
+      const name = String(req.body?.name || '').trim()
+      if (!name) return res.status(400).json({ error: 'Category name is required' })
+      const slug = normalizeSlug(req.body?.slug || name, 'category')
+      const category = await prisma.category.create({ data: { name, slug } })
+      res.status(201).json({ category })
+    } catch (e) {
+      console.error('POST /api/external/categories error:', e)
+      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate category slug' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.put('/external/categories/:id', requireApiScope('categories:write'), async (req, res) => {
+    try {
+      const category = await findCategoryByIdentifier(req.params.id)
+      if (!category) return res.status(404).json({ error: 'Category not found' })
+      const data = stripUndefined({
+        name: req.body?.name === undefined ? undefined : String(req.body.name || '').trim(),
+        slug: req.body?.slug === undefined ? undefined : normalizeSlug(req.body.slug, 'category'),
+      })
+      if (Object.keys(data).length === 0) return res.status(400).json({ error: 'No category fields supplied' })
+      const updated = await prisma.category.update({ where: { id: category.id }, data })
+      res.json({ category: updated })
+    } catch (e) {
+      console.error('PUT /api/external/categories/:id error:', e)
+      if (e?.code === 'P2002') return res.status(409).json({ error: 'Duplicate category slug' })
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.delete('/external/categories/:id', requireApiScope('categories:write'), async (req, res) => {
+    try {
+      const category = await findCategoryByIdentifier(req.params.id)
+      if (!category) return res.status(404).json({ error: 'Category not found' })
+      await prisma.category.delete({ where: { id: category.id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/external/categories/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/orders', requireApiScope('orders:read'), async (req, res) => {
+    try {
+      const take = Number.isFinite(Number(req.query.limit)) && Number(req.query.limit) > 0 ? Math.min(Number(req.query.limit), 100) : undefined
+      const status = req.query.status ? normalizeExternalOrderStatus(req.query.status) : undefined
+      let where
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        const mode = String(req.query.mode || 'all').trim().toLowerCase()
+        const branches = []
+        if (mode === 'buyer' || mode === 'all') branches.push({ buyerId: userId })
+        if (mode === 'seller' || mode === 'all') branches.push(buildSellerOrderWhere(userId))
+        where = { ...(status ? { status } : {}), OR: branches }
+      } else {
+        where = stripUndefined({
+          buyerId: req.query.buyerId ? Number(req.query.buyerId) : undefined,
+          sellerId: req.query.sellerId ? Number(req.query.sellerId) : undefined,
+          status,
+        })
+      }
+      const orders = await prisma.order.findMany({
+        where,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: { items: true, buyer: true, seller: true },
+      })
+      res.json({ orders })
+    } catch (e) {
+      console.error('GET /api/external/orders error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/orders/:id', requireApiScope('orders:read'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing order id' })
+      const order = await prisma.order.findUnique({
+        where: { id },
+        include: { items: { include: { product: true } }, buyer: true, seller: true },
+      })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        const canAccess = order.buyerId === userId || order.sellerId === userId || order.items.some((item) => item.product?.ownerId === userId)
+        if (!canAccess) return res.status(403).json({ error: 'Forbidden' })
+      }
+      res.json({ order })
+    } catch (e) {
+      console.error('GET /api/external/orders/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/external/orders', requireApiScope('orders:write'), async (req, res) => {
+    try {
+      const items = normalizeExternalOrderItems(req.body?.items)
+      if (Array.isArray(req.body?.items) && req.body.items.length !== items.length) {
+        return res.status(400).json({ error: 'Every order item requires productId and title' })
+      }
+      const data = buildExternalOrderPatch(req.body || {}, { fallbackStatus: 'pending' })
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        data.sellerId = data.sellerId ?? userId
+      }
+      data.total = data.total ?? items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+      if (items.length) data.items = { create: items }
+      const order = await prisma.order.create({
+        data,
+        include: { items: true, buyer: true, seller: true },
+      })
+      res.status(201).json({ order })
+    } catch (e) {
+      console.error('POST /api/external/orders error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.put('/external/orders/:id', requireApiScope('orders:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing order id' })
+      const exists = await prisma.order.findUnique({
+        where: { id },
+        include: { items: { include: { product: true } } },
+      })
+      if (!exists) return res.status(404).json({ error: 'Order not found' })
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        const canAccess = exists.buyerId === userId || exists.sellerId === userId || exists.items.some((item) => item.product?.ownerId === userId)
+        if (!canAccess) return res.status(403).json({ error: 'Forbidden' })
+      }
+      const items = req.body?.items === undefined ? undefined : normalizeExternalOrderItems(req.body.items)
+      if (Array.isArray(req.body?.items) && req.body.items.length !== items.length) {
+        return res.status(400).json({ error: 'Every order item requires productId and title' })
+      }
+      const data = buildExternalOrderPatch(req.body || {}, { fallbackStatus: undefined })
+      if (isOAuthUserScopedRequest(req)) {
+        delete data.buyerId
+        delete data.sellerId
+      }
+      if (items) data.total = data.total ?? items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+
+      const updateOrder = async (tx) => {
+        if (items) await tx.orderItem.deleteMany({ where: { orderId: id } })
+        return tx.order.update({
+          where: { id },
+          data: items ? { ...data, items: { create: items } } : data,
+          include: { items: true, buyer: true, seller: true },
+        })
+      }
+      const order = prisma.$transaction ? await prisma.$transaction(updateOrder) : await updateOrder(prisma)
+      res.json({ order })
+    } catch (e) {
+      console.error('PUT /api/external/orders/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.delete('/external/orders/:id', requireApiScope('orders:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing order id' })
+      if (isOAuthUserScopedRequest(req)) {
+        const order = await prisma.order.findUnique({
+          where: { id },
+          include: { items: { include: { product: true } } },
+        })
+        if (!order) return res.status(404).json({ error: 'Order not found' })
+        const userId = getExternalActorUserId(req)
+        const canAccess = order.buyerId === userId || order.sellerId === userId || order.items.some((item) => item.product?.ownerId === userId)
+        if (!canAccess) return res.status(403).json({ error: 'Forbidden' })
+      }
+      await prisma.order.delete({ where: { id } })
+      res.status(204).end()
+    } catch (e) {
+      console.error('DELETE /api/external/orders/:id error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/sales/summary', requireApiScope('sales:read'), async (req, res) => {
+    try {
+      const ownerId = isOAuthUserScopedRequest(req) ? getExternalActorUserId(req) : normalizeProductOwnerId(req.query.ownerId)
+      if (!ownerId) return res.status(400).json({ error: 'ownerId required' })
+      const orders = await prisma.order.findMany({
+        where: buildSellerOrderWhere(ownerId),
+        include: { items: { include: { product: true } } },
+        orderBy: { createdAt: 'desc' },
+      })
+      const revenueOrders = orders.filter((order) => ['paid', 'shipped', 'completed'].includes(order.status))
+      const refundedOrders = orders.filter((order) => order.status === 'refunded')
+      const summary = {
+        ownerId,
+        orderCount: orders.length,
+        revenueOrderCount: revenueOrders.length,
+        refundedOrderCount: refundedOrders.length,
+        totalRevenue: revenueOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+        totalRefunded: refundedOrders.reduce((sum, order) => sum + Number(order.total || 0), 0),
+        latestOrderAt: orders[0]?.createdAt?.toISOString?.() || null,
+      }
+      res.json({ summary, orders })
+    } catch (e) {
+      console.error('GET /api/external/sales/summary error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.get('/external/refunds', requireApiScope('refunds:read'), async (req, res) => {
+    try {
+      const scope = String(req.query.scope || 'all').trim().toLowerCase()
+      let where = {}
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        if (scope === 'buyer') where = { buyerId: userId }
+        else if (scope === 'seller') where = { sellerId: userId }
+        else where = { OR: [{ buyerId: userId }, { sellerId: userId }] }
+      }
+      const refunds = await prisma.refundRequest.findMany({
+        where,
+        include: { order: true, orderItem: true, buyer: true, seller: true },
+        orderBy: { createdAt: 'desc' },
+      })
+      res.json({ refunds })
+    } catch (e) {
+      console.error('GET /api/external/refunds error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/external/orders/:id/refund', requireApiScope('refunds:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing order id' })
+      const order = await prisma.order.findUnique({ where: { id }, include: { items: { include: { product: true } } } })
+      if (!order) return res.status(404).json({ error: 'Order not found' })
+      const reason = String(req.body?.reason || '').trim()
+      if (!reason) return res.status(400).json({ error: 'Refund reason required' })
+
+      let buyerId = normalizeProductOwnerId(req.body?.buyerId) ?? order.buyerId ?? null
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        if (order.buyerId && order.buyerId !== userId) return res.status(403).json({ error: 'Only the buyer can create this refund request' })
+        buyerId = userId
+      }
+      if (!buyerId) return res.status(400).json({ error: 'buyerId required for refund creation' })
+
+      const refund = await prisma.refundRequest.create({
+        data: {
+          orderId: order.id,
+          orderItemId: req.body?.orderItemId ? String(req.body.orderItemId).trim() : null,
+          buyerId,
+          sellerId: order.sellerId ?? null,
+          amount: req.body?.amount == null ? null : parseIntOrDefault(req.body.amount, 0, { min: 0 }),
+          reason,
+          status: 'requested',
+        },
+        include: { order: true, orderItem: true, buyer: true, seller: true },
+      })
+      res.status(201).json({ refund })
+    } catch (e) {
+      console.error('POST /api/external/orders/:id/refund error:', e)
+      res.status(500).json({ error: e?.message || 'Internal Error' })
+    }
+  })
+
+  router.post('/external/refunds/:id/review', requireApiScope('refunds:write'), async (req, res) => {
+    try {
+      const id = String(req.params.id || '').trim()
+      if (!id) return res.status(400).json({ error: 'Missing refund id' })
+      const refund = await prisma.refundRequest.findUnique({ where: { id }, include: { order: true, buyer: true, seller: true } })
+      if (!refund) return res.status(404).json({ error: 'Refund not found' })
+      if (isOAuthUserScopedRequest(req)) {
+        const userId = getExternalActorUserId(req)
+        if (refund.sellerId && refund.sellerId !== userId) return res.status(403).json({ error: 'Only the seller can review this refund request' })
+      }
+
+      const action = String(req.body?.action || '').trim().toLowerCase()
+      if (!['accept', 'reject', 'refund'].includes(action)) return res.status(400).json({ error: 'Invalid refund action' })
+      const nextStatus = action === 'accept' ? 'accepted' : action === 'refund' ? 'refunded' : 'rejected'
+      const updated = await prisma.refundRequest.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          resolution: req.body?.notes ? String(req.body.notes).trim() : refund.resolution,
+          amount: req.body?.amount == null ? refund.amount : parseIntOrDefault(req.body.amount, 0, { min: 0 }),
+        },
+        include: { order: true, orderItem: true, buyer: true, seller: true },
+      })
+      if (['accepted', 'refunded'].includes(updated.status)) {
+        await prisma.order.update({ where: { id: updated.orderId }, data: { status: 'refunded' } }).catch(() => {})
+      }
+      res.json({ refund: updated })
+    } catch (e) {
+      console.error('POST /api/external/refunds/:id/review error:', e)
       res.status(500).json({ error: e?.message || 'Internal Error' })
     }
   })

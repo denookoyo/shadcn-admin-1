@@ -151,6 +151,61 @@ model CartItem {
   product Product @relation(fields: [productId], references: [id])
 }
 
+enum LandListingStatus {
+  available
+  offer_received
+  reserved
+}
+
+enum LandListingZoning {
+  agricultural
+  mixed_use @map("mixed-use")
+  residential
+  commercial
+}
+
+enum LandListingTenure {
+  freehold
+  leasehold
+}
+
+enum LandListingAssetType {
+  land
+  house
+  apartment
+  commercial
+  office
+}
+
+model LandListing {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  title           String
+  county          String
+  town            String
+  assetType       LandListingAssetType @default(land)
+  acreage         Decimal           @db.Decimal(10, 2)
+  priceKes        Int
+  pricePerAcreKes Int?
+  zoning          LandListingZoning
+  listingType     LandListingTenure @default(freehold)
+  description     String
+  highlights      String[]          @default([])
+  documents       String[]          @default([])
+  utilities       Json?
+  water           String?
+  roadAccess      String?
+  coordinates     Json?
+  seller          Json
+  gallery         String[]          @default([])
+  status          LandListingStatus @default(available)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([slug])
+  @@index([county])
+}
+
 model Category {
   id        String   @id @default(cuid())
   name      String
@@ -196,135 +251,112 @@ model User {
   refundRequestsReceived RefundRequest[] @relation("RefundSeller")
 
   // Relations
-  dockets        Docket[]
-  shifts         Shift[]
-  maintenance    MaintenanceRequest[]
-  accidents      AccidentReport[]
-  fuelReceipts   FuelReceipt[]
-  payments       Payment[]
+  sellerApplication SellerApplication?
   telegramIntegrations TelegramIntegration[]
-}
-
-model Truck {
-  id        String   @id @default(cuid())
-  rego      String   @unique
-  name      String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  dockets   Docket[]
-  shifts    Shift[]
-  maint     MaintenanceRequest[]
-  accidents AccidentReport[]
-  receipts  FuelReceipt[]
-}
-
-model Docket {
-  id          String   @id @default(cuid())
-  driverId    Int
-  truckId     String?
-  date        DateTime
-  project     String?
-  startTime   String?
-  endTime     String?
-  hours       Float?
-  details     String?
-  files       String[]
-  createdAt   DateTime @default(now())
-
-  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  truck  Truck? @relation(fields: [truckId], references: [id])
-}
-
-model Shift {
-  id          String   @id @default(cuid())
-  driverId    Int
-  truckId     String?
-  date        DateTime
-  startTime   String
-  endTime     String
-  breakMin    Int      @default(0)
-  totalHours  Float
-  createdAt   DateTime @default(now())
-
-  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  truck  Truck? @relation(fields: [truckId], references: [id])
-}
-
-model MaintenanceRequest {
-  id          String   @id @default(cuid())
-  driverId    Int
-  truckId     String?
-  date        DateTime @default(now())
-  category    String
-  severity    String?
-  description String
-  status      String   @default("open")
-  files       String[]
-
-  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  truck  Truck? @relation(fields: [truckId], references: [id])
-}
-
-model AccidentReport {
-  id            String   @id @default(cuid())
-  driverId      Int
-  truckId       String?
-  occurredAt    DateTime
-  location      String?
-  description   String
-  injuries      Boolean  @default(false)
-  policeReport  Boolean  @default(false)
-  files         String[]
-  status        String   @default("submitted")
-
-  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  truck  Truck? @relation(fields: [truckId], references: [id])
-}
-
-model FuelReceipt {
-  id        String   @id @default(cuid())
-  driverId  Int
-  truckId   String?
-  date      DateTime
-  liters    Float
-  amount    Int      // minor units (cents)
-  odometer  Int?
-  fileUrl   String?
-
-  driver User  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  truck  Truck? @relation(fields: [truckId], references: [id])
-}
-
-model Payment {
-  id          String   @id @default(cuid())
-  driverId    Int
-  periodStart DateTime
-  periodEnd   DateTime
-  gross       Int // cents
-  net         Int // cents
-  status      String   @default("pending")
-  paidAt      DateTime?
-  createdAt   DateTime @default(now())
-
-  driver  User     @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  payslips Payslip[]
-}
-
-model Payslip {
-  id        String   @id @default(cuid())
-  paymentId String
-  url       String
-  createdAt DateTime @default(now())
-
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  apiApplications ApiApplication[] @relation("ApiApplicationsCreated")
+  oauthAuthorizationCodes OauthAuthorizationCode[]
+  oauthAccessTokens OauthAccessToken[]
 }
 
 enum UserRole {
   driver
   manager
   admin
+}
+
+enum SellerApplicationStatus {
+  not_submitted
+  pending
+  approved
+  rejected
+}
+
+model SellerApplication {
+  id            String                  @id @default(cuid())
+  userId        Int?                    @unique
+  email         String                  @unique
+  companyName   String
+  contactName   String
+  phone         String
+  location      String?
+  documents     String[]                @default([])
+  pitch         String?
+  status        SellerApplicationStatus @default(pending)
+  submittedAt   DateTime                @default(now())
+  reviewedAt    DateTime?
+  reviewerNotes String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([submittedAt])
+}
+
+model ApiApplication {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  clientId     String   @unique
+  clientSecretHash String?
+  clientSecretPrefix String?
+  apiKeyHash   String   @unique
+  apiKeyPrefix String
+  scopes       String[] @default([])
+  active       Boolean  @default(true)
+  oauthEnabled Boolean  @default(false)
+  redirectUris String[] @default([])
+  createdById  Int?
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdBy User? @relation("ApiApplicationsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  oauthAuthorizationCodes OauthAuthorizationCode[]
+  oauthAccessTokens OauthAccessToken[]
+
+  @@index([active])
+  @@index([createdById])
+}
+
+model OauthAuthorizationCode {
+  id           String   @id @default(cuid())
+  applicationId String
+  userId       Int
+  codeHash     String   @unique
+  redirectUri  String
+  scopes       String[] @default([])
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  application ApiApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, userId])
+  @@index([expiresAt])
+}
+
+model OauthAccessToken {
+  id               String   @id @default(cuid())
+  applicationId    String
+  userId           Int
+  accessTokenHash  String   @unique
+  refreshTokenHash String?  @unique
+  scopes           String[] @default([])
+  expiresAt        DateTime
+  refreshExpiresAt DateTime?
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  application ApiApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, userId])
+  @@index([expiresAt])
 }
 
 model BlogPost {

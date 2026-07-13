@@ -55,7 +55,6 @@ function LabelsPage() {
           {mine.map((p) => (
             <div key={p.id} className='flex flex-col items-center justify-center rounded border p-3'>
               <div className='mb-1 text-xs font-medium'>{p.title}</div>
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
               <svg id={`bc-${p.id}`}></svg>
             </div>
           ))}
