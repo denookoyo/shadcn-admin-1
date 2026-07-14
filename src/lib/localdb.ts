@@ -31,6 +31,7 @@ export type Product = {
   slug: string
   title: string
   price: number
+  compareAtPrice?: number | null
   seller: string
   rating?: number
   type: ProductType

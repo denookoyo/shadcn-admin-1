@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate, useSearch } from '@tanstack/react-r
 import { useEffect, useMemo, useState } from 'react'
 import { Store, ShoppingCart, Filter, SlidersHorizontal } from 'lucide-react'
 import { imageFor } from '@/features/marketplace/helpers'
+import { formatAudPrice, getMarketplaceSaleSignal } from '@/features/marketplace/pricing'
 import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
@@ -222,6 +223,7 @@ function Listings() {
               {items.map((it) => {
                 const sellerName = (it as any).ownerName || it.seller
                 const rating = Number((it as any).ownerRating ?? it.rating ?? 4.7).toFixed(1)
+                const sale = getMarketplaceSaleSignal({ price: it.price, compareAtPrice: it.compareAtPrice })
                 const availabilityLabel = it.type === 'service'
                   ? ((it as any).serviceDailyCapacity ? `${(it as any).serviceDailyCapacity} slots/day` : 'Accepting bookings')
                   : Number.isFinite(Number((it as any).stockCount))
@@ -236,6 +238,12 @@ function Listings() {
                         loading='lazy'
                         className='h-full w-full object-cover transition duration-500 group-hover:scale-110'
                       />
+                      {sale ? (
+                        <div className='absolute right-3 top-3 rounded-2xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400 px-3 py-2 text-right text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg'>
+                          <div>{sale.badge}</div>
+                          <div className='mt-0.5 text-[9px] font-semibold tracking-[0.14em] text-white/85'>{sale.kicker}</div>
+                        </div>
+                      ) : null}
                       <span className='absolute left-3 top-3 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-emerald-700'>
                         {it.type === 'service' ? 'Service' : 'Goods'}
                       </span>
@@ -246,8 +254,19 @@ function Listings() {
                           <div className='text-sm font-semibold text-slate-900'>{it.title}</div>
                           <div className='text-xs text-slate-500'>by {sellerName}</div>
                         </div>
-                        <div className='rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700'>A${it.price}</div>
+                        <div className={`rounded-2xl px-3 py-2 text-right shadow-sm ${sale ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' : 'bg-emerald-50 text-emerald-700'}`}>
+                          <div className={`text-sm font-black ${sale ? 'text-rose-600' : 'text-emerald-700'}`}>{formatAudPrice(it.price)}</div>
+                          {sale ? (
+                            <div className='mt-0.5 text-[10px] font-medium text-slate-500 line-through'>{formatAudPrice(sale.compareAtPrice)}</div>
+                          ) : null}
+                        </div>
                       </div>
+                      {sale ? (
+                        <div className='rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 px-3 py-2 text-xs shadow-sm'>
+                          <div className='font-black uppercase tracking-[0.16em] text-rose-600'>{sale.kicker}</div>
+                          <div className='mt-1 font-medium text-slate-700'>{sale.urgency}</div>
+                        </div>
+                      ) : null}
                       <div className='flex items-center justify-between text-xs text-emerald-700'>
                         <span>★ {rating}</span>
                         <span className='rounded-full bg-slate-100 px-2 py-1 text-slate-500'>{availabilityLabel}</span>

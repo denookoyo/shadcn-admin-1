@@ -6,6 +6,7 @@ import { SafeImg } from '@/components/safe-img'
 import { db, type Category, type Product } from '@/lib/data'
 import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
+import { formatAudPrice, getMarketplaceSaleSignal } from '@/features/marketplace/pricing'
 import { SHARED_SPACES, type SharedSpace, productToSharedSpace } from '@/features/marketplace/spaces/data'
 import { listLandListings, type LandListing, formatKes as formatLandKes, formatAcreage as formatLandAcreage } from '@/features/land/data'
 
@@ -125,6 +126,7 @@ function SharedSpaceTile({ space }: { space: SharedSpace }) {
 function SpotlightCard({ product }: { product: Product }) {
   const sellerName = (product as any).ownerName || product.seller
   const ownerRating = Number((product as any).ownerRating ?? product.rating ?? 4.8).toFixed(1)
+  const sale = getMarketplaceSaleSignal({ price: product.price, compareAtPrice: product.compareAtPrice })
 
   return (
     <Link
@@ -139,6 +141,12 @@ function SpotlightCard({ product }: { product: Product }) {
           loading='lazy'
           className='h-full w-full object-cover transition duration-500 group-hover:scale-105'
         />
+        {sale ? (
+          <div className='absolute right-3 top-3 rounded-2xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400 px-3 py-2 text-right text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg'>
+            <div>{sale.badge}</div>
+            <div className='mt-0.5 text-[9px] font-semibold tracking-[0.14em] text-white/85'>{sale.kicker}</div>
+          </div>
+        ) : null}
         <span className='absolute left-3 top-3 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-emerald-700'>
           {product.type === 'service' ? 'Service' : 'Goods'}
         </span>
@@ -146,8 +154,12 @@ function SpotlightCard({ product }: { product: Product }) {
       <div className='flex flex-1 flex-col gap-2 p-4'>
         <div className='flex items-start justify-between gap-2'>
           <h3 className='text-sm font-semibold text-slate-900'>{product.title}</h3>
-          <span className='rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700'>A${product.price}</span>
+          <div className={`rounded-2xl px-2.5 py-2 text-right shadow-sm ${sale ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' : 'bg-emerald-50 text-emerald-700'}`}>
+            <div className={`text-xs font-black ${sale ? 'text-rose-600' : 'text-emerald-700'}`}>{formatAudPrice(product.price)}</div>
+            {sale ? <div className='mt-0.5 text-[10px] text-slate-400 line-through'>{formatAudPrice(sale.compareAtPrice)}</div> : null}
+          </div>
         </div>
+        {sale ? <p className='text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-600'>{sale.kicker}</p> : null}
         <p className='text-xs text-slate-500'>Seller: {sellerName}</p>
         <div className='mt-auto flex items-center justify-between text-xs text-emerald-700'>
           <span>★ {ownerRating}</span>

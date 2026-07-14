@@ -6,6 +6,7 @@ import { db, type Product } from '@/lib/data'
 import { useAuthStore } from '@/stores/authStore'
 import { SafeImg } from '@/components/safe-img'
 import { ServiceScheduler } from '@/features/marketplace/service-scheduler'
+import { formatAudPrice, getMarketplaceSaleSignal } from '@/features/marketplace/pricing'
 import { ChatLauncher } from '@/features/assistant/chat-launcher'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -96,6 +97,7 @@ function ListingDetail() {
   }
 
   const isService = product.type === 'service'
+  const sale = getMarketplaceSaleSignal({ price: product.price, compareAtPrice: product.compareAtPrice })
   const displayQuantity = isService ? 1 : qty
   const merchantRouteId = String((product as any)?.storeSlug || (product as any)?.ownerId || '').trim()
   const ownerName = String((product as any)?.ownerName || product.seller || 'Seller').trim()
@@ -170,7 +172,29 @@ function ListingDetail() {
                   <span className='text-emerald-700'>★ {ownerRating.toFixed(1)}</span>
                 </div>
               </div>
-              <div className='text-3xl font-bold text-emerald-600'>A${product.price}</div>
+              {sale ? (
+                <div className='rounded-[1.75rem] border border-rose-200 bg-gradient-to-r from-rose-50 via-orange-50 to-amber-50 p-5 shadow-sm'>
+                  <div className='flex flex-wrap items-start justify-between gap-4'>
+                    <div>
+                      <div className='inline-flex rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-400 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-white shadow'>
+                        {sale.badge}
+                      </div>
+                      <div className='mt-3 text-xs font-black uppercase tracking-[0.18em] text-rose-600'>{sale.kicker}</div>
+                      <div className='mt-2 flex flex-wrap items-end gap-3'>
+                        <div className='text-4xl font-black text-rose-600'>{formatAudPrice(product.price)}</div>
+                        <div className='pb-1 text-lg font-semibold text-slate-400 line-through'>{formatAudPrice(sale.compareAtPrice)}</div>
+                      </div>
+                      <div className='mt-2 text-sm font-medium text-slate-700'>{sale.urgency}</div>
+                    </div>
+                    <div className='rounded-2xl bg-white/85 px-4 py-3 text-right shadow-sm ring-1 ring-rose-100'>
+                      <div className='text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500'>You save</div>
+                      <div className='mt-1 text-2xl font-black text-rose-600'>{formatAudPrice(sale.savingsAmount)}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className='text-3xl font-bold text-emerald-600'>{formatAudPrice(product.price)}</div>
+              )}
 
               <div className='space-y-5 text-sm text-slate-600'>
                 {isService ? (
@@ -222,7 +246,7 @@ function ListingDetail() {
                       window.dispatchEvent(new CustomEvent('cart:changed'))
                     }}
                   >
-                    Add to cart • A${(product.price * displayQuantity).toFixed(2)}
+                    {sale ? 'Grab this deal' : 'Add to cart'} • {formatAudPrice(product.price * displayQuantity)}
                   </Button>
                   <Button asChild variant='outline' className='rounded-full px-5 py-3 text-sm font-semibold'>
                     <Link to='/marketplace/checkout'>Buy now</Link>
