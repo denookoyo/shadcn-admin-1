@@ -12,6 +12,17 @@ export const Route = createFileRoute('/marketplace/_layout/dashboard/order/$id')
   component: ShopOrderDetail,
 })
 
+function parseAppointmentProposals(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string')
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 function ShopOrderDetail() {
   const { id } = useParams({ from: '/marketplace/_layout/dashboard/order/$id' })
   const [data, setData] = useState<any | null>(null)
@@ -43,8 +54,7 @@ function ShopOrderDetail() {
   useEffect(() => {
     try {
       const firstSvc = (data?.items || []).find((it: any) => it?.product?.type === 'service')
-      const arr = firstSvc?.appointmentAlternates ? JSON.parse(firstSvc.appointmentAlternates) : []
-      setLocalProposals(Array.isArray(arr) ? arr : [])
+      setLocalProposals(parseAppointmentProposals(firstSvc?.appointmentAlternates))
     } catch {
       setLocalProposals([])
     }
@@ -70,8 +80,8 @@ function ShopOrderDetail() {
   const goodsItems = (data.items || []).filter((it: any) => !isService(it))
   const paymentMade = ['paid', 'shipped', 'completed'].includes(data.status)
   const firstService = (data.items || []).find((it: any) => it.product?.type === 'service')
-  let proposals: string[] = []
-  try { proposals = firstService?.appointmentAlternates ? JSON.parse(firstService.appointmentAlternates) : [] } catch {}
+  const proposals = parseAppointmentProposals(firstService?.appointmentAlternates)
+  const buyerProposed = firstService?.appointmentProposedBy === 'buyer'
   function addProposal() {
     if (!selectedDate || !selectedTime) return
     const y = selectedDate.getFullYear()
@@ -157,8 +167,39 @@ function ShopOrderDetail() {
             </div>
           </div>
 
+          {buyerProposed && proposals.length > 0 && data.status === 'pending' ? (
+            <div className='mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4'>
+              <div className='font-semibold text-slate-900'>Buyer suggested new times</div>
+              <div className='mt-1 text-sm text-slate-600'>Choose one to confirm the appointment, or send another proposal.</div>
+              <div className='mt-3 flex flex-wrap gap-2'>
+                {proposals.map((proposal) => (
+                  <button
+                    key={proposal}
+                    disabled={working}
+                    className='rounded-md bg-black px-3 py-2 text-sm text-white disabled:opacity-60'
+                    onClick={async () => {
+                      setWorking(true)
+                      try {
+                        await fetchJson(`/api/orders/${data.id}/appointment/accept`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ date: proposal }),
+                        })
+                        location.reload()
+                      } finally {
+                        setWorking(false)
+                      }
+                    }}
+                  >
+                    Accept {new Date(proposal).toLocaleString()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className='mt-4 flex flex-wrap gap-2'>
-            {hasService && data.status === 'pending' && (
+            {hasService && firstService?.appointmentStatus === 'requested' && data.status === 'pending' && (
               <button disabled={working} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={async () => { setWorking(true); try { await fetchJson(`/api/orders/${data.id}/confirm-appointment`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }); location.reload() } finally { setWorking(false) } }}>Confirm Appointment</button>
             )}
             {hasService && data.status === 'scheduled' && (

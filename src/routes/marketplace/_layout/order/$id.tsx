@@ -13,6 +13,17 @@ export const Route = createFileRoute('/marketplace/_layout/order/$id')({
   component: OrderDetail,
 })
 
+function parseAppointmentProposals(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((entry): entry is string => typeof entry === 'string')
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 function OrderDetail() {
   const { id } = useParams({ from: '/marketplace/_layout/order/$id' })
   const me = useAuthStore((s) => s.auth.user as any | null)
@@ -95,8 +106,7 @@ function OrderDetail() {
     // Preload proposals from current order once data arrives
     try {
       const firstSvc = (data?.items || []).find((it: any) => it?.product?.type === 'service')
-      const arr = firstSvc?.appointmentAlternates ? JSON.parse(firstSvc.appointmentAlternates) : []
-      setLocalProposals(Array.isArray(arr) ? arr : [])
+      setLocalProposals(parseAppointmentProposals(firstSvc?.appointmentAlternates))
     } catch {
       setLocalProposals([])
     }
@@ -178,8 +188,12 @@ function OrderDetail() {
   const paymentStatus = String(data.paymentStatus || '').toLowerCase() || 'pending'
   const paymentMade = paymentStatus === 'paid' || ['paid', 'shipped', 'completed', 'refunded'].includes(data.status)
   const firstService = (data.items || []).find((it: any) => it?.product?.type === 'service')
-  let proposals: string[] = []
-  try { proposals = firstService?.appointmentAlternates ? JSON.parse(firstService.appointmentAlternates) : [] } catch {}
+  const proposals = parseAppointmentProposals(firstService?.appointmentAlternates)
+  const proposedBy = firstService?.appointmentProposedBy as 'buyer' | 'seller' | null | undefined
+  const canAcceptProposal = proposals.length > 0 && (
+    (isBuyer && (proposedBy === 'seller' || !proposedBy)) ||
+    (isSeller && proposedBy === 'buyer')
+  )
   function addProposal() {
     if (!selectedDate || !selectedTime) return
     const y = selectedDate.getFullYear()
@@ -456,10 +470,10 @@ function OrderDetail() {
       ) : null}
 
       {/* Buyer: Accept seller's proposed alternates */}
-  {isBuyer && hasService && proposals.length > 0 && data.status === 'pending' && (
+  {canAcceptProposal && hasService && data.status === 'pending' && (
     <div className='mt-4 rounded-2xl border p-4'>
-      <div className='mb-2 text-lg font-semibold'>Seller Proposed Alternate Times</div>
-      <div className='mb-2 text-sm text-gray-600'>Choose one of the proposed slots to schedule your appointment.</div>
+      <div className='mb-2 text-lg font-semibold'>{proposedBy === 'buyer' ? 'Buyer proposed alternate times' : 'Seller proposed alternate times'}</div>
+      <div className='mb-2 text-sm text-gray-600'>Accepting a time confirms it for both parties.</div>
       <div className='flex flex-wrap gap-2'>
         {proposals.map((p) => (
           <button
@@ -564,7 +578,7 @@ function OrderDetail() {
 
       {/* Actions (buyer + seller) */}
       <div className='mt-6 flex flex-wrap gap-2'>
-        {isSeller && (data.items || []).some((it: any) => it?.product?.type === 'service') && data.status === 'pending' && (
+        {isSeller && firstService?.appointmentStatus === 'requested' && data.status === 'pending' && (
           <button disabled={working} className='rounded-md bg-black px-3 py-2 text-sm text-white' onClick={async () => {
             setWorking(true); try { await fetchJson(`/api/orders/${data.id}/confirm-appointment`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }); location.reload() } finally { setWorking(false) }
           }}>Confirm Appointment</button>
@@ -574,14 +588,14 @@ function OrderDetail() {
             setWorking(true); try { await fetchJson(`/api/orders/${data.id}/complete-service`, { method: 'POST', headers: { 'Content-Type': 'application/json' } }); location.reload() } finally { setWorking(false) }
           }}>Mark Service Completed</button>
         )}
-        {isSeller && hasService && (
+        {(isSeller || isBuyer) && hasService && data.status === 'pending' && (
           <Dialog open={proposeOpen} onOpenChange={(o) => setProposeOpen(o)}>
             <DialogTrigger asChild>
-              <button className='rounded-md border px-3 py-2 text-sm'>Reject & Propose</button>
+              <button className='rounded-md border px-3 py-2 text-sm'>{isBuyer ? 'Suggest another time' : 'Suggest different times'}</button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Propose Alternate Times</DialogTitle>
+                <DialogTitle>{isBuyer ? 'Counter with another time' : 'Propose alternate times'}</DialogTitle>
               </DialogHeader>
               {firstService?.appointmentAt ? (
                 <div className='mb-2 text-xs text-gray-600'>Buyer requested: <span className='font-medium'>{new Date(firstService.appointmentAt).toLocaleString()}</span></div>
