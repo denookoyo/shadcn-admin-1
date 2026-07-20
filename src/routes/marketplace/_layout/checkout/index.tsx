@@ -77,6 +77,8 @@ function CheckoutPage() {
         title: d.product.title,
         price: d.product.price,
         quantity: d.quantity,
+        appointmentAt: d.product.type === 'service' ? d.meta : undefined,
+        // Keep the legacy field while older standalone marketplace servers are still deployed.
         meta: d.product.type === 'service' ? d.meta : undefined,
       }))
       const order: Order = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)

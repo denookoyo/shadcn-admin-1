@@ -65,6 +65,8 @@ export type OrderItem = {
   title: string
   price: number
   quantity: number
+  appointmentAt?: string
+  meta?: string
   shippedBarcodes?: string[]
   stockSource?: 'tracked_units' | 'manual'
 }
