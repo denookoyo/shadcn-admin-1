@@ -8,6 +8,7 @@ import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 import type { PaymentRoute, StorePaymentSettings } from '@/lib/localdb'
+import { getOrderSource } from '@/lib/order-source'
 
 export const Route = createFileRoute('/marketplace/_layout/order/$id')({
   component: OrderDetail,
@@ -190,6 +191,7 @@ function OrderDetail() {
   const firstService = (data.items || []).find((it: any) => it?.product?.type === 'service')
   const proposals = parseAppointmentProposals(firstService?.appointmentAlternates)
   const proposedBy = firstService?.appointmentProposedBy as 'buyer' | 'seller' | null | undefined
+  const source = getOrderSource(data.channel)
   const canAcceptProposal = proposals.length > 0 && (
     (isBuyer && (proposedBy === 'seller' || !proposedBy)) ||
     (isSeller && proposedBy === 'buyer')
@@ -354,6 +356,7 @@ function OrderDetail() {
             Status: <span className='font-semibold capitalize'>{data.status}</span>
           </div>
           <div className='mt-1 text-sm text-gray-600'>Placed: {new Date(data.createdAt).toLocaleString()}</div>
+          <div className={`mt-1 text-sm font-medium ${source.verified ? 'text-emerald-700' : 'text-amber-700'}`}>Order source: {source.label} · {source.verified ? 'verified' : 'review'}</div>
         </div>
       </div>
       {data.address ? (

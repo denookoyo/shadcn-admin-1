@@ -22,6 +22,7 @@ import type { PaymentRoute, StorePaymentSettings } from '@/lib/localdb'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
+import { getOrderSource } from '@/lib/order-source'
 
 const statusBadge: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -54,6 +55,11 @@ function getGoodsItems(order: any) {
 
 function isShippableGoodsOrder(order: any) {
   return !isServiceOrder(order) && String(order?.status || '') === 'paid' && getPaymentStatus(order) === 'paid'
+}
+
+function OrderSourceBadge({ channel }: { channel: unknown }) {
+  const source = getOrderSource(channel)
+  return <div className={`mt-1 text-[11px] font-medium ${source.verified ? 'text-emerald-700' : 'text-amber-700'}`}>Order source: {source.label} · {source.verified ? 'verified' : 'review'}</div>
 }
 
 const MetricCard = ({
@@ -371,6 +377,7 @@ export default function OrdersPage() {
                       </span>
                     </div>
                     <div className='mt-1 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
+                    <OrderSourceBadge channel={order.channel} />
                     <div className='mt-2 flex items-center gap-2 text-xs'>
                       {getPaymentStatus(order) === 'pending' ? (
                         <button
@@ -446,6 +453,7 @@ export default function OrdersPage() {
                       </span>
                     </div>
                     <div className='mt-1 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
+                    <OrderSourceBadge channel={order.channel} />
                     <div className='mt-2 flex items-center gap-2 text-xs'>
                       <Link
                         to='/marketplace/order/$id'
@@ -500,6 +508,7 @@ export default function OrdersPage() {
                   <span>{new Date(order.createdAt).toLocaleDateString()}</span>
                 </div>
                 <div className='mt-2 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
+                <OrderSourceBadge channel={order.channel} />
                 <div className='mt-3 flex items-center justify-between'>
                   <div className='text-sm font-semibold text-slate-900'>{formatCurrency(order.total)}</div>
                   <Link

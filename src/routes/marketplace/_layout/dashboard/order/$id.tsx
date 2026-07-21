@@ -6,6 +6,7 @@ import { db } from '@/lib/data'
 import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
+import { getOrderSource } from '@/lib/order-source'
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/order/$id')({
   beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
@@ -82,6 +83,7 @@ function ShopOrderDetail() {
   const firstService = (data.items || []).find((it: any) => it.product?.type === 'service')
   const proposals = parseAppointmentProposals(firstService?.appointmentAlternates)
   const buyerProposed = firstService?.appointmentProposedBy === 'buyer'
+  const source = getOrderSource(data.channel)
   function addProposal() {
     if (!selectedDate || !selectedTime) return
     const y = selectedDate.getFullYear()
@@ -135,6 +137,7 @@ function ShopOrderDetail() {
       <h1 className='text-2xl font-bold'>Order #{String(data.id).slice(0, 6)}</h1>
       <div className='mt-2 text-sm text-gray-600'>Status: <span className='capitalize font-semibold'>{data.status}</span></div>
       <div className='text-sm text-gray-600'>Placed: {new Date(data.createdAt).toLocaleString()}</div>
+      <div className={`text-sm font-medium ${source.verified ? 'text-emerald-700' : 'text-amber-700'}`}>Order source: {source.label} · {source.verified ? 'verified' : 'review before fulfilment'}</div>
       <div className='text-sm'>Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : 'Not paid'}</span></div>
 
       <div className='mt-4 grid gap-6 md:grid-cols-3'>
