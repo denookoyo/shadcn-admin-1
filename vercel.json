@@ -9,6 +9,8 @@
     { "source": "/api/products", "destination": "/api/products" },
     { "source": "/api/products/(.*)", "destination": "/api/products?path=$1" },
     { "source": "/api/categories", "destination": "/api/categories" },
+    { "source": "/api/land/listings", "destination": "/api/land/listings" },
+    { "source": "/api/land/listings/(.*)", "destination": "/api/land/listings?path=$1" },
     { "source": "/api/checkout", "destination": "/api/checkout" },
     { "source": "/api/seller/orders", "destination": "/api/seller/orders" },
     { "source": "/api/storefront/payment-settings", "destination": "/api/storefront/payment-settings" },
