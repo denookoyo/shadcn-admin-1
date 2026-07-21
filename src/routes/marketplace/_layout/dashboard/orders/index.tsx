@@ -19,7 +19,6 @@ import {
 
 import { db, type Order } from '@/lib/data'
 import type { PaymentRoute, StorePaymentSettings } from '@/lib/localdb'
-import { fetchJson } from '@/lib/http'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerRouteAccess } from '@/features/sellers/access'
 import { getOrderSource } from '@/lib/order-source'
@@ -415,12 +414,20 @@ export default function OrdersPage() {
                           </button>
                         </>
                       ) : null}
-                      {isServiceOrder(order) || isShippableGoodsOrder(order) ? (
+                      {isServiceOrder(order) ? (
+                        <Link
+                          to='/marketplace/dashboard/order/$id'
+                          params={{ id: order.id }}
+                          className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
+                        >
+                          Manage appointment
+                        </Link>
+                      ) : isShippableGoodsOrder(order) ? (
                         <button
                           className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
-                          onClick={() => (isServiceOrder(order) ? openServiceAction(order) : openShipmentDialog(order))}
+                          onClick={() => openShipmentDialog(order)}
                         >
-                          {isServiceOrder(order) ? 'Manage appointment' : 'Confirm shipped'}
+                          Confirm shipped
                         </button>
                       ) : null}
                       <Link
@@ -725,24 +732,6 @@ export default function OrdersPage() {
       </div>
     </div>
   )
-
-  function openServiceAction(order: any) {
-    if (order.status === 'pending') {
-      fetchJson(`/api/orders/${order.id}/confirm-appointment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-        .then(() => window.dispatchEvent(new CustomEvent('orders:changed')))
-        .catch(() => {})
-    } else {
-      fetchJson(`/api/orders/${order.id}/complete-service`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-        .then(() => window.dispatchEvent(new CustomEvent('orders:changed')))
-        .catch(() => {})
-    }
-  }
 
   return (
     <MarketplacePageShell width='wide' className='space-y-10'>
