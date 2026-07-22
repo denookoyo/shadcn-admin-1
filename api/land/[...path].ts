@@ -2,7 +2,8 @@ import { proxyGangLedgerJson } from '../../server/consumer.js'
 
 function remotePath(req: any) {
   const url = new URL(String(req.url || '/api/land/listings'), 'http://localhost')
-  const rewritten = String(url.searchParams.get('path') || '').replace(/^\/+/, '')
+  const queryPath = Array.isArray(req.query?.path) ? req.query.path.join('/') : req.query?.path
+  const rewritten = String(queryPath || url.searchParams.get('path') || '').replace(/^\/+/, '')
   const path = rewritten || url.pathname.replace(/^\/api\/land\/listings\/?/, '')
   return `/api/integrations/marketplace/real-estate${path ? `/${path}` : ''}`
 }
