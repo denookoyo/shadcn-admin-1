@@ -42,6 +42,7 @@ export type LandListing = {
   status: LandListingStatus
   createdAt: string
   updatedAt: string
+  canManage?: boolean
 }
 
 export type LandListingInput = {
@@ -129,6 +130,14 @@ export async function createLandListing(input: LandListingInput): Promise<LandLi
     throw new Error('Invalid response for real estate listing create.')
   }
   return data.listing
+}
+
+export async function deleteLandListing(slug: string): Promise<void> {
+  const res = await fetch(`${LAND_LISTINGS_ENDPOINT}/${encodeURIComponent(slug)}`, { method: 'DELETE', credentials: 'include' })
+  if (!res.ok) {
+    const errorBody = await parseJsonResponse<{ error?: string; message?: string }>(res)
+    throw new Error(errorBody.error || errorBody.message || 'Unable to delete this listing.')
+  }
 }
 
 export function formatKes(value: number) {

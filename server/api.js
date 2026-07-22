@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { getPrisma } from './prisma.js'
 import { ensureAuth } from './auth.js'
 import { sendMarketplaceEmail } from './email.js'
-import { isMarketplaceConsumerMode, notSupportedInConsumerMode } from './consumer.js'
+import { isMarketplaceConsumerMode, notSupportedInConsumerMode, proxyGangLedgerJson } from './consumer.js'
 
 function imageForServer(query, w = 640, h = 640) {
   const provider = process.env.VITE_IMAGE_PROVIDER || 'brand'
@@ -2265,7 +2265,10 @@ export function createApiRouter() {
     }
   })
 
-  router.get('/land/listings', async (_req, res) => {
+  router.get('/land/listings', async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return proxyGangLedgerJson(req, res, '/api/integrations/marketplace/real-estate')
+    }
     try {
       await ensureLandListingsSeeded()
       const listings = await prisma.landListing.findMany({ orderBy: { createdAt: 'desc' } })
@@ -2277,6 +2280,9 @@ export function createApiRouter() {
   })
 
   router.get('/land/listings/:slug', async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return proxyGangLedgerJson(req, res, `/api/integrations/marketplace/real-estate/${encodeURIComponent(req.params.slug)}`)
+    }
     try {
       const slug = String(req.params.slug || '').trim()
       if (!slug) return res.status(400).json({ error: 'Missing real estate listing slug' })
@@ -2290,6 +2296,9 @@ export function createApiRouter() {
   })
 
   router.post('/land/listings', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return proxyGangLedgerJson(req, res, '/api/integrations/marketplace/real-estate', { allowMethods: ['POST'] })
+    }
     try {
       const parsed = landListingInputSchema.safeParse(req.body || {})
       if (!parsed.success) {
@@ -2303,6 +2312,20 @@ export function createApiRouter() {
       console.error('POST /api/land/listings error:', e)
       return res.status(500).json({ error: 'Unable to save real estate listing yet.' })
     }
+  })
+
+  router.patch('/land/listings/:slug', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return proxyGangLedgerJson(req, res, `/api/integrations/marketplace/real-estate/${encodeURIComponent(req.params.slug)}`, { allowMethods: ['PATCH'] })
+    }
+    return notSupportedInConsumerMode(res, 'Real-estate editing is managed through Gang Ledger.')
+  })
+
+  router.delete('/land/listings/:slug', ensureAuth, async (req, res) => {
+    if (MARKETPLACE_CONSUMER_MODE) {
+      return proxyGangLedgerJson(req, res, `/api/integrations/marketplace/real-estate/${encodeURIComponent(req.params.slug)}`, { allowMethods: ['DELETE'] })
+    }
+    return notSupportedInConsumerMode(res, 'Real-estate deletion is managed through Gang Ledger.')
   })
 
   async function fetchServiceAvailability(product, startDate, rangeDays) {

@@ -384,6 +384,9 @@ function KenyaLandPage() {
                       <Button variant='default' className='mt-auto w-full rounded-full' onClick={() => setActiveListing(parcel)}>
                         Arrange viewing
                       </Button>
+                      <Button asChild variant='outline' className='w-full rounded-full'>
+                        <Link to='/marketplace/land/$slug' params={{ slug: parcel.slug }}>View full listing</Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

@@ -81,6 +81,7 @@ import { Route as MarketplaceLayoutAssistantIndexImport } from './routes/marketp
 import { Route as MarketplaceLayoutOrderTrackImport } from './routes/marketplace/_layout/order/track'
 import { Route as MarketplaceLayoutOrderPayImport } from './routes/marketplace/_layout/order/pay'
 import { Route as MarketplaceLayoutOrderIdImport } from './routes/marketplace/_layout/order/$id'
+import { Route as MarketplaceLayoutLandSlugImport } from './routes/marketplace/_layout/land/$slug'
 import { Route as MarketplaceLayoutDashboardVerificationImport } from './routes/marketplace/_layout/dashboard/verification'
 import { Route as MarketplaceLayoutDashboardSupportImport } from './routes/marketplace/_layout/dashboard/support'
 import { Route as MarketplaceLayoutDashboardReportsImport } from './routes/marketplace/_layout/dashboard/reports'
@@ -557,6 +558,12 @@ const MarketplaceLayoutOrderPayRoute = MarketplaceLayoutOrderPayImport.update({
 const MarketplaceLayoutOrderIdRoute = MarketplaceLayoutOrderIdImport.update({
   id: '/order/$id',
   path: '/order/$id',
+  getParentRoute: () => MarketplaceLayoutRoute,
+} as any)
+
+const MarketplaceLayoutLandSlugRoute = MarketplaceLayoutLandSlugImport.update({
+  id: '/land/$slug',
+  path: '/land/$slug',
   getParentRoute: () => MarketplaceLayoutRoute,
 } as any)
 
@@ -1200,6 +1207,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketplaceLayoutDashboardVerificationImport
       parentRoute: typeof MarketplaceLayoutDashboardImport
     }
+    '/marketplace/_layout/land/$slug': {
+      id: '/marketplace/_layout/land/$slug'
+      path: '/land/$slug'
+      fullPath: '/marketplace/land/$slug'
+      preLoaderRoute: typeof MarketplaceLayoutLandSlugImport
+      parentRoute: typeof MarketplaceLayoutImport
+    }
     '/marketplace/_layout/order/$id': {
       id: '/marketplace/_layout/order/$id'
       path: '/order/$id'
@@ -1558,6 +1572,7 @@ interface MarketplaceLayoutRouteChildren {
   MarketplaceLayoutMyOrdersRoute: typeof MarketplaceLayoutMyOrdersRoute
   MarketplaceLayoutIndexRoute: typeof MarketplaceLayoutIndexRoute
   MarketplaceLayoutDashboardRoute: typeof MarketplaceLayoutDashboardRouteWithChildren
+  MarketplaceLayoutLandSlugRoute: typeof MarketplaceLayoutLandSlugRoute
   MarketplaceLayoutOrderIdRoute: typeof MarketplaceLayoutOrderIdRoute
   MarketplaceLayoutOrderPayRoute: typeof MarketplaceLayoutOrderPayRoute
   MarketplaceLayoutOrderTrackRoute: typeof MarketplaceLayoutOrderTrackRoute
@@ -1577,6 +1592,7 @@ const MarketplaceLayoutRouteChildren: MarketplaceLayoutRouteChildren = {
   MarketplaceLayoutMyOrdersRoute: MarketplaceLayoutMyOrdersRoute,
   MarketplaceLayoutIndexRoute: MarketplaceLayoutIndexRoute,
   MarketplaceLayoutDashboardRoute: MarketplaceLayoutDashboardRouteWithChildren,
+  MarketplaceLayoutLandSlugRoute: MarketplaceLayoutLandSlugRoute,
   MarketplaceLayoutOrderIdRoute: MarketplaceLayoutOrderIdRoute,
   MarketplaceLayoutOrderPayRoute: MarketplaceLayoutOrderPayRoute,
   MarketplaceLayoutOrderTrackRoute: MarketplaceLayoutOrderTrackRoute,
@@ -1677,6 +1693,7 @@ export interface FileRoutesByFullPath {
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
+  '/marketplace/land/$slug': typeof MarketplaceLayoutLandSlugRoute
   '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
   '/marketplace/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
@@ -1765,6 +1782,7 @@ export interface FileRoutesByTo {
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
+  '/marketplace/land/$slug': typeof MarketplaceLayoutLandSlugRoute
   '/marketplace/order/$id': typeof MarketplaceLayoutOrderIdRoute
   '/marketplace/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/order/track': typeof MarketplaceLayoutOrderTrackRoute
@@ -1860,6 +1878,7 @@ export interface FileRoutesById {
   '/marketplace/_layout/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
   '/marketplace/_layout/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/_layout/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
+  '/marketplace/_layout/land/$slug': typeof MarketplaceLayoutLandSlugRoute
   '/marketplace/_layout/order/$id': typeof MarketplaceLayoutOrderIdRoute
   '/marketplace/_layout/order/pay': typeof MarketplaceLayoutOrderPayRoute
   '/marketplace/_layout/order/track': typeof MarketplaceLayoutOrderTrackRoute
@@ -1954,6 +1973,7 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/reports'
     | '/marketplace/dashboard/support'
     | '/marketplace/dashboard/verification'
+    | '/marketplace/land/$slug'
     | '/marketplace/order/$id'
     | '/marketplace/order/pay'
     | '/marketplace/order/track'
@@ -2041,6 +2061,7 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/reports'
     | '/marketplace/dashboard/support'
     | '/marketplace/dashboard/verification'
+    | '/marketplace/land/$slug'
     | '/marketplace/order/$id'
     | '/marketplace/order/pay'
     | '/marketplace/order/track'
@@ -2134,6 +2155,7 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/dashboard/reports'
     | '/marketplace/_layout/dashboard/support'
     | '/marketplace/_layout/dashboard/verification'
+    | '/marketplace/_layout/land/$slug'
     | '/marketplace/_layout/order/$id'
     | '/marketplace/_layout/order/pay'
     | '/marketplace/_layout/order/track'
@@ -2369,6 +2391,7 @@ export const routeTree = rootRoute
         "/marketplace/_layout/my-orders",
         "/marketplace/_layout/",
         "/marketplace/_layout/dashboard",
+        "/marketplace/_layout/land/$slug",
         "/marketplace/_layout/order/$id",
         "/marketplace/_layout/order/pay",
         "/marketplace/_layout/order/track",
@@ -2584,6 +2607,10 @@ export const routeTree = rootRoute
     "/marketplace/_layout/dashboard/verification": {
       "filePath": "marketplace/_layout/dashboard/verification.tsx",
       "parent": "/marketplace/_layout/dashboard"
+    },
+    "/marketplace/_layout/land/$slug": {
+      "filePath": "marketplace/_layout/land/$slug.tsx",
+      "parent": "/marketplace/_layout"
     },
     "/marketplace/_layout/order/$id": {
       "filePath": "marketplace/_layout/order/$id.tsx",
