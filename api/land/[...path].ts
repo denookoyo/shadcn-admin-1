@@ -9,7 +9,7 @@ function remotePath(req: any) {
 
 export default function handler(req: any, res: any) {
   return proxyGangLedgerJson(req, res, remotePath(req), {
-    allowMethods: ['GET', 'POST'],
+    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE'],
     notSupportedMessage: 'Real estate listings are managed by Gang Ledger.',
   })
 }
