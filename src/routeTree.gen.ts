@@ -90,6 +90,7 @@ import { Route as MarketplaceLayoutDashboardApprovalsImport } from './routes/mar
 import { Route as MarketplaceLayoutDashboardAnalyticsImport } from './routes/marketplace/_layout/dashboard/analytics'
 import { Route as MarketplaceLayoutDashboardAdminImport } from './routes/marketplace/_layout/dashboard/admin'
 import { Route as MarketplaceLayoutDashboardLayoutImport } from './routes/marketplace/_layout/dashboard/_layout'
+import { Route as MarketplaceLayoutStoreStoreSlugIndexImport } from './routes/marketplace/_layout/store/$storeSlug/index'
 import { Route as MarketplaceLayoutMerchantIdIndexImport } from './routes/marketplace/_layout/merchant/$id/index'
 import { Route as MarketplaceLayoutListingSlugIndexImport } from './routes/marketplace/_layout/listing/$slug/index'
 import { Route as MarketplaceLayoutDashboardSettingsIndexImport } from './routes/marketplace/_layout/dashboard/settings/index'
@@ -101,6 +102,7 @@ import { Route as MarketplaceLayoutDashboardOrdersAllImport } from './routes/mar
 import { Route as MarketplaceLayoutDashboardOrderIdImport } from './routes/marketplace/_layout/dashboard/order/$id'
 import { Route as MarketplaceLayoutDashboardListingsProductImport } from './routes/marketplace/_layout/dashboard/listings/product'
 import { Route as MarketplaceLayoutDashboardListingsNewImport } from './routes/marketplace/_layout/dashboard/listings/new'
+import { Route as MarketplaceLayoutStoreStoreSlugProductsProductSlugImport } from './routes/marketplace/_layout/store/$storeSlug/products/$productSlug'
 
 // Create Virtual Routes
 
@@ -620,6 +622,13 @@ const MarketplaceLayoutDashboardLayoutRoute =
     getParentRoute: () => MarketplaceLayoutDashboardRoute,
   } as any)
 
+const MarketplaceLayoutStoreStoreSlugIndexRoute =
+  MarketplaceLayoutStoreStoreSlugIndexImport.update({
+    id: '/store/$storeSlug/',
+    path: '/store/$storeSlug/',
+    getParentRoute: () => MarketplaceLayoutRoute,
+  } as any)
+
 const MarketplaceLayoutMerchantIdIndexRoute =
   MarketplaceLayoutMerchantIdIndexImport.update({
     id: '/merchant/$id/',
@@ -695,6 +704,13 @@ const MarketplaceLayoutDashboardListingsNewRoute =
     id: '/listings/new',
     path: '/listings/new',
     getParentRoute: () => MarketplaceLayoutDashboardRoute,
+  } as any)
+
+const MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute =
+  MarketplaceLayoutStoreStoreSlugProductsProductSlugImport.update({
+    id: '/store/$storeSlug/products/$productSlug',
+    path: '/store/$storeSlug/products/$productSlug',
+    getParentRoute: () => MarketplaceLayoutRoute,
   } as any)
 
 // Populate the FileRoutesByPath interface
@@ -1331,6 +1347,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketplaceLayoutMerchantIdIndexImport
       parentRoute: typeof MarketplaceLayoutImport
     }
+    '/marketplace/_layout/store/$storeSlug/': {
+      id: '/marketplace/_layout/store/$storeSlug/'
+      path: '/store/$storeSlug'
+      fullPath: '/marketplace/store/$storeSlug'
+      preLoaderRoute: typeof MarketplaceLayoutStoreStoreSlugIndexImport
+      parentRoute: typeof MarketplaceLayoutImport
+    }
+    '/marketplace/_layout/store/$storeSlug/products/$productSlug': {
+      id: '/marketplace/_layout/store/$storeSlug/products/$productSlug'
+      path: '/store/$storeSlug/products/$productSlug'
+      fullPath: '/marketplace/store/$storeSlug/products/$productSlug'
+      preLoaderRoute: typeof MarketplaceLayoutStoreStoreSlugProductsProductSlugImport
+      parentRoute: typeof MarketplaceLayoutImport
+    }
   }
 }
 
@@ -1539,6 +1569,8 @@ interface MarketplaceLayoutRouteChildren {
   MarketplaceLayoutSpacesIndexRoute: typeof MarketplaceLayoutSpacesIndexRoute
   MarketplaceLayoutListingSlugIndexRoute: typeof MarketplaceLayoutListingSlugIndexRoute
   MarketplaceLayoutMerchantIdIndexRoute: typeof MarketplaceLayoutMerchantIdIndexRoute
+  MarketplaceLayoutStoreStoreSlugIndexRoute: typeof MarketplaceLayoutStoreStoreSlugIndexRoute
+  MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute: typeof MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute
 }
 
 const MarketplaceLayoutRouteChildren: MarketplaceLayoutRouteChildren = {
@@ -1557,6 +1589,10 @@ const MarketplaceLayoutRouteChildren: MarketplaceLayoutRouteChildren = {
   MarketplaceLayoutListingSlugIndexRoute:
     MarketplaceLayoutListingSlugIndexRoute,
   MarketplaceLayoutMerchantIdIndexRoute: MarketplaceLayoutMerchantIdIndexRoute,
+  MarketplaceLayoutStoreStoreSlugIndexRoute:
+    MarketplaceLayoutStoreStoreSlugIndexRoute,
+  MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute:
+    MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute,
 }
 
 const MarketplaceLayoutRouteWithChildren =
@@ -1662,6 +1698,8 @@ export interface FileRoutesByFullPath {
   '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
   '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
   '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
+  '/marketplace/store/$storeSlug': typeof MarketplaceLayoutStoreStoreSlugIndexRoute
+  '/marketplace/store/$storeSlug/products/$productSlug': typeof MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute
 }
 
 export interface FileRoutesByTo {
@@ -1747,6 +1785,8 @@ export interface FileRoutesByTo {
   '/marketplace/dashboard/settings': typeof MarketplaceLayoutDashboardSettingsIndexRoute
   '/marketplace/listing/$slug': typeof MarketplaceLayoutListingSlugIndexRoute
   '/marketplace/merchant/$id': typeof MarketplaceLayoutMerchantIdIndexRoute
+  '/marketplace/store/$storeSlug': typeof MarketplaceLayoutStoreStoreSlugIndexRoute
+  '/marketplace/store/$storeSlug/products/$productSlug': typeof MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute
 }
 
 export interface FileRoutesById {
@@ -1841,6 +1881,8 @@ export interface FileRoutesById {
   '/marketplace/_layout/dashboard/settings/': typeof MarketplaceLayoutDashboardSettingsIndexRoute
   '/marketplace/_layout/listing/$slug/': typeof MarketplaceLayoutListingSlugIndexRoute
   '/marketplace/_layout/merchant/$id/': typeof MarketplaceLayoutMerchantIdIndexRoute
+  '/marketplace/_layout/store/$storeSlug/': typeof MarketplaceLayoutStoreStoreSlugIndexRoute
+  '/marketplace/_layout/store/$storeSlug/products/$productSlug': typeof MarketplaceLayoutStoreStoreSlugProductsProductSlugRoute
 }
 
 export interface FileRouteTypes {
@@ -1933,6 +1975,8 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/settings'
     | '/marketplace/listing/$slug'
     | '/marketplace/merchant/$id'
+    | '/marketplace/store/$storeSlug'
+    | '/marketplace/store/$storeSlug/products/$productSlug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/contact'
@@ -2017,6 +2061,8 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/settings'
     | '/marketplace/listing/$slug'
     | '/marketplace/merchant/$id'
+    | '/marketplace/store/$storeSlug'
+    | '/marketplace/store/$storeSlug/products/$productSlug'
   id:
     | '__root__'
     | '/_authenticated'
@@ -2109,6 +2155,8 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/dashboard/settings/'
     | '/marketplace/_layout/listing/$slug/'
     | '/marketplace/_layout/merchant/$id/'
+    | '/marketplace/_layout/store/$storeSlug/'
+    | '/marketplace/_layout/store/$storeSlug/products/$productSlug'
   fileRoutesById: FileRoutesById
 }
 
@@ -2331,7 +2379,9 @@ export const routeTree = rootRoute
         "/marketplace/_layout/listings/",
         "/marketplace/_layout/spaces/",
         "/marketplace/_layout/listing/$slug/",
-        "/marketplace/_layout/merchant/$id/"
+        "/marketplace/_layout/merchant/$id/",
+        "/marketplace/_layout/store/$storeSlug/",
+        "/marketplace/_layout/store/$storeSlug/products/$productSlug"
       ]
     },
     "/oauth/authorize": {
@@ -2617,6 +2667,14 @@ export const routeTree = rootRoute
     },
     "/marketplace/_layout/merchant/$id/": {
       "filePath": "marketplace/_layout/merchant/$id/index.tsx",
+      "parent": "/marketplace/_layout"
+    },
+    "/marketplace/_layout/store/$storeSlug/": {
+      "filePath": "marketplace/_layout/store/$storeSlug/index.tsx",
+      "parent": "/marketplace/_layout"
+    },
+    "/marketplace/_layout/store/$storeSlug/products/$productSlug": {
+      "filePath": "marketplace/_layout/store/$storeSlug/products/$productSlug.tsx",
       "parent": "/marketplace/_layout"
     }
   }

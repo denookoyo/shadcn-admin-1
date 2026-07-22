@@ -10,8 +10,9 @@ function formatMoney(value: number) {
   return `A$${Number(value || 0).toLocaleString()}`
 }
 
-function MerchantPage() {
-  const { id } = useParams({ from: '/marketplace/_layout/merchant/$id/' })
+export function MerchantPage({ storeId }: { storeId?: string }) {
+  const routeParams = useParams({ strict: false })
+  const id = storeId || String((routeParams as { id?: string }).id || '')
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 

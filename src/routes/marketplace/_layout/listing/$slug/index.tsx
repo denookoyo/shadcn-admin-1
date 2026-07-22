@@ -24,13 +24,17 @@ const SHARED_OFFER_LABELS: Record<'roommate' | 'desk-pass' | 'lease-transfer', s
 }
 
 export const Route = createFileRoute('/marketplace/_layout/listing/$slug/')({
-  component: ListingDetail,
+  component: ListingRoute,
 })
 
-function ListingDetail() {
+function ListingRoute() {
+  const { slug } = useParams({ from: '/marketplace/_layout/listing/$slug/' })
+  return <ListingDetail legacySlug={slug} />
+}
+
+export function ListingDetail({ legacySlug, storeSlug, productSlug }: { legacySlug?: string; storeSlug?: string; productSlug?: string }) {
   const { user } = useAuthStore((s) => s.auth)
   const ns = user?.email || user?.accountNo || 'guest'
-  const { slug } = useParams({ from: '/marketplace/_layout/listing/$slug/' })
   const [product, setProduct] = useState<Product | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [qty, setQty] = useState(1)
@@ -50,7 +54,12 @@ function ListingDetail() {
   useEffect(() => {
     let mounted = true
     ;(async () => {
-      const prod = await db.getProductBySlug(slug)
+      const prod = legacySlug
+        ? await db.getProductBySlug(legacySlug)
+        : (await db.listProducts()).find((candidate) =>
+            String(candidate.storeSlug || '').toLowerCase() === String(storeSlug || '').toLowerCase() &&
+            String(candidate.productSlug || candidate.slug).toLowerCase() === String(productSlug || '').toLowerCase()
+          )
       if (mounted) {
         setProduct(prod ?? null)
         setLoaded(true)
@@ -59,7 +68,7 @@ function ListingDetail() {
     return () => {
       mounted = false
     }
-  }, [slug])
+  }, [legacySlug, productSlug, storeSlug])
 
   useEffect(() => {
     setSelectedSlot(null)

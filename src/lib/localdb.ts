@@ -29,6 +29,8 @@ export type SharedSpaceProfile = {
 export type Product = {
   id: string
   slug: string
+  productSlug?: string
+  storeSlug?: string
   title: string
   price: number
   compareAtPrice?: number | null
