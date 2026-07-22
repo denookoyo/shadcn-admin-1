@@ -1,4 +1,4 @@
-import { proxyGangLedgerJson } from '../../server/consumer.js'
+import { proxyGangLedgerJson } from '../../../server/consumer.js'
 
 export default function handler(req: any, res: any) {
   return proxyGangLedgerJson(req, res, '/api/integrations/marketplace/real-estate', {
