@@ -9,6 +9,7 @@ import { useSellerAccess } from '@/features/sellers/access'
 type StoreRole = 'OWNER' | 'MANAGER' | 'STOCK_CONTROLLER' | 'SALES_STAFF' | 'FULFILLMENT_STAFF' | 'ANALYST' | 'STAFF'
 type TeamResponse = {
   store: { id: number; name: string }
+  stores: Array<{ id: number; name: string; slug: string; status: string; role: StoreRole }>
   access: { role: StoreRole; isOwner: boolean; permissions: string[] }
   memberships: Array<{ id: number; userId: number; role: StoreRole; status: string; user: { name?: string | null; email: string } }>
   invites: Array<{ id: number; email: string; role: StoreRole; status: string; createdAt: string }>
@@ -34,12 +35,15 @@ function StaffPermissionsPage() {
   const [role, setRole] = useState<StoreRole>('SALES_STAFF')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null)
 
-  const loadTeam = useCallback(async () => {
-    const response = await fetch('/api/storefront/team', { credentials: 'include', cache: 'no-store' })
+  const loadTeam = useCallback(async (storeId?: number | null) => {
+    const query = storeId ? `?storeId=${encodeURIComponent(storeId)}` : ''
+    const response = await fetch(`/api/storefront/team${query}`, { credentials: 'include', cache: 'no-store' })
     const result = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(result.error || result.message || 'Could not load storefront staff.')
     setTeam(result)
+    setSelectedStoreId(Number(result.store?.id) || null)
   }, [])
 
   useEffect(() => {
@@ -59,7 +63,7 @@ function StaffPermissionsPage() {
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || result.message || 'The staff update could not be saved.')
-      await loadTeam()
+      await loadTeam(selectedStoreId)
       return true
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The staff update could not be saved.')
@@ -97,6 +101,24 @@ function StaffPermissionsPage() {
             <p className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>Seller cockpit</p>
             <h1 className='mt-1 text-3xl font-semibold text-slate-900'>Staff & permissions</h1>
             <p className='mt-2 max-w-2xl text-sm text-slate-600'>Invite employees and assign the minimum access needed for their storefront duties. Changes and staff activity are securely audited in Gang Ledger.</p>
+            {owner && (team?.stores.length || 0) > 1 ? (
+              <label className='mt-5 block max-w-md text-sm font-medium text-slate-700'>
+                Manage storefront
+                <select
+                  value={selectedStoreId || ''}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const nextStoreId = Number(event.target.value)
+                    setSelectedStoreId(nextStoreId)
+                    setMessage('')
+                    loadTeam(nextStoreId).catch((error) => setMessage(error instanceof Error ? error.message : 'Could not switch storefront.'))
+                  }}
+                  className='mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm shadow-sm'
+                >
+                  {team?.stores.filter((store) => store.role === 'OWNER').map((store) => <option key={store.id} value={store.id}>{store.name} · {store.status.toLowerCase()}</option>)}
+                </select>
+              </label>
+            ) : null}
           </div>
         </div>
       </section>
