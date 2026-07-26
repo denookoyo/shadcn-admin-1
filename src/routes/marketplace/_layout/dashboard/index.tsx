@@ -68,14 +68,21 @@ function SellerDashboard() {
   const myNumericId = (user as any)?.id ?? (user as any)?.uid
   const role = String((user as any)?.role ?? '').toLowerCase()
   const isAdmin = Boolean((user as any)?.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
+  const storefrontPermissions = Array.isArray((user as any)?.storefrontPermissions) ? (user as any).storefrontPermissions : []
+  const storefrontStoreIds = Array.isArray((user as any)?.storefrontStoreIds) ? (user as any).storefrontStoreIds.map(Number) : []
+  const isStorefrontStaff = Boolean((user as any)?.isStorefrontStaff)
+  const canSell = !isStorefrontStaff || storefrontPermissions.includes('orders.manage')
+  const canManageCatalog = !isStorefrontStaff || storefrontPermissions.includes('catalog.manage')
+  const canReadOrders = !isStorefrontStaff || storefrontPermissions.includes('orders.read')
 
   const mine = useMemo(() => {
     return products.filter((product: any) => {
+      if (storefrontStoreIds.length && product?.storeId != null) return storefrontStoreIds.includes(Number(product.storeId))
       if (typeof product?.ownerId === 'number') return myNumericId != null && Number(product.ownerId) === Number(myNumericId)
       if (typeof product?.ownerId === 'string') return product.ownerId === ns
       return false
     })
-  }, [products, ns, myNumericId])
+  }, [products, ns, myNumericId, storefrontStoreIds])
 
   const totalRevenue = useMemo(() => orders.reduce((acc, order) => acc + order.total, 0), [orders])
   const pendingOrders = useMemo(() => orders.filter((order: any) => ['pending', 'scheduled'].includes(order.status)), [orders])
@@ -124,15 +131,15 @@ function SellerDashboard() {
                   Admin dashboard
                 </Link>
               ) : null}
-              <Link to='/marketplace/dashboard/pos' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
+              {canSell ? <Link to='/marketplace/dashboard/pos' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
                 <ScanLine className='h-3.5 w-3.5' /> Open POS
-              </Link>
-              <Link to='/marketplace/dashboard/listings/new' className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-500'>
+              </Link> : null}
+              {canManageCatalog ? <Link to='/marketplace/dashboard/listings/new' className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-600 px-4 py-2 font-semibold text-white transition hover:bg-emerald-500'>
                 Launch listing
-              </Link>
-              <Link to='/marketplace/dashboard/orders' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
+              </Link> : null}
+              {canReadOrders ? <Link to='/marketplace/dashboard/orders' className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:border-emerald-200 hover:text-emerald-700'>
                 <PackageSearch className='h-3.5 w-3.5' /> Manage orders
-              </Link>
+              </Link> : null}
             </div>
           </div>
           <div className='grid w-full max-w-sm gap-4 text-sm text-slate-600'>

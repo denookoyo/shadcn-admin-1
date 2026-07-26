@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useUiStore } from '@/stores/uiStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
-import { ensureSellerRouteAccess } from '@/features/sellers/access'
+import { ensureSellerPermission } from '@/features/sellers/access'
 
 type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; type?: Product['type'] }
 
@@ -52,7 +52,9 @@ function PosPage() {
     const term = q.trim().toLowerCase()
     // Only products belonging to the logged-in user
     const myNumeric = (user as any)?.id ?? (user as any)?.uid
+    const assignedStoreIds = Array.isArray((user as any)?.storefrontStoreIds) ? (user as any).storefrontStoreIds.map(Number) : []
     const own = products.filter((p: any) => {
+      if (assignedStoreIds.length && p?.storeId != null) return assignedStoreIds.includes(Number(p.storeId))
       if (typeof p?.ownerId === 'number') return myNumeric != null && Number(p.ownerId) === Number(myNumeric)
       if (typeof p?.ownerId === 'string') return p.ownerId === (user?.email || (user as any)?.accountNo)
       return false
@@ -359,6 +361,6 @@ function PosPage() {
 }
 
 export const Route = createFileRoute('/marketplace/_layout/dashboard/pos/')({
-  beforeLoad: ({ location }) => ensureSellerRouteAccess(location),
+  beforeLoad: ({ location }) => ensureSellerPermission('orders.manage', location),
   component: PosPage,
 })

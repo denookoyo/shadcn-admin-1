@@ -16,6 +16,7 @@ type SellerAccessState = {
   isStorefrontStaff: boolean
   storefrontRole: string | null
   storefrontPermissions: string[]
+  storefrontStoreIds: number[]
 }
 
 function computeSellerAccess(user: any | null): SellerAccessState {
@@ -30,8 +31,9 @@ function computeSellerAccess(user: any | null): SellerAccessState {
   const isStorefrontStaff = Boolean(user?.isStorefrontStaff || user?.storefrontRole)
   const storefrontRole = user?.storefrontRole ? String(user.storefrontRole) : null
   const storefrontPermissions = Array.isArray(user?.storefrontPermissions) ? user.storefrontPermissions : []
+  const storefrontStoreIds = Array.isArray(user?.storefrontStoreIds) ? user.storefrontStoreIds.map(Number).filter(Number.isFinite) : []
   const canAccessSellerTools = isAdmin || marketplaceEligible || isStorefrontStaff || sellerStatus === 'approved'
-  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions }
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions, storefrontStoreIds }
 }
 
 export function getSellerAccessState(): SellerAccessState {
@@ -64,6 +66,12 @@ export async function ensureSellerRouteAccess(location?: { href?: string; pathna
     throw redirect({ to: '/marketplace/dashboard/verification', search: { redirect: redirectTarget } })
   }
   return access
+}
+
+export async function ensureSellerPermission(permission: string, location?: { href?: string; pathname?: string }) {
+  const access = await ensureSellerRouteAccess(location)
+  if (access.isAdmin || !access.isStorefrontStaff || access.storefrontPermissions.includes(permission)) return access
+  throw redirect({ to: '/marketplace/dashboard' })
 }
 
 export function useSellerAccess() {
@@ -103,12 +111,12 @@ export function useSellerAccess() {
     }
   }, [user])
 
-  const { sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions } = useMemo(
+  const { sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions, storefrontStoreIds } = useMemo(
     () => computeSellerAccess(user),
     [user, version],
   )
 
-  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions, loading }
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions, storefrontStoreIds, loading }
 }
 
 const statusCopy: Record<

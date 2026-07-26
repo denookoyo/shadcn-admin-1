@@ -99,6 +99,7 @@ function signGangLedgerBridgeToken(req, audience = MARKETPLACE_API_TOKEN_AUDIENC
     isStorefrontStaff: Boolean(req.user?.isStorefrontStaff),
     storefrontRole: req.user?.storefrontRole || null,
     storefrontStoreId: req.user?.storefrontStoreId || null,
+    storefrontStoreIds: Array.isArray(req.user?.storefrontStoreIds) ? req.user.storefrontStoreIds : [],
     storefrontPermissions: Array.isArray(req.user?.storefrontPermissions) ? req.user.storefrontPermissions : [],
     iss: MARKETPLACE_API_TOKEN_ISSUER,
     aud: audience,

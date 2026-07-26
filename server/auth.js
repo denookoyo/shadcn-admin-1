@@ -41,6 +41,7 @@ function consumerSessionUser(req) {
     isStorefrontStaff: Boolean(req.user?.isStorefrontStaff),
     storefrontRole: req.user?.storefrontRole || null,
     storefrontStoreId: req.user?.storefrontStoreId || null,
+    storefrontStoreIds: Array.isArray(req.user?.storefrontStoreIds) ? req.user.storefrontStoreIds : [],
     storefrontPermissions: Array.isArray(req.user?.storefrontPermissions) ? req.user.storefrontPermissions : [],
     source: req.user?.source || 'gangledger',
   }
@@ -185,6 +186,7 @@ export function createAuthRouter() {
         isStorefrontStaff: Boolean(payload.isStorefrontStaff),
         storefrontRole: payload.storefrontRole || null,
         storefrontStoreId: payload.storefrontStoreId || null,
+        storefrontStoreIds: Array.isArray(payload.storefrontStoreIds) ? payload.storefrontStoreIds : [],
         storefrontPermissions: Array.isArray(payload.storefrontPermissions) ? payload.storefrontPermissions : [],
         source: 'gangledger',
       }
