@@ -55,7 +55,8 @@ function Nav() {
     }
   }, [])
 
-  const { sellerStatus, canAccessSellerTools, isAdmin } = useSellerAccess()
+  const { sellerStatus, canAccessSellerTools, isAdmin, storefrontRole, storefrontPermissions } = useSellerAccess()
+  const canManageStorefrontStaff = isAdmin || storefrontRole === 'OWNER' || storefrontRole === 'MANAGER' || storefrontPermissions.includes('team.manage')
   const primaryLinks = [
     { href: '/marketplace/listings', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
@@ -69,6 +70,7 @@ function Nav() {
         { href: '/marketplace/dashboard', label: 'Seller cockpit' },
         { href: '/marketplace/dashboard/orders', label: 'Orders' },
         { href: '/marketplace/dashboard/support', label: 'Support' },
+        ...(canManageStorefrontStaff ? [{ href: '/marketplace/dashboard/staff', label: 'Staff & permissions' }] as const : []),
         { href: '/marketplace/dashboard/verification', label: 'Seller profile' },
       ] as const)
     : ([

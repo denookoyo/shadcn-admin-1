@@ -13,6 +13,9 @@ type SellerAccessState = {
   isAdmin: boolean
   marketplaceEligible: boolean
   canAccessSellerTools: boolean
+  isStorefrontStaff: boolean
+  storefrontRole: string | null
+  storefrontPermissions: string[]
 }
 
 function computeSellerAccess(user: any | null): SellerAccessState {
@@ -24,8 +27,11 @@ function computeSellerAccess(user: any | null): SellerAccessState {
   const isAdmin = explicitAdmin || roleAdmin
   const marketplaceEligible =
     Boolean(user?.marketplaceEligible) || Boolean(user?.marketplaceCatalog) || Boolean(user?.marketplaceApi) || isAdmin
-  const canAccessSellerTools = isAdmin || marketplaceEligible || sellerStatus === 'approved'
-  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools }
+  const isStorefrontStaff = Boolean(user?.isStorefrontStaff || user?.storefrontRole)
+  const storefrontRole = user?.storefrontRole ? String(user.storefrontRole) : null
+  const storefrontPermissions = Array.isArray(user?.storefrontPermissions) ? user.storefrontPermissions : []
+  const canAccessSellerTools = isAdmin || marketplaceEligible || isStorefrontStaff || sellerStatus === 'approved'
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions }
 }
 
 export function getSellerAccessState(): SellerAccessState {
@@ -97,12 +103,12 @@ export function useSellerAccess() {
     }
   }, [user])
 
-  const { sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools } = useMemo(
+  const { sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions } = useMemo(
     () => computeSellerAccess(user),
     [user, version],
   )
 
-  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, loading }
+  return { user, sellerStatus, isAdmin, marketplaceEligible, canAccessSellerTools, isStorefrontStaff, storefrontRole, storefrontPermissions, loading }
 }
 
 const statusCopy: Record<

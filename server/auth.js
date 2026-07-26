@@ -38,6 +38,10 @@ function consumerSessionUser(req) {
     marketplaceEligible: Boolean(req.user?.marketplaceEligible) || Boolean(req.user?.marketplaceCatalog) || Boolean(req.user?.marketplaceApi) || isAdmin,
     marketplaceCatalog: Boolean(req.user?.marketplaceCatalog) || isAdmin,
     marketplaceApi: Boolean(req.user?.marketplaceApi) || isAdmin,
+    isStorefrontStaff: Boolean(req.user?.isStorefrontStaff),
+    storefrontRole: req.user?.storefrontRole || null,
+    storefrontStoreId: req.user?.storefrontStoreId || null,
+    storefrontPermissions: Array.isArray(req.user?.storefrontPermissions) ? req.user.storefrontPermissions : [],
     source: req.user?.source || 'gangledger',
   }
 }
@@ -178,6 +182,10 @@ export function createAuthRouter() {
         marketplaceEligible: Boolean(payload.marketplaceEligible) || Boolean(payload.marketplaceCatalog) || Boolean(payload.marketplaceApi) || isAdmin,
         marketplaceCatalog: Boolean(payload.marketplaceCatalog) || isAdmin,
         marketplaceApi: Boolean(payload.marketplaceApi) || isAdmin,
+        isStorefrontStaff: Boolean(payload.isStorefrontStaff),
+        storefrontRole: payload.storefrontRole || null,
+        storefrontStoreId: payload.storefrontStoreId || null,
+        storefrontPermissions: Array.isArray(payload.storefrontPermissions) ? payload.storefrontPermissions : [],
         source: 'gangledger',
       }
 

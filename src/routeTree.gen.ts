@@ -84,6 +84,7 @@ import { Route as MarketplaceLayoutOrderIdImport } from './routes/marketplace/_l
 import { Route as MarketplaceLayoutLandSlugImport } from './routes/marketplace/_layout/land/$slug'
 import { Route as MarketplaceLayoutDashboardVerificationImport } from './routes/marketplace/_layout/dashboard/verification'
 import { Route as MarketplaceLayoutDashboardSupportImport } from './routes/marketplace/_layout/dashboard/support'
+import { Route as MarketplaceLayoutDashboardStaffImport } from './routes/marketplace/_layout/dashboard/staff'
 import { Route as MarketplaceLayoutDashboardReportsImport } from './routes/marketplace/_layout/dashboard/reports'
 import { Route as MarketplaceLayoutDashboardLabelsImport } from './routes/marketplace/_layout/dashboard/labels'
 import { Route as MarketplaceLayoutDashboardImportImport } from './routes/marketplace/_layout/dashboard/import'
@@ -578,6 +579,13 @@ const MarketplaceLayoutDashboardSupportRoute =
   MarketplaceLayoutDashboardSupportImport.update({
     id: '/support',
     path: '/support',
+    getParentRoute: () => MarketplaceLayoutDashboardRoute,
+  } as any)
+
+const MarketplaceLayoutDashboardStaffRoute =
+  MarketplaceLayoutDashboardStaffImport.update({
+    id: '/staff',
+    path: '/staff',
     getParentRoute: () => MarketplaceLayoutDashboardRoute,
   } as any)
 
@@ -1193,6 +1201,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketplaceLayoutDashboardReportsImport
       parentRoute: typeof MarketplaceLayoutDashboardImport
     }
+    '/marketplace/_layout/dashboard/staff': {
+      id: '/marketplace/_layout/dashboard/staff'
+      path: '/staff'
+      fullPath: '/marketplace/dashboard/staff'
+      preLoaderRoute: typeof MarketplaceLayoutDashboardStaffImport
+      parentRoute: typeof MarketplaceLayoutDashboardImport
+    }
     '/marketplace/_layout/dashboard/support': {
       id: '/marketplace/_layout/dashboard/support'
       path: '/support'
@@ -1509,6 +1524,7 @@ interface MarketplaceLayoutDashboardRouteChildren {
   MarketplaceLayoutDashboardImportRoute: typeof MarketplaceLayoutDashboardImportRoute
   MarketplaceLayoutDashboardLabelsRoute: typeof MarketplaceLayoutDashboardLabelsRoute
   MarketplaceLayoutDashboardReportsRoute: typeof MarketplaceLayoutDashboardReportsRoute
+  MarketplaceLayoutDashboardStaffRoute: typeof MarketplaceLayoutDashboardStaffRoute
   MarketplaceLayoutDashboardSupportRoute: typeof MarketplaceLayoutDashboardSupportRoute
   MarketplaceLayoutDashboardVerificationRoute: typeof MarketplaceLayoutDashboardVerificationRoute
   MarketplaceLayoutDashboardIndexRoute: typeof MarketplaceLayoutDashboardIndexRoute
@@ -1538,6 +1554,7 @@ const MarketplaceLayoutDashboardRouteChildren: MarketplaceLayoutDashboardRouteCh
       MarketplaceLayoutDashboardLabelsRoute,
     MarketplaceLayoutDashboardReportsRoute:
       MarketplaceLayoutDashboardReportsRoute,
+    MarketplaceLayoutDashboardStaffRoute: MarketplaceLayoutDashboardStaffRoute,
     MarketplaceLayoutDashboardSupportRoute:
       MarketplaceLayoutDashboardSupportRoute,
     MarketplaceLayoutDashboardVerificationRoute:
@@ -1691,6 +1708,7 @@ export interface FileRoutesByFullPath {
   '/marketplace/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
   '/marketplace/dashboard/labels': typeof MarketplaceLayoutDashboardLabelsRoute
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
+  '/marketplace/dashboard/staff': typeof MarketplaceLayoutDashboardStaffRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
   '/marketplace/land/$slug': typeof MarketplaceLayoutLandSlugRoute
@@ -1780,6 +1798,7 @@ export interface FileRoutesByTo {
   '/marketplace/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
   '/marketplace/dashboard/labels': typeof MarketplaceLayoutDashboardLabelsRoute
   '/marketplace/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
+  '/marketplace/dashboard/staff': typeof MarketplaceLayoutDashboardStaffRoute
   '/marketplace/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
   '/marketplace/land/$slug': typeof MarketplaceLayoutLandSlugRoute
@@ -1876,6 +1895,7 @@ export interface FileRoutesById {
   '/marketplace/_layout/dashboard/import': typeof MarketplaceLayoutDashboardImportRoute
   '/marketplace/_layout/dashboard/labels': typeof MarketplaceLayoutDashboardLabelsRoute
   '/marketplace/_layout/dashboard/reports': typeof MarketplaceLayoutDashboardReportsRoute
+  '/marketplace/_layout/dashboard/staff': typeof MarketplaceLayoutDashboardStaffRoute
   '/marketplace/_layout/dashboard/support': typeof MarketplaceLayoutDashboardSupportRoute
   '/marketplace/_layout/dashboard/verification': typeof MarketplaceLayoutDashboardVerificationRoute
   '/marketplace/_layout/land/$slug': typeof MarketplaceLayoutLandSlugRoute
@@ -1971,6 +1991,7 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/import'
     | '/marketplace/dashboard/labels'
     | '/marketplace/dashboard/reports'
+    | '/marketplace/dashboard/staff'
     | '/marketplace/dashboard/support'
     | '/marketplace/dashboard/verification'
     | '/marketplace/land/$slug'
@@ -2059,6 +2080,7 @@ export interface FileRouteTypes {
     | '/marketplace/dashboard/import'
     | '/marketplace/dashboard/labels'
     | '/marketplace/dashboard/reports'
+    | '/marketplace/dashboard/staff'
     | '/marketplace/dashboard/support'
     | '/marketplace/dashboard/verification'
     | '/marketplace/land/$slug'
@@ -2153,6 +2175,7 @@ export interface FileRouteTypes {
     | '/marketplace/_layout/dashboard/import'
     | '/marketplace/_layout/dashboard/labels'
     | '/marketplace/_layout/dashboard/reports'
+    | '/marketplace/_layout/dashboard/staff'
     | '/marketplace/_layout/dashboard/support'
     | '/marketplace/_layout/dashboard/verification'
     | '/marketplace/_layout/land/$slug'
@@ -2558,6 +2581,7 @@ export const routeTree = rootRoute
         "/marketplace/_layout/dashboard/import",
         "/marketplace/_layout/dashboard/labels",
         "/marketplace/_layout/dashboard/reports",
+        "/marketplace/_layout/dashboard/staff",
         "/marketplace/_layout/dashboard/support",
         "/marketplace/_layout/dashboard/verification",
         "/marketplace/_layout/dashboard/",
@@ -2598,6 +2622,10 @@ export const routeTree = rootRoute
     },
     "/marketplace/_layout/dashboard/reports": {
       "filePath": "marketplace/_layout/dashboard/reports.tsx",
+      "parent": "/marketplace/_layout/dashboard"
+    },
+    "/marketplace/_layout/dashboard/staff": {
+      "filePath": "marketplace/_layout/dashboard/staff.tsx",
       "parent": "/marketplace/_layout/dashboard"
     },
     "/marketplace/_layout/dashboard/support": {
