@@ -52,6 +52,11 @@ function getGoodsItems(order: any) {
   return (order?.items || []).filter((item: any) => item?.product?.type !== 'service')
 }
 
+function canUseOrderPermission(order: any, permission: string) {
+  const permissions = order?.store?.accessPermissions
+  return Array.isArray(permissions) ? permissions.includes(permission) : true
+}
+
 function isShippableGoodsOrder(order: any) {
   return !isServiceOrder(order) && String(order?.status || '') === 'paid' && getPaymentStatus(order) === 'paid'
 }
@@ -378,7 +383,7 @@ export default function OrdersPage() {
                     <div className='mt-1 text-xs text-slate-500'>Buyer: {getBuyerLabel(order)} • {order.items?.length || 0} item(s)</div>
                     <OrderSourceBadge channel={order.channel} />
                     <div className='mt-2 flex items-center gap-2 text-xs'>
-                      {getPaymentStatus(order) === 'pending' ? (
+                      {getPaymentStatus(order) === 'pending' && canUseOrderPermission(order, 'payments.manage') ? (
                         <button
                           className='rounded-full border border-emerald-600 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50'
                           onClick={() => {
@@ -414,7 +419,7 @@ export default function OrdersPage() {
                           </button>
                         </>
                       ) : null}
-                      {isServiceOrder(order) ? (
+                      {isServiceOrder(order) && canUseOrderPermission(order, 'appointments.manage') ? (
                         <Link
                           to='/marketplace/dashboard/order/$id'
                           params={{ id: order.id }}
@@ -422,7 +427,7 @@ export default function OrdersPage() {
                         >
                           Manage appointment
                         </Link>
-                      ) : isShippableGoodsOrder(order) ? (
+                      ) : isShippableGoodsOrder(order) && canUseOrderPermission(order, 'orders.manage') ? (
                         <button
                           className='rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500'
                           onClick={() => openShipmentDialog(order)}

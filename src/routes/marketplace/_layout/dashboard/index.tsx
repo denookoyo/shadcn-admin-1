@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
-import { ensureSellerRouteAccess } from '@/features/sellers/access'
+import { ensureSellerRouteAccess, useLiveStorefrontAccess } from '@/features/sellers/access'
 
 type Highlight = { heading: string; body: string; href: string }
 
@@ -42,17 +42,20 @@ function StatTile({ label, value, helper, trend }: StatTileProps) {
 
 function SellerDashboard() {
   const { user } = useAuthStore((s) => s.auth)
-  const ns = user?.email || user?.accountNo || 'guest'
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const { stores: liveStores } = useLiveStorefrontAccess()
 
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const [prods, ords] = await Promise.all([db.listProducts(), db.listOrders(ns)])
+        const [prods, ords] = await Promise.all([
+          db.listSellerProducts?.('seller') ?? db.listProducts(),
+          db.listSellerOrders?.() ?? Promise.resolve([]),
+        ])
         if (!mounted) return
         setProducts(prods)
         setOrders(ords)
@@ -63,26 +66,17 @@ function SellerDashboard() {
     return () => {
       mounted = false
     }
-  }, [ns])
+  }, [])
 
-  const myNumericId = (user as any)?.id ?? (user as any)?.uid
   const role = String((user as any)?.role ?? '').toLowerCase()
   const isAdmin = Boolean((user as any)?.isAdmin) || ['admin', 'manager', 'superadmin'].includes(role)
-  const storefrontPermissions = Array.isArray((user as any)?.storefrontPermissions) ? (user as any).storefrontPermissions : []
-  const storefrontStoreIds = Array.isArray((user as any)?.storefrontStoreIds) ? (user as any).storefrontStoreIds.map(Number) : []
   const isStorefrontStaff = Boolean((user as any)?.isStorefrontStaff)
-  const canSell = !isStorefrontStaff || storefrontPermissions.includes('orders.manage')
-  const canManageCatalog = !isStorefrontStaff || storefrontPermissions.includes('catalog.manage')
-  const canReadOrders = !isStorefrontStaff || storefrontPermissions.includes('orders.read')
-
-  const mine = useMemo(() => {
-    return products.filter((product: any) => {
-      if (storefrontStoreIds.length && product?.storeId != null) return storefrontStoreIds.includes(Number(product.storeId))
-      if (typeof product?.ownerId === 'number') return myNumericId != null && Number(product.ownerId) === Number(myNumericId)
-      if (typeof product?.ownerId === 'string') return product.ownerId === ns
-      return false
-    })
-  }, [products, ns, myNumericId, storefrontStoreIds])
+  const hasLiveProductPermission = (permission: string) => products.some((product) => product.accessPermissions?.includes(permission))
+  const hasLiveStorePermission = (permission: string) => liveStores.some((store) => store.permissions.includes(permission))
+  const canSell = hasLiveProductPermission('orders.manage') || hasLiveStorePermission('orders.manage') || !isStorefrontStaff
+  const canManageCatalog = hasLiveProductPermission('catalog.manage') || hasLiveStorePermission('catalog.manage') || !isStorefrontStaff
+  const canReadOrders = orders.length > 0 || hasLiveProductPermission('orders.read') || hasLiveStorePermission('orders.read') || !isStorefrontStaff
+  const mine = products
 
   const totalRevenue = useMemo(() => orders.reduce((acc, order) => acc + order.total, 0), [orders])
   const pendingOrders = useMemo(() => orders.filter((order: any) => ['pending', 'scheduled'].includes(order.status)), [orders])
@@ -202,6 +196,7 @@ function SellerDashboard() {
               <tbody>
                 {mine.slice(0, 6).map((product) => {
                   const lastTouched = (product as any)?.updatedAt ?? (product as any)?.createdAt
+                  const canEditProduct = product.accessPermissions?.includes('catalog.manage') ?? !isStorefrontStaff
                   return (
                     <tr key={product.id} className='border-b text-slate-600'>
                       <td className='py-3 pr-4'>
@@ -217,7 +212,7 @@ function SellerDashboard() {
                       <td className='py-3 pr-4 text-emerald-700'>A${product.price}</td>
                       <td className='py-3 pr-4 text-xs text-slate-400'>{lastTouched ? new Date(lastTouched).toLocaleDateString?.() : '—'}</td>
                       <td className='py-3 pr-0 text-right'>
-                        <div className='inline-flex gap-2'>
+                        {canEditProduct ? <div className='inline-flex gap-2'>
                           <Link
                             to='/marketplace/dashboard/listings/product'
                             search={{ id: product.id }}
@@ -228,7 +223,7 @@ function SellerDashboard() {
                           <Button variant='destructive' size='sm' className='rounded-full px-3 text-xs' onClick={() => setDeleteId(product.id)}>
                             Delete
                           </Button>
-                        </div>
+                        </div> : <span className='text-xs text-slate-400'>View only · {product.accessRole?.toLowerCase().replace(/_/g, ' ')}</span>}
                       </td>
                     </tr>
                   )

@@ -150,9 +150,11 @@ export type RefundRequest = {
 export type DataAPI = {
   // Products
   listProducts: () => Promise<Product[]>
+  listSellerProducts?: (scope?: 'seller' | 'pos') => Promise<Product[]>
   getProductBySlug: (slug: string) => Promise<Product | undefined>
   getProductById: (id: string) => Promise<Product | undefined>
-  getProductByBarcode?: (code: string) => Promise<Product | null>
+  getSellerProductById?: (id: string) => Promise<Product | undefined>
+  getProductByBarcode?: (code: string, scope?: 'seller' | 'pos') => Promise<Product | null>
   getProductAvailability?: (
     id: string,
     options?: { start?: string | Date; days?: number }
@@ -344,6 +346,9 @@ const api: DataAPI = {
   async listProducts(): Promise<Product[]> {
     return http<Product[]>('/api/products')
   },
+  async listSellerProducts(scope = 'seller'): Promise<Product[]> {
+    return http<Product[]>(`/api/products?scope=${encodeURIComponent(scope)}`)
+  },
   async createPosOrder(input) {
     return http<Order>('/api/pos/orders', { method: 'POST', body: JSON.stringify(input) })
   },
@@ -355,6 +360,10 @@ const api: DataAPI = {
     const products = await api.listProducts()
     return products.find((p) => p.id === id)
   },
+  async getSellerProductById(id: string): Promise<Product | undefined> {
+    const products = await api.listSellerProducts?.('seller') ?? []
+    return products.find((p) => p.id === id)
+  },
   async getProductAvailability(id: string, options) {
     const params = new URLSearchParams()
     if (options?.start) params.set('start', new Date(options.start).toISOString())
@@ -363,9 +372,10 @@ const api: DataAPI = {
     const path = `/api/products/${encodeURIComponent(id)}/availability${query ? `?${query}` : ''}`
     return http<ProductAvailability>(path)
   },
-  async getProductByBarcode(code: string) {
+  async getProductByBarcode(code: string, scope?: 'seller' | 'pos') {
     try {
-      return await http<Product>(`/api/products/barcode/${encodeURIComponent(code)}`)
+      const query = scope ? `?scope=${encodeURIComponent(scope)}` : ''
+      return await http<Product>(`/api/products/barcode/${encodeURIComponent(code)}${query}`)
     } catch {
       return null
     }

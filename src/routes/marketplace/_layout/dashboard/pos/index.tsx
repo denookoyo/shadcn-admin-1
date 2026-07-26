@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { db, type Product } from '@/lib/data'
-import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -15,7 +14,6 @@ import { ensureSellerPermission } from '@/features/sellers/access'
 type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; type?: Product['type'] }
 
 function PosPage() {
-  const { user } = useAuthStore((s) => s.auth)
   const hideChrome = useUiStore((s) => s.hideMarketplaceChrome)
   const setHideChrome = useUiStore((s) => s.setHideMarketplaceChrome)
   const [products, setProducts] = useState<Product[]>([])
@@ -32,7 +30,7 @@ function PosPage() {
   const [lineQuantity, setLineQuantity] = useState('1')
   const [linePrice, setLinePrice] = useState('0')
 
-  useEffect(() => { (async () => setProducts(await db.listProducts()))() }, [])
+  useEffect(() => { (async () => setProducts(await (db.listSellerProducts?.('pos') ?? db.listProducts())))() }, [])
   // No-op: POS can request/exit fullscreen via buttons; we don't need to track state.
   useEffect(() => {
     return () => { setHideChrome(false); if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{}) }
@@ -50,18 +48,9 @@ function PosPage() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase()
-    // Only products belonging to the logged-in user
-    const myNumeric = (user as any)?.id ?? (user as any)?.uid
-    const assignedStoreIds = Array.isArray((user as any)?.storefrontStoreIds) ? (user as any).storefrontStoreIds.map(Number) : []
-    const own = products.filter((p: any) => {
-      if (assignedStoreIds.length && p?.storeId != null) return assignedStoreIds.includes(Number(p.storeId))
-      if (typeof p?.ownerId === 'number') return myNumeric != null && Number(p.ownerId) === Number(myNumeric)
-      if (typeof p?.ownerId === 'string') return p.ownerId === (user?.email || (user as any)?.accountNo)
-      return false
-    })
-    if (!term) return own
-    return own.filter((p) => (p.title?.toLowerCase().includes(term) || p.slug?.toLowerCase().includes(term) || p.seller?.toLowerCase?.().includes(term)))
-  }, [q, products, user])
+    if (!term) return products
+    return products.filter((p) => (p.title?.toLowerCase().includes(term) || p.slug?.toLowerCase().includes(term) || p.seller?.toLowerCase?.().includes(term)))
+  }, [q, products])
 
   const subtotal = cart.reduce((a, c) => a + c.price * c.quantity, 0)
   const taxes = 0 // extend later (GST)
@@ -101,7 +90,7 @@ function PosPage() {
     if (!trimmed) return
     let p = products.find((x: any) => String(x.barcode || '').trim() === trimmed)
     if (!p && (db as any).getProductByBarcode) {
-      try { p = (await (db as any).getProductByBarcode(trimmed)) || undefined } catch {}
+      try { p = (await db.getProductByBarcode?.(trimmed, 'pos')) || undefined } catch {}
     }
     if (p) addToCart(p)
   }

@@ -26,7 +26,7 @@ function LabelsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const jsbReady = useScript('https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js')
 
-  useEffect(() => { (async () => setProducts(await db.listProducts()))() }, [])
+  useEffect(() => { (async () => setProducts(await (db.listSellerProducts?.('seller') ?? db.listProducts())))() }, [])
 
   const mine = useMemo(() => products.filter((p: any) => p.barcode), [products])
 

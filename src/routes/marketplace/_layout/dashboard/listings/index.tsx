@@ -2,16 +2,13 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { Filter, PlusCircle, MoreVertical } from 'lucide-react'
 import { db, type Product } from '@/lib/data'
-import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
-import { ensureSellerRouteAccess } from '@/features/sellers/access'
+import { ensureSellerRouteAccess, useLiveStorefrontAccess } from '@/features/sellers/access'
 
 function SellerListingsPage() {
-  const { user } = useAuthStore((s) => s.auth)
-  const ns = user?.email || user?.accountNo || 'guest'
   const [products, setProducts] = useState<Product[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -24,12 +21,13 @@ function SellerListingsPage() {
   const [barcodeLines, setBarcodeLines] = useState('')
   const [stockBusy, setStockBusy] = useState(false)
   const [stockFeedback, setStockFeedback] = useState<string | null>(null)
+  const { stores: liveStores } = useLiveStorefrontAccess()
 
   useEffect(() => {
     let mounted = true
     ;(async () => {
       try {
-        const prods = await db.listProducts()
+        const prods = await (db.listSellerProducts?.('seller') ?? db.listProducts())
         if (!mounted) return
         setProducts(prods)
       } finally {
@@ -41,15 +39,9 @@ function SellerListingsPage() {
     }
   }, [])
 
-  const myNumericId = (user as any)?.id ?? (user as any)?.uid
-
-  const mine = useMemo(() => {
-    return products.filter((product: any) => {
-      if (typeof product?.ownerId === 'number') return myNumericId != null && Number(product.ownerId) === Number(myNumericId)
-      if (typeof product?.ownerId === 'string') return product.ownerId === ns
-      return false
-    })
-  }, [products, ns, myNumericId])
+  const mine = products
+  const canCreateListing = liveStores.some((store) => store.permissions.includes('catalog.manage'))
+  const stockProducts = mine.filter((product) => product.type !== 'service' && product.accessPermissions?.includes('inventory.manage'))
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -81,7 +73,7 @@ function SellerListingsPage() {
         quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : undefined,
         barcodes,
       })
-      const refreshed = await db.listProducts()
+      const refreshed = await (db.listSellerProducts?.('seller') ?? db.listProducts())
       setProducts(refreshed)
       setStockFeedback('Stock purchase recorded.')
       setSupplierName('')
@@ -105,23 +97,23 @@ function SellerListingsPage() {
           <p className='mt-1 text-sm text-slate-600'>Launch, optimise, and organise your Hedgetech listings from a single workspace.</p>
         </div>
         <div className='flex flex-wrap gap-2'>
-          <button
+          {stockProducts.length ? <button
             type='button'
             className='inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700'
             onClick={() => {
-              setStockProductId(mine[0]?.id || '')
+              setStockProductId(stockProducts[0]?.id || '')
               setStockFeedback(null)
               setStockDialogOpen(true)
             }}
           >
             Record stock purchase
-          </button>
-          <Link
+          </button> : null}
+          {canCreateListing ? <Link
             to='/marketplace/dashboard/listings/new'
             className='inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500'
           >
             <PlusCircle className='h-4 w-4' /> New listing
-          </Link>
+          </Link> : null}
         </div>
       </header>
 
@@ -197,6 +189,7 @@ function SellerListingsPage() {
               ) : null}
               {filtered.map((product) => {
                 const createdAt = (product as any)?.createdAt ? new Date((product as any).createdAt) : null
+                const canEdit = product.accessPermissions?.includes('catalog.manage')
                 return (
                   <tr key={product.id} className='border-b text-slate-600 hover:bg-slate-50'>
                     <td className='py-3 pr-4'>
@@ -213,7 +206,7 @@ function SellerListingsPage() {
                     <td className='py-3 pr-4 text-xs text-slate-400'>{product.barcode || '—'}</td>
                     <td className='py-3 pr-4 text-xs text-slate-400'>{createdAt ? createdAt.toLocaleDateString() : '—'}</td>
                     <td className='py-3 pr-0 text-right'>
-                      <div className='inline-flex items-center gap-2'>
+                      {canEdit ? <div className='inline-flex items-center gap-2'>
                         <Link
                           to='/marketplace/dashboard/listings/product'
                           search={{ id: product.id }}
@@ -224,7 +217,7 @@ function SellerListingsPage() {
                         <button className='rounded-full border border-slate-200 p-1 text-slate-400 hover:text-slate-700'>
                           <MoreVertical className='h-4 w-4' />
                         </button>
-                      </div>
+                      </div> : <span className='text-xs text-slate-400'>View only · {product.accessRole?.toLowerCase().replace(/_/g, ' ')}</span>}
                     </td>
                   </tr>
                 )
@@ -246,6 +239,7 @@ function SellerListingsPage() {
           ) : null}
           {filtered.map((product) => {
             const createdAt = (product as any)?.createdAt ? new Date((product as any).createdAt) : null
+            const canEdit = product.accessPermissions?.includes('catalog.manage')
             return (
               <article key={product.id} className='rounded-3xl border border-slate-200 p-4 shadow-sm'>
                 <div className='flex items-start gap-3'>
@@ -269,7 +263,7 @@ function SellerListingsPage() {
                     <div>{createdAt ? createdAt.toLocaleDateString() : '—'}</div>
                   </div>
                 </div>
-                <div className='mt-4 flex gap-2'>
+                {canEdit ? <div className='mt-4 flex gap-2'>
                   <Link
                     to='/marketplace/dashboard/listings/product'
                     search={{ id: product.id }}
@@ -280,7 +274,7 @@ function SellerListingsPage() {
                   <button className='rounded-full border border-slate-200 px-3 py-2 text-slate-400 hover:text-slate-700'>
                     <MoreVertical className='h-4 w-4' />
                   </button>
-                </div>
+                </div> : <div className='mt-4 text-xs text-slate-400'>View only · {product.accessRole?.toLowerCase().replace(/_/g, ' ')}</div>}
               </article>
             )
           })}
@@ -300,7 +294,7 @@ function SellerListingsPage() {
                 className='w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm'
               >
                 <option value=''>Select a listing</option>
-                {mine.filter((product) => product.type !== 'service').map((product) => (
+                {stockProducts.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.title}
                   </option>

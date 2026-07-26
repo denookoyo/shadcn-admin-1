@@ -19,6 +19,24 @@ type SellerAccessState = {
   storefrontStoreIds: number[]
 }
 
+export type LiveStorefrontAccess = {
+  id: number
+  name: string
+  slug: string
+  status: string
+  storeId: number
+  role: string
+  permissions: string[]
+  isOwner: boolean
+}
+
+export async function loadLiveStorefrontAccess(): Promise<LiveStorefrontAccess[]> {
+  const response = await fetch('/api/storefront/access', { credentials: 'include', cache: 'no-store' })
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.error || result.message || 'Could not verify storefront access.')
+  return Array.isArray(result.stores) ? result.stores : []
+}
+
 function computeSellerAccess(user: any | null): SellerAccessState {
   const email = user?.email as string | undefined
   const role = String(user?.role ?? '').toLowerCase()
@@ -70,8 +88,38 @@ export async function ensureSellerRouteAccess(location?: { href?: string; pathna
 
 export async function ensureSellerPermission(permission: string, location?: { href?: string; pathname?: string }) {
   const access = await ensureSellerRouteAccess(location)
-  if (access.isAdmin || !access.isStorefrontStaff || access.storefrontPermissions.includes(permission)) return access
+  if (access.isAdmin || !access.isStorefrontStaff) return access
+  try {
+    const stores = await loadLiveStorefrontAccess()
+    if (stores.some((store) => store.permissions.includes(permission))) return access
+  } catch {
+    // A failed live authorization check must not promote cached token access.
+  }
   throw redirect({ to: '/marketplace/dashboard' })
+}
+
+export function useLiveStorefrontAccess() {
+  const [stores, setStores] = useState<LiveStorefrontAccess[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    loadLiveStorefrontAccess()
+      .then((result) => {
+        if (active) setStores(result)
+      })
+      .catch(() => {
+        if (active) setStores([])
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  return { stores, loading }
 }
 
 export function useSellerAccess() {

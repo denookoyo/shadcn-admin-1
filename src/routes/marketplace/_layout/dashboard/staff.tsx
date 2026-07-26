@@ -4,7 +4,7 @@ import { ShieldCheck, UserPlus, Users } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
-import { useSellerAccess } from '@/features/sellers/access'
+import { ensureSellerPermission, useSellerAccess } from '@/features/sellers/access'
 
 type StoreRole = 'OWNER' | 'MANAGER' | 'STOCK_CONTROLLER' | 'SALES_STAFF' | 'FULFILLMENT_STAFF' | 'ANALYST' | 'STAFF'
 type TeamResponse = {
@@ -28,8 +28,7 @@ function labelRole(role: string) {
 }
 
 function StaffPermissionsPage() {
-  const { isAdmin, storefrontRole, storefrontPermissions } = useSellerAccess()
-  const allowed = isAdmin || storefrontRole === 'OWNER' || storefrontRole === 'MANAGER' || storefrontPermissions.includes('team.manage')
+  const { isAdmin } = useSellerAccess()
   const [team, setTeam] = useState<TeamResponse | null>(null)
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<StoreRole>('SALES_STAFF')
@@ -47,9 +46,8 @@ function StaffPermissionsPage() {
   }, [])
 
   useEffect(() => {
-    if (!allowed) return
     loadTeam().catch((error) => setMessage(error instanceof Error ? error.message : 'Could not load storefront staff.'))
-  }, [allowed, loadTeam])
+  }, [loadTeam])
 
   async function request(method: 'POST' | 'PATCH', body: Record<string, unknown>) {
     setBusy(true)
@@ -82,7 +80,7 @@ function StaffPermissionsPage() {
     }
   }
 
-  if (!allowed) {
+  if (!team && message) {
     return (
       <MarketplacePageShell width='default' className='py-12'>
         <div className='rounded-3xl border border-amber-200 bg-amber-50 p-8 text-amber-950'>Only storefront owners and managers can manage staff and permissions.</div>
@@ -90,7 +88,7 @@ function StaffPermissionsPage() {
     )
   }
 
-  const owner = team?.access.isOwner || storefrontRole === 'OWNER' || isAdmin
+  const owner = Boolean(team?.access.isOwner || isAdmin)
 
   return (
     <MarketplacePageShell width='xl' className='space-y-8 py-10'>
@@ -101,7 +99,7 @@ function StaffPermissionsPage() {
             <p className='text-xs font-semibold uppercase tracking-wide text-emerald-700'>Seller cockpit</p>
             <h1 className='mt-1 text-3xl font-semibold text-slate-900'>Staff & permissions</h1>
             <p className='mt-2 max-w-2xl text-sm text-slate-600'>Invite employees and assign the minimum access needed for their storefront duties. Changes and staff activity are securely audited in Gang Ledger.</p>
-            {owner && (team?.stores.length || 0) > 1 ? (
+            {(team?.stores.length || 0) > 1 ? (
               <label className='mt-5 block max-w-md text-sm font-medium text-slate-700'>
                 Manage storefront
                 <select
@@ -115,7 +113,7 @@ function StaffPermissionsPage() {
                   }}
                   className='mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm shadow-sm'
                 >
-                  {team?.stores.filter((store) => store.role === 'OWNER').map((store) => <option key={store.id} value={store.id}>{store.name} · {store.status.toLowerCase()}</option>)}
+                  {team?.stores.map((store) => <option key={store.id} value={store.id}>{store.name} · {labelRole(store.role)} · {store.status.toLowerCase()}</option>)}
                 </select>
               </label>
             ) : null}
@@ -173,4 +171,7 @@ function StaffPermissionsPage() {
   )
 }
 
-export const Route = createFileRoute('/marketplace/_layout/dashboard/staff')({ component: StaffPermissionsPage })
+export const Route = createFileRoute('/marketplace/_layout/dashboard/staff')({
+  beforeLoad: ({ location }) => ensureSellerPermission('team.manage', location),
+  component: StaffPermissionsPage,
+})

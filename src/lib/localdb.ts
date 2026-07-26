@@ -43,6 +43,9 @@ export type Product = {
   description?: string
   images?: string[]
   ownerId?: string | number | null
+  storeId?: string | number | null
+  accessRole?: string
+  accessPermissions?: string[]
   categoryId?: string
   stockCount?: number
   serviceDurationMinutes?: number
@@ -119,6 +122,8 @@ export type Order = {
     name?: string | null
     slug?: string | null
     paymentSettings?: StorePaymentSettings | null
+    accessRole?: string
+    accessPermissions?: string[]
   } | null
 }
 

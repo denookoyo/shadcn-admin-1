@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { HedgetechLogo } from '@/components/hedgetech-logo'
 import { StageBadge } from '@/components/stage-badge'
-import { useSellerAccess } from '@/features/sellers/access'
+import { useLiveStorefrontAccess, useSellerAccess } from '@/features/sellers/access'
 import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
 
 function Nav() {
@@ -55,8 +55,10 @@ function Nav() {
     }
   }, [])
 
-  const { sellerStatus, canAccessSellerTools, isAdmin, isStorefrontStaff, storefrontRole, storefrontPermissions } = useSellerAccess()
-  const canManageStorefrontStaff = isAdmin || storefrontRole === 'OWNER' || storefrontRole === 'MANAGER' || storefrontPermissions.includes('team.manage')
+  const { sellerStatus, canAccessSellerTools, isAdmin, isStorefrontStaff } = useSellerAccess()
+  const { stores: liveStores } = useLiveStorefrontAccess()
+  const hasLivePermission = (permission: string) => liveStores.some((store) => store.permissions.includes(permission))
+  const canManageStorefrontStaff = isAdmin || hasLivePermission('team.manage')
   const primaryLinks = [
     { href: '/marketplace/listings', label: 'Marketplace' },
     { href: '/marketplace/listings', label: 'Listings' },
@@ -68,7 +70,7 @@ function Nav() {
     ? ([
         ...(isAdmin ? [{ href: '/marketplace/dashboard/admin', label: 'Admin dashboard' }] as const : []),
         { href: '/marketplace/dashboard', label: 'Seller cockpit' },
-        ...(!isStorefrontStaff || storefrontPermissions.includes('orders.read') ? [{ href: '/marketplace/dashboard/orders', label: 'Orders' }] as const : []),
+        ...(!isStorefrontStaff || hasLivePermission('orders.read') ? [{ href: '/marketplace/dashboard/orders', label: 'Orders' }] as const : []),
         { href: '/marketplace/dashboard/support', label: 'Support' },
         ...(canManageStorefrontStaff ? [{ href: '/marketplace/dashboard/staff', label: 'Staff & permissions' }] as const : []),
         ...(!isStorefrontStaff ? [{ href: '/marketplace/dashboard/verification', label: 'Seller profile' }] as const : []),

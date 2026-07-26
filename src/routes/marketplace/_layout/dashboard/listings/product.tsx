@@ -30,7 +30,7 @@ function ProductEditorRoute() {
     setLoading(true)
     ;(async () => {
       try {
-        const found = await db.getProductById(id)
+        const found = await (db.getSellerProductById?.(id) ?? db.getProductById(id))
         if (active) setProduct(found ?? null)
       } finally {
         if (active) setLoading(false)
