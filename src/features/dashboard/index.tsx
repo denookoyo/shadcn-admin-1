@@ -307,6 +307,8 @@ export default function Dashboard() {
   const groupedOrders = useMemo(() => {
     const groups: Record<Order['status'], Order[]> = {
       pending: [],
+      processing: [],
+      confirmed: [],
       scheduled: [],
       paid: [],
       shipped: [],
