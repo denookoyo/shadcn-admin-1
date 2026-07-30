@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { buildGangLedgerSignInUrl, marketplaceConsumerMode } from '@/lib/marketplace-consumer'
+import { resolveImmediateCheckoutUrl } from '@/lib/checkout-payment'
 
 function CheckoutPage() {
   const { user } = useAuthStore((s) => s.auth)
@@ -22,6 +23,7 @@ function CheckoutPage() {
   const [placing, setPlacing] = useState(false)
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null)
   const [accessCode, setAccessCode] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const isGuest = !user
 
   useEffect(() => {
@@ -71,6 +73,7 @@ function CheckoutPage() {
   async function handlePlaceOrder() {
     if (placing) return
     setPlacing(true)
+    setCheckoutError(null)
     try {
       const items = detailed.map((d) => ({
         productId: d.product.id,
@@ -81,11 +84,22 @@ function CheckoutPage() {
         // Keep the legacy field while older standalone marketplace servers are still deployed.
         meta: d.product.type === 'service' ? d.meta : undefined,
       }))
-      const order: Order = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)
+      const order = await db.createOrder({ items, total, customerName: name, customerEmail: email, address, customerPhone: phone }, ns)
+      const checkoutUrl = resolveImmediateCheckoutUrl(order)
+
+      if (checkoutUrl) {
+        await db.clearCart(ns)
+        window.dispatchEvent(new CustomEvent('cart:changed'))
+        window.location.assign(checkoutUrl)
+        return
+      }
+
       await db.clearCart(ns)
       window.dispatchEvent(new CustomEvent('cart:changed'))
       setConfirmedOrder(order)
       if (isGuest && (order as any)?.accessCode) setAccessCode((order as any).accessCode)
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'Unable to continue to secure payment.')
     } finally {
       setPlacing(false)
     }
@@ -95,13 +109,13 @@ function CheckoutPage() {
     return (
       <MarketplacePageShell width='narrow' className='space-y-6 text-center' topSpacing='md' bottomSpacing='md'>
         <div className='inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-          Checkout complete
+          Order submitted
         </div>
         <CheckCircle2 className='mx-auto h-16 w-16 text-emerald-500' />
-        <h1 className='text-2xl font-semibold text-slate-900'>Order confirmed</h1>
+        <h1 className='text-2xl font-semibold text-slate-900'>Order sent for seller review</h1>
         <p className='text-sm text-slate-600'>Your order ID is <span className='font-semibold text-emerald-700'>#{confirmedOrder.id}</span>. A confirmation was sent to {email || 'your email'}.</p>
         <div className='mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm'>
-          The seller can now request payment through Gang Ledger Payments or their connected Stripe account. You will see the checkout link here and in your order detail as soon as they send it.
+          This storefront reviews orders before collecting payment. The seller will send a secure Stripe payment link when the order is ready.
         </div>
         {isGuest && accessCode ? (
           <div className='mx-auto max-w-md rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left text-sm text-emerald-800'>
@@ -132,16 +146,16 @@ function CheckoutPage() {
         <div className='flex flex-wrap items-start justify-between gap-4'>
           <div>
             <span className='inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700'>
-              Step 2 • Confirm details
+              Step 2 • Review and pay
             </span>
-            <h1 className='mt-3 text-2xl font-semibold text-slate-900'>Confirm delivery & contact details</h1>
-            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Once your order is created, your seller can send a secure checkout link from Gang Ledger. Use accurate contact information so payment and fulfilment stay aligned.</p>
+            <h1 className='mt-3 text-2xl font-semibold text-slate-900'>Confirm your details, then pay</h1>
+            <p className='mt-2 max-w-2xl text-sm text-slate-600'>Use accurate contact information, review the total, then continue to secure payment. For storefronts that collect payment during checkout, your order is confirmed only after Stripe reports a successful payment.</p>
           </div>
           <div className='flex items-center gap-3 rounded-2xl border border-white bg-white/80 px-4 py-3 text-xs text-slate-600 shadow-sm'>
             <ShieldCheck className='h-4 w-4 text-emerald-600' />
             <div>
               <div className='font-semibold text-slate-800'>Centralized payments</div>
-              <div>Checkout links come from Gang Ledger or the seller&apos;s connected Stripe account</div>
+              <div>The final payment step opens securely in Stripe</div>
             </div>
           </div>
         </div>
@@ -193,7 +207,7 @@ function CheckoutPage() {
           <div className='rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600'>
             <div className='font-semibold text-slate-900'>How payment works</div>
             <p className='mt-1 text-xs text-slate-500'>
-              After you place the order, the seller can request payment and share a Stripe Checkout link. Complete payment through that link when it appears in your order detail.
+              Select Continue to secure payment. If this storefront collects payment during checkout, Stripe opens as the final step and the order is confirmed only after payment succeeds. Storefronts using seller review will send the payment link after review.
             </p>
           </div>
         </section>
@@ -235,8 +249,13 @@ function CheckoutPage() {
               <span>Total due</span>
               <span>A${total.toFixed(2)}</span>
             </div>
+            {checkoutError ? (
+              <div role='alert' className='mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700'>
+                {checkoutError}
+              </div>
+            ) : null}
             <Button disabled={placing || detailed.length === 0} onClick={handlePlaceOrder} className='mt-5 w-full rounded-full py-3'>
-              {placing ? 'Placing order…' : 'Place order'}
+              {placing ? 'Preparing secure payment…' : 'Continue to secure payment'}
             </Button>
             <Link to='/marketplace/cart' className='mt-3 block text-center text-xs font-semibold text-emerald-700 hover:underline'>Back to cart</Link>
           </div>
@@ -244,11 +263,11 @@ function CheckoutPage() {
           <div className='rounded-3xl border border-slate-200 bg-slate-50 p-5 text-xs text-slate-600'>
             <div className='flex items-center gap-3'>
               <ShieldCheck className='h-4 w-4 text-emerald-600' />
-              Payments are requested from Gang Ledger and opened through Stripe Checkout.
+              Payment is the final checkout step when the storefront requires payment now.
             </div>
             <div className='mt-2 flex items-center gap-3'>
               <CheckCircle2 className='h-4 w-4 text-emerald-600' />
-              Track progress from the same order detail after the seller sends the payment link.
+              Your order detail reflects the payment result reported by Stripe.
             </div>
           </div>
         </aside>

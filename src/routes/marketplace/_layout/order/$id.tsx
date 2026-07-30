@@ -27,6 +27,11 @@ function parseAppointmentProposals(value: unknown): string[] {
 
 function OrderDetail() {
   const { id } = useParams({ from: '/marketplace/_layout/order/$id' })
+  const paymentReturn = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const value = new URLSearchParams(window.location.search).get('payment')
+    return value === 'success' || value === 'cancelled' ? value : null
+  }, [])
   const me = useAuthStore((s) => s.auth.user as any | null)
   const namespace = me?.email || (me as any)?.accountNo || 'guest'
   const isLiveDataEnabled =
@@ -40,8 +45,9 @@ function OrderDetail() {
 
   useEffect(() => {
     let mounted = true
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-    async function loadOrder() {
+    async function loadOrder(attempt = 0) {
       try {
         const order = await db.getOrder?.(id, namespace)
         if (!order) {
@@ -52,6 +58,10 @@ function OrderDetail() {
           setError(null)
           setStatus(null)
           setLocalFallback(!isLiveDataEnabled)
+
+          if (paymentReturn === 'success' && String(order.paymentStatus || '').toLowerCase() !== 'paid' && attempt < 5) {
+            retryTimer = setTimeout(() => void loadOrder(attempt + 1), 1_000)
+          }
         }
       } catch (e: any) {
         if (mounted) {
@@ -67,8 +77,9 @@ function OrderDetail() {
 
     return () => {
       mounted = false
+      if (retryTimer) clearTimeout(retryTimer)
     }
-  }, [id, namespace, isLiveDataEnabled])
+  }, [id, namespace, isLiveDataEnabled, paymentReturn])
 
   // Compute hooks unconditionally to keep hook order stable
   const isBuyer = useMemo(() => {
@@ -366,6 +377,17 @@ function OrderDetail() {
       <div className='mt-3 text-sm text-gray-600'>
         Payment: <span className={paymentMade ? 'text-green-700 font-semibold' : 'text-red-700 font-semibold'}>{paymentMade ? 'Paid' : paymentStatus.replace(/_/g, ' ')}</span>
       </div>
+      {paymentReturn === 'success' ? (
+        <div className={`mt-4 rounded-3xl border px-4 py-3 text-sm ${paymentMade ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>
+          <div className='font-semibold'>{paymentMade ? 'Payment successful — order confirmed' : 'Payment received — confirming your order'}</div>
+          {!paymentMade ? <p className='mt-1 text-xs'>Stripe is finalising the payment status. This page will refresh automatically.</p> : null}
+        </div>
+      ) : paymentReturn === 'cancelled' ? (
+        <div className='mt-4 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800'>
+          <div className='font-semibold'>Payment was not completed</div>
+          <p className='mt-1 text-xs'>Your order remains unpaid. Use the secure checkout link below when you are ready to try again.</p>
+        </div>
+      ) : null}
       {paymentFeedback ? (
         <div className={`mt-3 rounded-2xl border px-4 py-3 text-sm ${paymentFeedback.toLowerCase().includes('unable') ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
           {paymentFeedback}

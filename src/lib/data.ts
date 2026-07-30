@@ -12,6 +12,7 @@ import {
   type StorePaymentSettings,
 } from './localdb'
 import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
+import type { CheckoutPaymentResponseLike } from './checkout-payment'
 import { CATALOG } from '@/features/marketplace/catalog'
 import { marketplaceConsumerMode } from './marketplace-consumer'
 import { useStageStore } from '@/stores/stageStore'
@@ -172,7 +173,7 @@ export type DataAPI = {
   // Orders
   listOrders: (namespace?: string) => Promise<Order[]>
   getOrder?: (id: string, namespace?: string) => Promise<Order | undefined>
-  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<Order>
+  createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<CheckoutOrderResult>
   // POS (seller-created order)
   createPosOrder?: (input: { items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
   listSellerOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>
@@ -247,6 +248,12 @@ export type DataAPI = {
   adminListTrucks?: () => Promise<any[]>
   adminCreateTruck?: (input: { rego: string; name: string; active?: boolean }) => Promise<any>
 }
+
+export type CheckoutOrderResult = Order &
+  CheckoutPaymentResponseLike & {
+    accessCode?: string
+    orders?: Order[]
+  }
 
 async function http<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const stage = useStageStore.getState().stage
@@ -420,8 +427,8 @@ const api: DataAPI = {
   async createOrder(
     input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] },
     _namespace?: string,
-  ): Promise<Order> {
-    const order = await http<Order & { accessCode?: string }>('/api/checkout', { method: 'POST', body: JSON.stringify(input) })
+  ): Promise<CheckoutOrderResult> {
+    const order = await http<CheckoutOrderResult>('/api/checkout', { method: 'POST', body: JSON.stringify(input) })
     // If guest checkout, persist tracking accessCode locally for convenience
     try {
       if (typeof window !== 'undefined' && (order as any)?.accessCode) {
@@ -434,7 +441,7 @@ const api: DataAPI = {
         localStorage.setItem(key, JSON.stringify(next))
       }
     } catch {}
-    return order as unknown as Order
+    return order
   },
 
   async listSellerOrders() {

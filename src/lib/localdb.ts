@@ -77,6 +77,7 @@ export type OrderItem = {
 }
 
 export type PaymentRoute = 'platform' | 'connected_account'
+export type PaymentCollectionMode = 'pay_at_checkout' | 'request_after_review'
 export type OrderPaymentStatus =
   | 'pending'
   | 'payment_requested'
@@ -89,6 +90,7 @@ export type OrderPaymentStatus =
 
 export type StorePaymentSettings = {
   defaultPaymentRoute: PaymentRoute
+  paymentCollectionMode?: PaymentCollectionMode
   stripeConnectedAccountId?: string | null
   stripeChargesEnabled: boolean
   stripePayoutsEnabled: boolean
@@ -103,6 +105,7 @@ export type Order = {
   status: 'pending' | 'scheduled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
   paymentStatus?: OrderPaymentStatus
   paymentRoute?: PaymentRoute | null
+  paymentCollectionMode?: PaymentCollectionMode
   paymentUrl?: string | null
   paymentRequestedAt?: string | null
   paidAt?: string | null
