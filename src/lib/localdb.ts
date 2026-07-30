@@ -78,6 +78,13 @@ export type OrderItem = {
 
 export type PaymentRoute = 'platform' | 'connected_account'
 export type PaymentCollectionMode = 'pay_at_checkout' | 'request_after_review'
+export type StorefrontPaymentMethod =
+  | 'STRIPE_CHECKOUT'
+  | 'STRIPE_TAP_TO_PAY'
+  | 'SQUARE_TERMINAL'
+  | 'SQUARE_TAP_TO_PAY'
+  | 'CASH'
+  | 'EXTERNAL_EFTPOS'
 export type OrderPaymentStatus =
   | 'pending'
   | 'payment_requested'
@@ -91,10 +98,16 @@ export type OrderPaymentStatus =
 export type StorePaymentSettings = {
   defaultPaymentRoute: PaymentRoute
   paymentCollectionMode?: PaymentCollectionMode
+  acceptedPaymentMethods: StorefrontPaymentMethod[]
+  defaultPosPaymentMethod: StorefrontPaymentMethod
   stripeConnectedAccountId?: string | null
   stripeChargesEnabled: boolean
   stripePayoutsEnabled: boolean
   stripeDetailsSubmitted: boolean
+  squareConnected: boolean
+  squareMerchantId?: string | null
+  squareLocationId?: string | null
+  squareDefaultDeviceId?: string | null
 }
 
 export type Order = {
@@ -102,12 +115,15 @@ export type Order = {
   items: OrderItem[]
   total: number
   createdAt: string
-  status: 'pending' | 'scheduled' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
+  status: 'pending' | 'confirmed' | 'scheduled' | 'processing' | 'paid' | 'shipped' | 'completed' | 'cancelled' | 'refunded'
   paymentStatus?: OrderPaymentStatus
   paymentRoute?: PaymentRoute | null
   paymentCollectionMode?: PaymentCollectionMode
   paymentUrl?: string | null
   paymentRequestedAt?: string | null
+  paymentMethod?: StorefrontPaymentMethod
+  terminalDeepLink?: string
+  squareCheckoutId?: string
   paidAt?: string | null
   refundedAt?: string | null
   currency?: string

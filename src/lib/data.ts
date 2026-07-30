@@ -10,6 +10,7 @@ import {
   type ShipmentItemInput,
   type StockIntakeInput,
   type StorePaymentSettings,
+  type StorefrontPaymentMethod,
 } from './localdb'
 import type { AssistantChatRequest, AssistantChatResponse } from '@/features/assistant/types'
 import type { CheckoutPaymentResponseLike } from './checkout-payment'
@@ -175,7 +176,7 @@ export type DataAPI = {
   getOrder?: (id: string, namespace?: string) => Promise<Order | undefined>
   createOrder: (input: Omit<Order, 'id' | 'createdAt' | 'status'> & { status?: Order['status'] }, namespace?: string) => Promise<CheckoutOrderResult>
   // POS (seller-created order)
-  createPosOrder?: (input: { items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
+  createPosOrder?: (input: { storeId?: string | number | null; paymentMethod: StorefrontPaymentMethod; items: { productId: string; title: string; price: number; quantity: number; meta?: string }[]; customerName?: string; customerEmail?: string; customerPhone?: string }) => Promise<Order>
   listSellerOrders?: () => Promise<(Order & { buyer?: { id: number; name?: string | null; email: string } })[]>
   shipOrder?: (id: string, shipment?: { ackPaid?: boolean; items?: ShipmentItemInput[] } | boolean) => Promise<Order>
   confirmReceived?: (id: string) => Promise<Order>
@@ -186,9 +187,9 @@ export type DataAPI = {
   getOrderReview?: (orderId: string) => Promise<{ rating: number; feedback: string } | null>
   requestOrderPayment?: (id: string, paymentRoute: PaymentRoute) => Promise<{ checkoutUrl: string; order: Order }>
   cancelOrderPaymentRequest?: (id: string) => Promise<Order>
-  getStorePaymentSettings?: () => Promise<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>
+  getStorePaymentSettings?: (storeId?: number | string | null) => Promise<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>
   connectStripeAccount?: () => Promise<{ url: string }>
-  updateStorePaymentSettings?: (input: { defaultPaymentRoute: PaymentRoute }) => Promise<{ paymentSettings: StorePaymentSettings }>
+  updateStorePaymentSettings?: (input: { storeId?: number | string | null; defaultPaymentRoute: PaymentRoute; acceptedPaymentMethods?: StorefrontPaymentMethod[]; defaultPosPaymentMethod?: StorefrontPaymentMethod }) => Promise<{ paymentSettings: StorePaymentSettings }>
   createStockIntake?: (input: StockIntakeInput) => Promise<any>
   listStockIntakes?: () => Promise<any[]>
   // Support
@@ -481,13 +482,19 @@ const api: DataAPI = {
   async cancelOrderPaymentRequest(id: string) {
     return http<Order>(`/api/orders/${encodeURIComponent(id)}/cancel-payment-request`, { method: 'POST' })
   },
-  async getStorePaymentSettings() {
-    return http<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>('/api/storefront/payment-settings')
+  async getStorePaymentSettings(storeId) {
+    const query = storeId != null ? `?storeId=${encodeURIComponent(String(storeId))}` : ''
+    return http<{ store: { id?: number | string | null; name?: string | null; slug?: string | null; currency?: string | null }; paymentSettings: StorePaymentSettings }>(`/api/storefront/payment-settings${query}`)
   },
-  async updateStorePaymentSettings(input: { defaultPaymentRoute: PaymentRoute }) {
+  async updateStorePaymentSettings(input) {
     return http<{ paymentSettings: StorePaymentSettings }>('/api/storefront/payment-settings', {
       method: 'PATCH',
-      body: JSON.stringify({ defaultPaymentRoute: input.defaultPaymentRoute.toUpperCase() }),
+      body: JSON.stringify({
+        storeId: input.storeId,
+        defaultPaymentRoute: input.defaultPaymentRoute.toUpperCase(),
+        acceptedPaymentMethods: input.acceptedPaymentMethods,
+        defaultPosPaymentMethod: input.defaultPosPaymentMethod,
+      }),
     })
   },
   async connectStripeAccount() {
@@ -783,6 +790,8 @@ const localWrapper: DataAPI = {
       customerEmail: input.customerEmail,
       customerPhone: input.customerPhone,
       status: 'paid',
+      paymentMethod: input.paymentMethod,
+      paymentStatus: 'paid',
     }, ns)
   },
   async listSellerOrders() { return [] },
@@ -840,26 +849,38 @@ const localWrapper: DataAPI = {
     } catch {}
     return updated
   },
-  async getStorePaymentSettings() {
+  async getStorePaymentSettings(_storeId) {
     return {
       store: { id: 'local-store', name: 'Demo store', slug: 'demo-store', currency: 'AUD' },
       paymentSettings: {
         defaultPaymentRoute: 'platform' as const,
+        acceptedPaymentMethods: ['CASH', 'EXTERNAL_EFTPOS'] as StorefrontPaymentMethod[],
+        defaultPosPaymentMethod: 'CASH' as const,
         stripeConnectedAccountId: null,
         stripeChargesEnabled: false,
         stripePayoutsEnabled: false,
         stripeDetailsSubmitted: false,
+        squareConnected: false,
+        squareMerchantId: null,
+        squareLocationId: null,
+        squareDefaultDeviceId: null,
       },
     }
   },
-  async updateStorePaymentSettings(input: { defaultPaymentRoute: PaymentRoute }) {
+  async updateStorePaymentSettings(input) {
     return {
       paymentSettings: {
         defaultPaymentRoute: input.defaultPaymentRoute,
+        acceptedPaymentMethods: input.acceptedPaymentMethods || ['CASH', 'EXTERNAL_EFTPOS'],
+        defaultPosPaymentMethod: input.defaultPosPaymentMethod || 'CASH',
         stripeConnectedAccountId: null,
         stripeChargesEnabled: false,
         stripePayoutsEnabled: false,
         stripeDetailsSubmitted: false,
+        squareConnected: false,
+        squareMerchantId: null,
+        squareLocationId: null,
+        squareDefaultDeviceId: null,
       },
     }
   },

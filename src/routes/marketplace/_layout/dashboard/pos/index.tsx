@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { db, type Product } from '@/lib/data'
+import type { StorePaymentSettings, StorefrontPaymentMethod } from '@/lib/localdb'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -11,7 +12,22 @@ import { useUiStore } from '@/stores/uiStore'
 import { MarketplacePageShell } from '@/features/marketplace/page-shell'
 import { ensureSellerPermission } from '@/features/sellers/access'
 
-type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; type?: Product['type'] }
+type CartLine = { id: string; title: string; price: number; quantity: number; productId: string; storeId?: string | number | null; type?: Product['type'] }
+
+const paymentMethodLabels: Partial<Record<StorefrontPaymentMethod, string>> = {
+  STRIPE_TAP_TO_PAY: 'Tap to Pay with Stripe',
+  SQUARE_TERMINAL: 'Square Terminal',
+  CASH: 'Cash',
+  EXTERNAL_EFTPOS: 'External EFTPOS',
+}
+
+function availableWebPosMethods(settings: StorePaymentSettings | null) {
+  if (!settings) return []
+  return settings.acceptedPaymentMethods.filter((method) => {
+    if (method === 'SQUARE_TERMINAL') return settings.squareConnected && Boolean(settings.squareDefaultDeviceId)
+    return method === 'STRIPE_TAP_TO_PAY' || method === 'CASH' || method === 'EXTERNAL_EFTPOS'
+  })
+}
 
 function PosPage() {
   const hideChrome = useUiStore((s) => s.hideMarketplaceChrome)
@@ -23,14 +39,46 @@ function PosPage() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerEmail, setCustomerEmail] = useState('')
-  const [payMethod, setPayMethod] = useState<'cash' | 'card'>('cash')
+  const [payMethod, setPayMethod] = useState<StorefrontPaymentMethod | null>(null)
+  const [paymentSettings, setPaymentSettings] = useState<StorePaymentSettings | null>(null)
+  const [paymentError, setPaymentError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [receiptId, setReceiptId] = useState<string | null>(null)
+  const [receiptPaymentStatus, setReceiptPaymentStatus] = useState<string | null>(null)
+  const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<StorefrontPaymentMethod | null>(null)
   const [editingLine, setEditingLine] = useState<CartLine | null>(null)
   const [lineQuantity, setLineQuantity] = useState('1')
   const [linePrice, setLinePrice] = useState('0')
 
   useEffect(() => { (async () => setProducts(await (db.listSellerProducts?.('pos') ?? db.listProducts())))() }, [])
+  const activeStoreId = cart[0]?.storeId ?? null
+  useEffect(() => {
+    let cancelled = false
+    if (activeStoreId == null || !db.getStorePaymentSettings) {
+      setPaymentSettings(null)
+      setPayMethod(null)
+      return () => { cancelled = true }
+    }
+    setPaymentError('')
+    void db.getStorePaymentSettings(activeStoreId)
+      .then(({ paymentSettings: nextSettings }) => {
+        if (cancelled) return
+        setPaymentSettings(nextSettings)
+        const available = availableWebPosMethods(nextSettings)
+        setPayMethod(
+          available.includes(nextSettings.defaultPosPaymentMethod)
+            ? nextSettings.defaultPosPaymentMethod
+            : available[0] || null,
+        )
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setPaymentSettings(null)
+        setPayMethod(null)
+        setPaymentError(error instanceof Error ? error.message : 'Could not load this storefront’s payment methods.')
+      })
+    return () => { cancelled = true }
+  }, [activeStoreId])
   // No-op: POS can request/exit fullscreen via buttons; we don't need to track state.
   useEffect(() => {
     return () => { setHideChrome(false); if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{}) }
@@ -57,9 +105,16 @@ function PosPage() {
   const total = subtotal + taxes
 
   function addToCart(p: Product) {
+    const currentStoreId = cart[0]?.storeId
+    const productStoreId = p.storeId ?? 'local-store'
+    if (currentStoreId != null && String(currentStoreId) !== String(productStoreId)) {
+      setPaymentError('Complete or clear the current sale before adding products from another storefront.')
+      return
+    }
+    setPaymentError('')
     setCart((cur) => {
       const idx = cur.findIndex((c) => c.productId === p.id)
-      if (idx === -1) return [{ id: `ci_${Date.now()}`, productId: p.id, title: p.title, price: p.price, quantity: 1, type: p.type }, ...cur]
+      if (idx === -1) return [{ id: `ci_${Date.now()}`, productId: p.id, storeId: productStoreId, title: p.title, price: p.price, quantity: 1, type: p.type }, ...cur]
       const next = [...cur]
       next[idx] = { ...next[idx], quantity: next[idx].quantity + 1 }
       return next
@@ -70,7 +125,7 @@ function PosPage() {
     setCart((cur) => cur.map((c) => (c.id === id ? { ...c, quantity: Math.max(1, c.quantity + delta) } : c)))
   }
   function removeLine(id: string) { setCart((cur) => cur.filter((c) => c.id !== id)) }
-  function clearCart() { setCart([]) }
+  function clearCart() { setCart([]); setPaymentError('') }
 
   function updateLineFromDialog() {
     if (!editingLine) return
@@ -96,11 +151,9 @@ function PosPage() {
   }
 
   async function cameraScan() {
-    // @ts-ignore
     const BD = (window as any).BarcodeDetector
     if (!BD) { alert('Camera barcode scanning not supported on this browser. Use a USB/BT scanner or type code.'); return }
     try {
-      // @ts-ignore
       const detector = new BD({ formats: ['ean_13','ean_8','code_128','code_39','upc_a','qr_code'] })
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       const video = document.createElement('video')
@@ -108,7 +161,6 @@ function PosPage() {
       await video.play()
       let found = ''
       for (let i=0;i<120 && !found;i++) {
-        // @ts-ignore
         const codes = await detector.detect(video)
         if (codes && codes.length) found = codes[0].rawValue
         await new Promise(r=>setTimeout(r, 100))
@@ -130,21 +182,31 @@ function PosPage() {
   }
 
   async function checkout() {
-    if (cart.length === 0) return
+    if (cart.length === 0 || !payMethod) return
     setSubmitting(true)
+    setPaymentError('')
     try {
       const payload = {
+        storeId: activeStoreId,
+        paymentMethod: payMethod,
         items: cart.map((c) => ({ productId: c.productId, title: c.title, price: c.price, quantity: c.quantity })),
         customerName: customerName || 'Walk-in',
         customerEmail: customerEmail || undefined,
         customerPhone: customerPhone || undefined,
       }
       const order = await db.createPosOrder?.(payload)
-      if (order?.id) setReceiptId(order.id)
+      if (order?.id) {
+        setReceiptId(order.id)
+        setReceiptPaymentStatus(order.paymentStatus || null)
+        setReceiptPaymentMethod(payMethod)
+      }
+      if (order?.terminalDeepLink) {
+        window.location.href = order.terminalDeepLink
+      }
       clearCart()
       setCustomerName(''); setCustomerEmail(''); setCustomerPhone('')
     } catch (e) {
-      // no-op
+      setPaymentError(e instanceof Error ? e.message : 'Could not complete this sale.')
     } finally {
       setSubmitting(false)
     }
@@ -271,20 +333,40 @@ function PosPage() {
               <Input type='email' placeholder='Customer email (optional)' value={customerEmail} onChange={(e)=>setCustomerEmail(e.target.value)} />
             </div>
             <div className='my-3 grid grid-cols-2 gap-2'>
-              <button onClick={()=>setPayMethod('cash')} className={`rounded-lg border px-3 py-2 text-sm ${payMethod==='cash'?'bg-black text-white':'bg-white'}`}>Cash</button>
-              <button onClick={()=>setPayMethod('card')} className={`rounded-lg border px-3 py-2 text-sm ${payMethod==='card'?'bg-black text-white':'bg-white'}`}>Card</button>
+              {availableWebPosMethods(paymentSettings).map((method) => (
+                <button
+                  key={method}
+                  type='button'
+                  onClick={() => setPayMethod(method)}
+                  className={`rounded-lg border px-3 py-2 text-sm ${payMethod === method ? 'bg-black text-white' : 'bg-white'}`}
+                >
+                  {paymentMethodLabels[method] || method}
+                </button>
+              ))}
             </div>
+            {cart.length > 0 && paymentSettings && availableWebPosMethods(paymentSettings).length === 0 ? (
+              <div className='my-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
+                This storefront has no payment method available in the web POS. An owner or manager can enable cash, external EFTPOS, Stripe Tap to Pay, or a paired Square Terminal.
+              </div>
+            ) : null}
+            {paymentError ? (
+              <div className='my-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800'>{paymentError}</div>
+            ) : null}
             <div className='space-y-1 text-sm'>
               <div className='flex justify-between'><span>Subtotal</span><span>A${subtotal}</span></div>
               <div className='flex justify-between text-gray-500'><span>Tax</span><span>A${taxes}</span></div>
               <div className='flex justify-between font-semibold'><span>Total</span><span>A${total}</span></div>
             </div>
-            <Button className='mt-3 w-full' disabled={cart.length===0 || submitting} onClick={checkout}>
-              {submitting ? 'Processing…' : payMethod==='cash' ? 'Complete Sale (Cash)' : 'Complete Sale (Card)'}
+            <Button className='mt-3 w-full' disabled={cart.length===0 || submitting || !payMethod} onClick={checkout}>
+              {submitting ? 'Processing…' : payMethod ? `Complete sale · ${paymentMethodLabels[payMethod] || payMethod}` : 'Choose a payment method'}
             </Button>
             {receiptId && (
               <div className='mt-3 rounded-md border bg-green-50 p-3 text-sm text-green-900'>
-                Sale recorded. Receipt #{receiptId.slice(0,6)} created.
+                {receiptPaymentStatus === 'processing'
+                  ? receiptPaymentMethod === 'SQUARE_TERMINAL'
+                    ? `Payment sent to the paired Square Terminal for order #${receiptId.slice(0, 10)}.`
+                    : `Order #${receiptId.slice(0, 10)} is ready in the Tap to Pay app.`
+                  : `Sale recorded. Receipt #${receiptId.slice(0, 10)} created.`}
               </div>
             )}
           </CardContent>
